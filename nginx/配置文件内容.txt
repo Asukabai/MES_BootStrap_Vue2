@@ -1,0 +1,166 @@
+#user  nobody;
+worker_processes  1;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+    sendfile        on;
+    keepalive_timeout  65;
+
+    # Vue 项目配置 - 端口8003
+    server {
+        listen       8003;
+        server_name  localhost;
+
+        root   html;
+        index  index.html index.htm;
+
+        location /sswebsite/ {
+            try_files $uri $uri/ /sswebsite/index.html;
+        }
+
+        # 静态资源缓存配置
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   html;
+        }
+    }
+
+    # 3D仿真静态项目配置 - 端口8005
+    server {
+        listen       8005;
+        server_name  localhost;
+
+        # 设置3D仿真项目的根目录
+        root   D:/software/nginx/static-projects/ss3dsimulation;
+        index  index.html index.htm;
+
+        location /home/ {
+            try_files $uri $uri/ /home/index.html;
+        }
+
+        # 静态资源缓存配置
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg|gltf|glb|bin)$ {
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root   D:/software/nginx/html;
+        }
+    }
+
+    # 统一代理服务器 - 监听22325端口
+    server {
+        listen       22325;
+        server_name  192.168.65.234 localhost;
+
+        # 处理不带斜杠的路径重定向
+        location = /sswebsite {
+            return 301 $scheme://$http_host/sswebsite/;
+        }
+
+        location = /ss3dsimulation/home {
+            return 301 $scheme://$http_host/ss3dsimulation/home/;
+        }
+
+        # 3D仿真项目静态资源优先处理 - 使用rewrite正确映射路径
+        location ~* ^/ss3dsimulation/home/.*\.(js|css|png|jpg|jpeg|gif|ico|svg|gltf|glb|bin)$ {
+            # 重写路径：将/ss3dsimulation/home/转换为/home/
+            rewrite ^/ss3dsimulation/home/(.*)$ /home/$1 break;
+            proxy_pass http://127.0.0.1:8005;
+            proxy_set_header Host $host:8005;  # 明确指定端口
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # 缓存设置
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # 3D仿真项目代理 - 使用rewrite正确映射路径
+        location /ss3dsimulation/home/ {
+            # 重写路径：将/ss3dsimulation/home/转换为/home/
+            rewrite ^/ss3dsimulation/home/(.*)$ /home/$1 break;
+            proxy_pass http://127.0.0.1:8005;
+            proxy_set_header Host $host:8005;  # 明确指定端口
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            # 处理前端路由
+            proxy_intercept_errors on;
+            error_page 404 =200 /ss3dsimulation/home/index.html;
+        }
+
+        # 现有监控项目静态资源
+        location ~* ^/ssmonitor/.*\.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            proxy_pass http://127.0.0.1:22324;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # 现有监控项目代理
+        location /ssmonitor/ {
+            proxy_pass http://127.0.0.1:22324/ssmonitor/;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            proxy_http_version 1.1;
+            proxy_set_header Connection '';
+            proxy_buffering off;
+            proxy_cache off;
+
+            proxy_connect_timeout 75s;
+            proxy_read_timeout 300s;
+        }
+
+        # Vue项目代理
+        location /sswebsite/ {
+            proxy_pass http://127.0.0.1:8003/sswebsite/;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            proxy_intercept_errors on;
+            error_page 404 = /sswebsite/index.html;
+        }
+
+        # 通用静态资源处理 (用于Vue项目)
+        location ~* \.(js|css|png|jpg|jpeg|gif|ico|svg)$ {
+            proxy_pass http://127.0.0.1:8003;
+            proxy_set_header Host $http_host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+
+            expires 1y;
+            add_header Cache-Control "public, immutable";
+        }
+
+        # 错误页面处理
+        error_page   500 502 503 504  /50x.html;
+        location = /50x.html {
+            root D:/software/nginx/html;
+        }
+    }
+}
