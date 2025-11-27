@@ -90,10 +90,102 @@ export default {
       this.isExpanded = !this.isExpanded;
     },
     goToProjectDetail(item) {
-      this.$router.push({
-        path: `/project-detail/${item.id}`,
-        query: { name: item.name }
+      // 调用 ProjectInfoGetFun 接口获取项目详细信息
+      const param = {
+        "Project_Name": item.name
+      };
+
+      SensorRequest.ProjectInfoGetFun(JSON.stringify(param), respData => {
+        // 解析返回的数据
+        let projectInfo = JSON.parse(respData);
+        console.log("项目信息:", projectInfo);
+
+        // 创建弹窗内容
+        let content = '';
+        if (Array.isArray(projectInfo) && projectInfo.length > 0) {
+          // 提取第一条记录显示
+          const info = projectInfo[0];
+
+          // 构建项目基本信息
+          content = `
+        <div style="text-align: left; padding: 10px;">
+          <p><strong>项目名称:</strong> ${info.Project_Name || ''}</p>
+          <p><strong>项目编号:</strong> ${info.Project_Code || ''}</p>
+          <p><strong>项目状态:</strong> ${info.Project_Status || ''}</p>
+          <p><strong>项目进度:</strong> ${info.Project_Progress || 0}%</p>
+          <p><strong>开始日期:</strong> ${this.formatDateTime(info.Project_StartTime)}</p>
+          <p><strong>结束日期:</strong> ${this.formatDateTime(info.Project_ExEndTime)}</p>
+          <p><strong>项目描述:</strong> ${info.Project_Description || ''}</p>
+          <p><strong>创建时间:</strong> ${this.formatDateTime(info.Ts_create)}</p>
+          <p><strong>更新时间:</strong> ${this.formatDateTime(info.Ts_edit)}</p>
+        </div>
+      `;
+
+          // 添加文件列表
+          if (info.Project_Files && info.Project_Files.length > 0) {
+            content += `
+          <div style="margin-top: 15px; padding: 10px; border-top: 1px solid #eee;">
+            <h4 style="margin: 0 0 10px 0;">关联文件 (${info.Project_Files.length})</h4>
+            <ul style="list-style: none; padding-left: 0;">
+        `;
+
+            info.Project_Files.forEach(file => {
+              content += `
+            <li style="padding: 5px 0; border-bottom: 1px dashed #eee;">
+              <span style="color: #333;">${file.File_Name}</span>
+              <span style="color: #996; font-size: 12px; margin-left: 10px;">上传时间: ${this.formatDateTime(file.Upload_Time)}</span>
+            </li>
+          `;
+            });
+
+            content += '</ul></div>';
+          }
+
+          // 添加负责人信息
+          if (info.Project_Leader && info.Project_Leader.length > 0) {
+            const leader = info.Project_Leader[0];
+            content += `
+          <div style="margin-top: 15px; padding: 10px; border-top: 1px solid #eee;">
+            <h4 style="margin: 0 0 10px 0;">项目负责人</h4>
+            <p><strong>姓名:</strong> ${leader.Person_Name || ''}</p>
+            <p><strong>部门:</strong> ${leader.Person_Department || ''}</p>
+            <p><strong>电话:</strong> ${leader.Person_Phone || ''}</p>
+            <p><strong>DingID:</strong> ${leader.Person_DingID || ''}</p>
+          </div>
+        `;
+          }
+        } else {
+          content = '<div style="padding: 20px; text-align: center;">暂无项目详情信息</div>';
+        }
+
+        // 显示弹窗
+        this.$dialog.alert({
+          title: '项目详情',
+          message: content,
+          confirmButtonText: '关闭',
+          messageAlign: 'left'
+        });
+      }, error => {
+        console.error('获取项目详情失败:', error);
+        this.$toast.fail('获取项目详情失败');
       });
+    },
+// 添加一个方法来格式化时间
+    formatDateTime(dateTime) {
+      if (!dateTime) return '';
+
+      // 将字符串转换为日期对象
+      const date = new Date(dateTime);
+
+      // 格式化为 YYYY-MM-DD HH:mm:ss
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      const seconds = String(date.getSeconds()).padStart(2, '0');
+
+      return `${year}-${month}-${day} ${hours}:${minutes}:${seconds}`;
     },
     // 获取项目数据
     fetchProjectData() {
@@ -322,7 +414,6 @@ export default {
           }
         ]
       };
-
       myChart.setOption(option);
     },
     resizeCharts() {

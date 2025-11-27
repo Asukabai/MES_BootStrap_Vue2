@@ -74,7 +74,7 @@ module.exports = {
     assetsRoot: path.resolve(__dirname, '../dist'),
     // assetsSubDirectory: 'static',
     assetsSubDirectory: 'sswebsite',
-    assetsPublicPath: '/',
+    assetsPublicPath: './',
 
     /**
      * Source Maps

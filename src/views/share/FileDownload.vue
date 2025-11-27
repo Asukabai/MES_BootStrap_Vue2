@@ -75,28 +75,28 @@ export default {
       this.fileUrl = decodeURIComponent(encodedUrl)
       // alert("URL :"+this.fileUrl)
       this.fileName = fileNameFromQuery
-          ? decodeURIComponent(fileNameFromQuery)
-          : this.getFileNameFromURL(this.fileUrl)
+        ? decodeURIComponent(fileNameFromQuery)
+        : this.getFileNameFromURL(this.fileUrl)
 
       // 移动端直接使用 <a> 标签下载
       if (this.isMobile()) {
         this.showGlobalLoading = true
         this.downloadStatus = '准备下载...'
         try {
-            const downloadLink = document.createElement('a')
-            downloadLink.href = this.fileUrl
-            downloadLink.textContent = `点击下载 ${this.fileName}`
-            downloadLink.setAttribute('download', this.fileName)
-            downloadLink.style.display = 'none'
-            document.body.appendChild(downloadLink)
-            downloadLink.click()
-            document.body.removeChild(downloadLink)
+          const downloadLink = document.createElement('a')
+          downloadLink.href = this.fileUrl
+          downloadLink.textContent = `点击下载 ${this.fileName}`
+          downloadLink.setAttribute('download', this.fileName)
+          downloadLink.style.display = 'none'
+          document.body.appendChild(downloadLink)
+          downloadLink.click()
+          document.body.removeChild(downloadLink)
 
           //downloadLink.href = this.fileUrl + (this.fileUrl.includes('?') ? '&' : '?') + 'filename=' + encodeURIComponent(this.fileName)
           // 这个逻辑是将文件名作为URL参数附加到原始URL上，而不是直接拼接文件名到URL末尾。原因如下：
           //URL格式要求：URL有特定的结构（协议://域名:端口/路径?查询参数#锚点），不能随意在末尾添加文件名
-              // 查询参数格式：通过?和&来分隔查询参数是标准做法
-              // 如果你想要直接在URL路径末尾拼接文件名，可以使用以下方式：
+          // 查询参数格式：通过?和&来分隔查询参数是标准做法
+          // 如果你想要直接在URL路径末尾拼接文件名，可以使用以下方式：
 
           // 更好的做法是让后端在HTTP响应头中设置Content-Disposition来指定文件名
 
@@ -125,16 +125,27 @@ export default {
       const taskId = 'file-download-' + Date.now()
 
       try {
-        this.$downloadManager.addDownloadTask(taskId, this.fileName)
+        // 安全检查：确保 $downloadManager 存在
+        if (this.$downloadManager) {
+          this.$downloadManager.addDownloadTask(taskId, this.fileName)
+        } else {
+          console.warn('Download manager not available')
+        }
+
         const response = await axios.get(this.fileUrl, {
           responseType: 'blob',
           onDownloadProgress: (progressEvent) => {
             const percent = Math.floor((progressEvent.loaded / progressEvent.total) * 100)
             this.downloadProgress = percent
             this.downloadStatus = `下载中 ${percent}%`
-            this.$downloadManager.updateDownloadTask(taskId, `下载中 ${percent}%`, percent)
+
+            // 安全检查
+            if (this.$downloadManager) {
+              this.$downloadManager.updateDownloadTask(taskId, `下载中 ${percent}%`, percent)
+            }
           }
         })
+
         const blob = new Blob([response.data])
         const downloadUrl = window.URL.createObjectURL(blob)
         this.downloadLink = downloadUrl
@@ -145,10 +156,21 @@ export default {
         link.click()
         document.body.removeChild(link)
         this.downloadComplete = true
-        this.$downloadManager.finishDownloadTask(taskId)
+        this.downloadProgress = 100
+        this.downloadStatus = '下载完成'
+
+        // 安全检查
+        if (this.$downloadManager) {
+          this.$downloadManager.finishDownloadTask(taskId)
+        }
       } catch (error) {
         console.error('文件下载失败:', error)
-        this.$downloadManager.finishDownloadTask(taskId, '下载失败，请重试')
+
+        // 安全检查
+        if (this.$downloadManager) {
+          this.$downloadManager.finishDownloadTask(taskId, '下载失败，请重试')
+        }
+
         alert('文件下载失败，请检查网络或稍后再试')
       } finally {
         this.showGlobalLoading = false
@@ -167,7 +189,13 @@ export default {
     },
     async downloadFile() {
       const taskId = 'file-download-' + Date.now()
-      this.$downloadManager.addDownloadTask(taskId, this.fileName)
+
+      // 安全检查：确保 $downloadManager 存在
+      if (this.$downloadManager) {
+        this.$downloadManager.addDownloadTask(taskId, this.fileName)
+      } else {
+        console.warn('Download manager not available')
+      }
 
       try {
         const response = await axios.get(this.fileUrl, {
@@ -176,7 +204,11 @@ export default {
             const percent = Math.floor((progressEvent.loaded / progressEvent.total) * 100)
             this.downloadProgress = percent
             this.downloadStatus = `下载中 ${percent}%`
-            this.$downloadManager.updateDownloadTask(taskId, `下载中 ${percent}%`, percent)
+
+            // 安全检查
+            if (this.$downloadManager) {
+              this.$downloadManager.updateDownloadTask(taskId, `下载中 ${percent}%`, percent)
+            }
           }
         })
 
@@ -193,10 +225,19 @@ export default {
         this.downloadComplete = true
         this.downloadProgress = 100
         this.downloadStatus = '下载完成'
-        this.$downloadManager.finishDownloadTask(taskId)
+
+        // 安全检查
+        if (this.$downloadManager) {
+          this.$downloadManager.finishDownloadTask(taskId)
+        }
       } catch (error) {
         console.error('文件下载失败:', error)
-        this.$downloadManager.finishDownloadTask(taskId, '下载失败，请重试')
+
+        // 安全检查
+        if (this.$downloadManager) {
+          this.$downloadManager.finishDownloadTask(taskId, '下载失败，请重试')
+        }
+
         alert('文件下载失败，请检查网络或稍后再试')
       } finally {
         this.showGlobalLoading = false
