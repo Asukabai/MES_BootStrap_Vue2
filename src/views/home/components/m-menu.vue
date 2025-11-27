@@ -105,7 +105,8 @@ export default {
         this.$router.push(`/${departmentPrefix}/task-manage`)
       }
       if (item.title === '单板扫码') {
-        this.scanQRCode();
+        // this.scanQRCode();
+        this.$toast.success('正在开发中 ！')
       }
       if (item.title === '批量扫码') {
         // this.scanQRCodeList();
@@ -120,6 +121,10 @@ export default {
       if (item.title === '扫码看板') {
         this.$toast.success('正在开发中 ！')
       }
+      if (item.title === '查看全部') {
+        this.$toast.success('已展示全部 ！')
+      }
+
     },
   }
 };

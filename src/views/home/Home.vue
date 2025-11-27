@@ -1,11 +1,20 @@
 <template>
   <div class="container-fluid home-container">
-    <div class="mobile-content">
+    <div
+      class="mobile-content"
+      @touchstart="handleTouchStart"
+      @touchmove="handleTouchMove"
+      @touchend="handleTouchEnd"
+    >
+      <!-- 刷新提示 -->
+      <div v-if="isRefreshing" class="refresh-indicator">
+        刷新中...
+      </div>
+
       <m-banner />
       <div class="wrapper">
         <m-menu />
-<!--        <m-recommend />-->
-        <TaskProgressBoard />
+        <TaskProgressBoard :key="taskBoardKey" />
       </div>
     </div>
   </div>
@@ -25,7 +34,10 @@ export default {
   },
   data() {
     return {
-      isPC: false
+      isPC: false,
+      isRefreshing: false,
+      startY: 0,
+      taskBoardKey: 0
     };
   },
   mounted() {
@@ -35,6 +47,28 @@ export default {
     checkDeviceType() {
       const userAgent = navigator.userAgent;
       this.isPC = !(/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent));
+    },
+
+    handleTouchStart(e) {
+      this.startY = e.touches[0].pageY;
+    },
+
+    handleTouchMove(e) {
+      const currentY = e.touches[0].pageY;
+      const diff = currentY - this.startY;
+
+      // 简单的下拉检测
+      if (window.scrollY === 0 && diff > 50) {
+        this.isRefreshing = true;
+      }
+    },
+
+    handleTouchEnd() {
+      if (this.isRefreshing) {
+        // 刷新组件
+        this.taskBoardKey += 1;
+        this.isRefreshing = false;
+      }
     }
   }
 };
@@ -47,7 +81,7 @@ export default {
   padding: 0;
   margin: 0;
   width: 100%;
-  overflow-x: hidden; /* 防止横向滚动 */
+  overflow-x: hidden;
 }
 
 .pc-placeholder {
@@ -58,6 +92,13 @@ export default {
 .mobile-content {
   width: 100%;
   overflow-x: hidden;
+  position: relative;
+}
+
+.refresh-indicator {
+  text-align: center;
+  padding: 10px;
+  background: #f5f5f5;
 }
 
 .mobile-content .wrapper {
