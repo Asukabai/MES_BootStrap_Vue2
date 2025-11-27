@@ -7,7 +7,7 @@
           v-for="(item, index) in menuList"
           :key="item.title"
           class="col-xs-3 col-sm-3 col-md-2 menu-item"
-          @click="onClick(item)"
+          @click="handleGridClick(item)"
         >
           <div class="menu-item-content">
             <div class="icon-wrapper">
@@ -31,6 +31,7 @@ import progressTrackIcon from '@/assets/进度跟踪.png'
 import contactIcon from '@/assets/联系人123.png'
 import allIcon from '@/assets/省略号.png'
 import scanConfigIcon from '@/assets/流程汇总日志.png'
+import {departmentPrefix} from "../../../utils/Dingding";
 
 export default {
   name: 'MMenu',
@@ -81,10 +82,45 @@ export default {
     };
   },
   methods: {
-    onClick(item) {
-      // 处理菜单项点击事件
-      console.log('点击了:', item.title);
-    }
+    handleGridClick(item) {
+      if (item.title === '项目编码') {
+        this.$router.push(`/${departmentPrefix}/project-code`)
+      }
+      if (item.title === '扫码记录') {
+        this.$router.push(`/${departmentPrefix}/code/codeList`)
+      }
+      if (item.title === '问题反馈') {
+        this.$toast.success('感谢您的反馈')
+      }
+      if (item.title === '文件统计') {
+        this.$router.push(`/${departmentPrefix}/statistical-report`)
+      }
+      if (item.title === '进度跟踪') {
+        this.$router.push(`/${departmentPrefix}/progress-tracking`)
+      }
+      if (item.title === '项目列表') {
+        this.$router.push(`/${departmentPrefix}/project-manage`)
+      }
+      if (item.title === '任务日历') {
+        this.$router.push(`/${departmentPrefix}/task-manage`)
+      }
+      if (item.title === '单板扫码') {
+        this.scanQRCode();
+      }
+      if (item.title === '批量扫码') {
+        // this.scanQRCodeList();
+        this.$toast.success('正在开发中 ！')
+      }
+      if (item.title === '联系人') {
+        this.$toast.success('正在开发中 ！')
+      }
+      if (item.title === '扫码配置') {
+        this.$router.push(`/${departmentPrefix}/code/config`)
+      }
+      if (item.title === '扫码看板') {
+        this.$toast.success('正在开发中 ！')
+      }
+    },
   }
 };
 </script>

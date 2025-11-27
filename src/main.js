@@ -37,6 +37,12 @@ Vue.use(VueMeta, {
   refreshOnceOnNavigation: true
 })
 
+
+// 引入 Vant 及其样式
+import Vant from 'vant'
+import 'vant/lib/index.css'
+Vue.use(Vant)
+
 new Vue({
   el: '#app',
   router,

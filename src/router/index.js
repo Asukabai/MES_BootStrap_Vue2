@@ -1,30 +1,300 @@
 import Vue from 'vue'
 import Router from 'vue-router'
+import * as dd from 'dingtalk-jsapi'
+
+// 导入视图组件...
+import Home from '../views/home/Home.vue'
+import CartFile from '../views/share/CartFile.vue'
+import User from '../views/user/User.vue'
+import Task from "@/views/task/Task.vue";
+import Login from "@/views/login/Login.vue"
+import StatisticalReport from "@/views/summary/StatisticalReport.vue"
+import UploadSummary from "@/views/summary/UploadSummary.vue"
+import ChatCategory from "@/views/knowledge/ChatCategory.vue"
+import CreatePost from "@/views/knowledge/CreatePost.vue"
+import PostDetail from "@/views/knowledge/PostDetail.vue"
+// 导入 getCurrentDepartment 方法
+import { departmentPrefix } from '../api/Dingding.js'
 Vue.use(Router)
 
-export default new Router({
+const basePath = `/sensor/ddingWork/`
+// 获取当前部门前缀
+const router = new Router({
   mode: 'history',
-  base: '/sswebsite/',
+  base: basePath,
   routes: [
- {
-          path: '/',
-          redirect: '/test_home'
-        }, {
-          path: '/test_home',
-          name: 'test_home',
-          component: resolve => require(['@/view/test_home/Home'], resolve),
-          meta: {
-            title: 'test-首页'
-          }
+    // {
+    //   path: '/',
+    //   redirect: '/login'
+    // },
+    {
+      path: `/${departmentPrefix}/index`,
+      name: 'Home',
+      component: Home,
+      meta: { title: '首页' }
     },
-  ],
-  scrollBehavior (to, from, savedPosition) {
-    if (savedPosition) {
-      return savedPosition
-    } else if (to.hash) {
-      return { selector: to.hash }
-    } else {
-      return { x: 0, y: 0 }
+    {
+      path: `/${departmentPrefix}/chat_category`,
+      name: 'ChatCategory',
+      component: ChatCategory,
+      meta: { title: '知识库' }
+    },
+    {
+      path: `/${departmentPrefix}/create_post`,
+      name: 'CreatePost',
+      component: CreatePost,
+      meta: { title: '创建帖子' }
+    },
+    {
+      path: `/${departmentPrefix}/post-detail`,
+      name: 'PostDetail',
+      component: PostDetail,
+      meta: { title: '详情信息' }
+    },
+    {
+      path: `/${departmentPrefix}/cart`,
+      name: 'CartFile',
+      component: CartFile,
+      meta: { title: '文件分享' }
+    },
+    {
+      path: `/${departmentPrefix}/user`,
+      name: 'User',
+      component: User,
+      meta: { title: '用户中心' }
+    },
+    {
+      path: `/${departmentPrefix}/task`,
+      name: 'Task',
+      component: Task,
+      meta: { title: '任务管理' }
+    },
+    {
+      path: `/${departmentPrefix}/download`,
+      name: 'FileDownload',
+      component: () => import('@/views/share/FileDownload.vue'),
+      meta: { title: '文件下载' }
+    },
+    {
+      path: `/${departmentPrefix}/profile`,
+      name: 'Profile',
+      component: () => import('@/views/user/Profile.vue'),
+      meta: { title: '个人资料' }
+    },
+    {
+      path: `/${departmentPrefix}/project-code`,
+      name: 'ProjectCode',
+      component: () => import('@/views/project/ProjectCode.vue'),
+      meta: { title: '项目编码' }
+    },
+    {
+      path: `/${departmentPrefix}/code-recode`,
+      name: 'CodeRecode',
+      component: () => import('@/views/share/CodeRecode.vue'),
+      meta: { title: '编码记录' }
+    },
+    {
+      path: `/${departmentPrefix}/notice-detail`,
+      name: 'NoticeDetail',
+      component: () => import('../components/NoticeDetail.vue'),
+      meta: { title: '公告详情', showTabBar: false }
+    },
+    {
+      path: `/${departmentPrefix}/task-record`,
+      name: 'taskRecord',
+      component: () => import('../views/task/taskRecord.vue'),
+      meta: { title: '任务记录' }
+    },
+    {
+      path: `/${departmentPrefix}/statistical-report`,
+      name: 'StatisticalReport',
+      component: StatisticalReport,
+      meta: { title: '统计报表' }
+    },
+    {
+      path: `/${departmentPrefix}/upload-summary`,
+      name: 'UploadSummary',
+      component: UploadSummary,
+      meta: { title: '上传文件信息汇总' }
+    },
+    {
+      path: `/${departmentPrefix}/file-type-stats`,
+      name: 'FileTypeStats',
+      component: () => import('@/views/summary/FileTypeStats.vue'),
+      meta: { title: '文件类型统计' }
+    },
+    {
+      path: `/${departmentPrefix}/recent-logs`,
+      name: 'RecentLogs',
+      component: () => import('@/views/summary/RecentLogs.vue'),
+      meta: { title: '系统日志' }
+    },
+    {
+      path: `/${departmentPrefix}/project-manage`,
+      name: 'projectManage',
+      component: () => import('@/views/project/projectManage.vue'),
+      meta: { title: '项目列表' }
+    },
+    {
+      path: `/${departmentPrefix}/task-manage`,
+      name: 'taskManage',
+      component: () => import('@/views/task/taskManage.vue'),
+      meta: { title: '任务日历' }
+    },
+    {
+      path: `/${departmentPrefix}/task-detail`,
+      name: 'TaskDetail',
+      component: () => import('@/views/task/taskDetail.vue'),
+      meta: { title: '任务详情' }
+    },
+    {
+      path: `/${departmentPrefix}/task-detail-last`,
+      name: 'TaskDetailLast',
+      component: () => import('@/views/task/taskDetailLast.vue'),
+      meta: { title: '任务完成提交表单' }
+    },
+    {
+      path: `/${departmentPrefix}/task-detail-progress`,
+      name: 'TaskDetailProgress',
+      component: () => import('@/views/task/taskDetailProgress.vue'),
+      meta: { title: '任务进度提交表单' }
+    },
+    {
+      path: `/${departmentPrefix}/task-detail-look`,
+      name: 'TaskDetailLook',
+      component: () => import('@/views/task/taskDetailLook.vue'),
+      meta: { title: '查看任务详情' }
+    },
+    {
+      path: `/${departmentPrefix}/task/evidence-detail`,
+      name: 'EvidenceDetail',
+      component: () => import('@/views/task/EvidenceDetail.vue'),
+      meta: { title: '证据详情' },
+    },
+    {
+      path: `/${departmentPrefix}/code/codeList`,
+      name: 'CodeList',
+      component: () => import('@/views/code/CodeList.vue'),
+      meta: { title: '扫码记录日志时间列表' }
+    },
+    {
+      path: `/${departmentPrefix}/code/config`,
+      name: 'ScanConfigPage',
+      component: () => import('@/views/code/ScanConfigPage.vue'),
+      meta: { title: '扫码配置' }
+    },
+    {
+      path: `/${departmentPrefix}/code/configList`,
+      name: 'ScanConfigList',
+      component: () => import('@/views/code/ScanConfigList.vue'),
+      meta: { title: '配置列表' }
+    },
+    {
+      path: `/${departmentPrefix}/code/batch_scan_results`,
+      name: 'ScanConfigList',
+      component: () => import('@/views/code/BatchScanResults.vue'),
+      meta: { title: '批量扫码结果' }
+    },
+    {
+      path: `/${departmentPrefix}/code/AddStored`,
+      name: 'AddStored',
+      component: () => import('@/views/code/AddStored.vue'),
+      meta: { title: '晟思资产出入库表单' }
+    },
+    {
+      path: `/${departmentPrefix}/code/AddHistory`,
+      name: 'AddHistory',
+      component: () => import('@/views/code/AddHistory.vue'),
+      meta: { title: '资产记录表单' }
+    },
+    {
+      path: `/${departmentPrefix}/code/HistoryView`,
+      name: 'HistoryView',
+      component: () => import('@/views/code/HistoryView.vue'),
+      meta: { title: '资产记录详情' }
+    },
+    {
+      path: `/${departmentPrefix}/progress-tracking`,
+      name: 'ProgressTracking',
+      component: () => import('@/views/project/ProgressTracking.vue'),
+      meta: { title: '进度跟踪' }
+    },
+    {
+      path: `/${departmentPrefix}/project-detail/:id`,
+      name: 'ProjectDetail',
+      component: () => import('@/views/project/ProjectDetail.vue'),
+      meta: { title: '项目详情' }
+    },
+    {
+      path: '/:department/:type',
+      name: 'Login',
+      component: Login,
+      meta: { title: '登录' }
+    },
+    {
+      path: '*',
+      redirect: `/${departmentPrefix}/login`
     }
-  }
+  ]
 })
+
+// 动态设置标题 - 适配钉钉环境
+router.beforeEach((to, from, next) => {
+  console.log('=== 路由守卫 beforeEach ===');
+  console.log('从路由:', from.path);
+  console.log('到路由:', to.path);
+  console.log('路由元信息:', to.meta);
+
+  const title = to.meta.title || '工作助手';
+  console.log('应设置的标题:', title);
+
+  // 设置页面标题（普通浏览器）
+  document.title = title;
+  console.log('document.title 已设置为:', document.title);
+
+  // 适配钉钉环境
+  updatePageTitle(title);
+
+  next();
+});
+
+// 路由切换完成后再次设置（确保生效）
+router.afterEach((to) => {
+  console.log('=== 路由守卫 afterEach ===');
+  console.log('当前路由:', to.path);
+
+  Vue.nextTick(() => {
+    const title = to.meta.title || '工作助手';
+    document.title = title;
+    console.log('afterEach 中 document.title 设置为:', document.title);
+    updatePageTitle(title);
+  });
+});
+
+// 统一的页面标题更新函数
+function updatePageTitle(title) {
+  console.log('=== updatePageTitle 函数 ===');
+  console.log('尝试设置标题:', title);
+
+  // 首先设置文档标题
+  document.title = title;
+  console.log('document.title =', document.title);
+
+  // 检查是否在钉钉环境中
+  console.log('dd 对象是否存在:', typeof dd !== 'undefined');
+
+  if (typeof dd !== 'undefined') {
+    console.log('调用钉钉 API 设置标题');
+    dd.biz.navigation.setTitle({
+      title: title
+    }).then(() => {
+      console.log('钉钉标题设置成功:', title);
+    }).catch((error) => {
+      console.warn('钉钉标题设置失败:', error);
+    });
+  } else {
+    console.log('不在钉钉环境中，跳过钉钉 API 调用');
+  }
+}
+
+export default router;

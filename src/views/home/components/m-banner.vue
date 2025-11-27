@@ -16,7 +16,10 @@
 </template>
 
 <script>
-import Banner from '@/assets/backgroundL.png';
+// import Banner from '@/assets/backgroundL.png';
+//import Banner from '@/assets/backgroundPC.png';
+import Banner from '@/assets/background9261.png';
+
 export default {
   name: 'MBanner',
   data() {
@@ -28,40 +31,34 @@ export default {
 </script>
 
 <style scoped>
-.carousel {
-  margin-bottom: 0;
+/* 默认隐藏轮播图 */
+.swiper-container {
+  display: none;
 }
 
-.carousel-inner > .item > img {
-  width: 100%;
-  object-fit: cover;
-}
+/* 在移动端（≤ 991px）显示轮播图 */
+@media (max-width: 991px) {
+  .swiper-container {
+    display: block;
+  }
 
-/* 添加响应式轮播图样式 */
-.carousel-image {
-  width: 100%;
-  height: auto;
-  max-height: 300px; /* 设置最大高度限制 */
-  object-fit: cover;
-}
-
-/* 针对不同屏幕尺寸的响应式处理 */
-@media (max-width: 767px) {
+  /* 移动端图片高度限制 */
   .carousel-image {
-    max-height: 200px; /* 移动端较小高度 */
+    max-height: 200px;
   }
 }
 
+/* 平板设备（768px - 991px） */
 @media (min-width: 768px) and (max-width: 991px) {
   .carousel-image {
-    max-height: 250px; /* 平板设备适中高度 */
+    max-height: 250px;
   }
 }
 
+/* 桌面端（≥ 992px）隐藏轮播图 */
 @media (min-width: 992px) {
   .carousel-image {
-    max-height: 300px; /* 桌面端较大高度 */
+    max-height: 180px;
   }
 }
 </style>
-

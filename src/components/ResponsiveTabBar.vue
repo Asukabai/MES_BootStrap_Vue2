@@ -62,7 +62,7 @@ export default {
           name: 'profile',
           title: '我的',
           icon: 'glyphicon-user',
-          path: '/profile'
+          path: '/user'
         }
       ]
     };
@@ -141,9 +141,11 @@ export default {
   left: 0;
   right: 0;
   bottom: 0;
-  /* 添加安全区域支持 */
+  /* 固定高度，避免计算差异 */
+  height: 50px;
   padding-bottom: env(safe-area-inset-bottom);
-  height: calc(50px + env(safe-area-inset-bottom));
+  /* 使用 min-height 确保安全区域 */
+  min-height: calc(50px + env(safe-area-inset-bottom));
   background: #ffffff;
   box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.1);
   z-index: 1000;

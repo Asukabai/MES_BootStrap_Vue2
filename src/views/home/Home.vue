@@ -1,17 +1,11 @@
 <template>
   <div class="container-fluid home-container">
-    <!-- PC端显示空白内容 -->
-    <div v-if="isPC" class="pc-placeholder">
-      <!-- 空白内容 -->
-    </div>
-
-    <!-- 移动端显示原有内容 -->
-    <div v-else class="mobile-content">
+    <div class="mobile-content">
       <m-banner />
       <div class="wrapper">
         <m-menu />
-        <m-recommend />
-        <m-ad />
+<!--        <m-recommend />-->
+        <TaskProgressBoard />
       </div>
     </div>
   </div>
@@ -20,16 +14,14 @@
 <script>
 import MBanner from './components/m-banner.vue';
 import MMenu from './components/m-menu.vue';
-import MRecommend from './components/m-recommend.vue';
-import MAd from './components/m-ad.vue';
+import TaskProgressBoard from '@/components/TaskProgressBoard.vue';
 
 export default {
   name: 'HomePage',
   components: {
     MBanner,
     MMenu,
-    MRecommend,
-    MAd
+    TaskProgressBoard
   },
   data() {
     return {
