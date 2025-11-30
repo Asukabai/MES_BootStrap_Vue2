@@ -4,14 +4,14 @@ import * as jwt from 'jsonwebtoken';
 
 
 
-// 定义了一个常量 postUrlV1，用于存储后端服务器的请求路径    https://api-v2.sensor-smart.cn:29028/ddinguic/index.html
+// 定义了一个常量 postUrlV1，用于存储后端服务器的请求路径    https://api-v2.sensor-smart.cn:29028/ddinguic/index.html  https://api-v2.sensor-smart.cn:22027/ss-proxy/p35001
 const systemConfigure = {
   // isDebugMode: true,
   isDebugMode: false,
   // serverrUrl: "https://api-v1.sensor-smart.cn:28023",
   serverr802: "https://api-v2.sensor-smart.cn:22027/ding/pack",
   // serverrUrl: "https://api-v2.sensor-smart.cn:29028/ss-proxy/p29001"
-  serverrUrl: "https://api-v2.sensor-smart.cn:22027/ss-proxy/p35001"
+  serverrUrl: "./ss-proxy/p35001"
 }
 
 
@@ -127,7 +127,7 @@ export function PostData(method, data, callSuccess, callFail) {
   // let urlSend = "/pack" //systemConfigure.serverrUrl + postURL    systemConfigure.serverr802
   // let urlSend = systemConfigure.serverrUrl
 
-  axios.post(baseURL, JSON.stringify(postPack), {
+  axios.post(systemConfigure.serverrUrl, JSON.stringify(postPack), {
     headers: {
       "content-type": "application/json"
     }
@@ -186,7 +186,7 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
   // }
 
   //    axios.post(urlSend, postJson, {
-  axios.post(baseURL, postJson, {
+  axios.post(systemConfigure.serverrUrl, postJson, {
     headers: {
       "content-type": dataType
     }

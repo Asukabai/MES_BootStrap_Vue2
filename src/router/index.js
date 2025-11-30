@@ -14,7 +14,7 @@ import ChatCategory from "@/views/knowledge/ChatCategory.vue"
 import CreatePost from "@/views/knowledge/CreatePost.vue"
 import PostDetail from "@/views/knowledge/PostDetail.vue"
 // 导入 getCurrentDepartment 方法
-import { departmentPrefix } from '../api/Dingding.js'
+import { departmentPrefix } from '../utils/Dingding.js'
 Vue.use(Router)
 
 const basePath = `/sensor/ddingWork/`

@@ -27,7 +27,7 @@
 </template>
 
 <script>
-import { departmentPrefix } from '../api/Dingding.js'
+import { departmentPrefix } from '../utils/Dingding.js'
 export default {
   props: {
     showRouterView: {

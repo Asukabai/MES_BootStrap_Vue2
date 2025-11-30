@@ -49,7 +49,7 @@
 import * as dd from 'dingtalk-jsapi'
 import { Cell, CellGroup, Toast } from 'vant'
 import VerificationCode from "@/components/VerificationCode.vue";
-import {getCurrentDepartment,departmentPrefix} from "@/utils/Dingding";
+import {getCurrentDepartment,departmentPrefix} from '@/utils/Dingding.js';
 export default {
   // eslint-disable-next-line vue/multi-word-component-names
   name: "MyUser",

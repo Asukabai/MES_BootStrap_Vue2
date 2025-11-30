@@ -26,8 +26,8 @@ import {
   getCurrentDepartment,
   getLoginCodeByDepartment,
   key_DingTokenJWT
-} from '../api/Dingding.js'
-import SensorRequest from '../api/SensorRequest.js'
+} from '../utils/Dingding.js'
+import SensorRequest from '../utils/SensorRequest.js'
 import { Toast } from 'vant'
 
 export default {

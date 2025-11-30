@@ -4,9 +4,6 @@ import App from './App'
 /* 路由 */
 import router from './router'
 
-/* axios */
-import SensorRequest from './api/SensorRequest.js' // 引入SensorRequest
-
 /* swiper */
 import 'swiper/dist/css/swiper.min.css';
 
