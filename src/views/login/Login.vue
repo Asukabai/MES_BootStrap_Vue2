@@ -75,14 +75,16 @@ export default {
         GetDingUserToken(
             (token) => {
               localStorage.setItem('sensor_DingTokenJWT', token)
-
-              // 根据路由参数确定目标路径
-              let targetPath = `/${departmentPrefix}/index`
-              if (type === 'task') {
-                targetPath = `/${departmentPrefix}/task`
-              }
-              if (type === 'share' ) {
-                targetPath = `/${departmentPrefix}/cart`
+                // 验证token是否设置成功后再跳转
+                if (localStorage.getItem('sensor_DingTokenJWT')) {
+                // 根据路由参数确定目标路径
+                let targetPath = `/${departmentPrefix}/index`
+                if (type === 'task') {
+                  targetPath = `/${departmentPrefix}/task`
+                }
+                if (type === 'share' ) {
+                  targetPath = `/${departmentPrefix}/cart`
+                }
               }
 
               // 避免重复导航
