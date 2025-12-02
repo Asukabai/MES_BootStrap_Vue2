@@ -2,18 +2,18 @@
   <div class="verification-code">
     <!-- 刷新按钮 -->
     <van-button
-        size="small"
-        :disabled="isRefreshing"
-        @click="fetchDDingCode"
-        class="custom-button"
+      size="small"
+      :disabled="isRefreshing"
+      @click="fetchDDingCode"
+      class="custom-button"
     >
       {{ isRefreshing ? `请等待(${refreshCountdown}s)` : '获取密钥' }}
     </van-button>
 
     <!-- 验证码显示 -->
     <div class="code-display">
-      <p v-if="ddingCode">
-        MFA密钥 ：<strong>{{ ddingCode }}</strong>
+      <p v-if="ddingCode" @click="copyCode" class="code-text clickable">
+        MFA密钥 ：<strong>{{ ddingCode.trim() }}</strong>
         <span v-if="countdownVisible" class="countdown-text">（{{ countdownTime }}s 过期）</span>
       </p>
       <p v-else class="placeholder-text">***********</p>
@@ -70,25 +70,23 @@ export default {
       const loginMethod = getLoginCodeByDepartment(department)
       console.log('调用获取验证码的方法,方法名是：', loginMethod); // 调试日志
       SensorRequest.GetDDingCode(
-          loginMethod, // 传入登录方法作为参数
-          token,
-          (response) => {
-            console.log("验证码："+response)
-            try {
-
-              // 修改判断逻辑，区分空字符串和其它假值
-              if (response === null || response === undefined) {
-                this.ddingCode = '请退出小程序，重新获取'
-              } else if (response === '') {
-                this.ddingCode = '信息过期，请退出重新登录'
-              } else {
-                this.ddingCode = response
-              }
-              if (this.ddingCode !== '请退出小程序，重新获取' && this.ddingCode !== '信息过期，请退出重新登录') {
+        loginMethod, // 传入登录方法作为参数
+        token,
+        (response) => {
+          console.log("验证码："+response)
+          try {
+            // 修改判断逻辑，区分空字符串和其它假值
+            if (response === null || response === undefined) {
+              this.ddingCode = '请退出小程序，重新获取'
+            } else if (response === '') {
+              this.ddingCode = '信息过期，请退出重新登录'
+            } else {
+              this.ddingCode = response
+            }
+            if (this.ddingCode !== '请退出小程序，重新获取' && this.ddingCode !== '信息过期，请退出重新登录') {
               // 开始隐藏倒计时
               this.countdownTime = 30
               this.countdownVisible = true
-
               // 清除旧定时器，避免重复
               if (this.hideInterval) clearInterval(this.hideInterval)
 
@@ -104,17 +102,50 @@ export default {
               // 对于错误情况，隐藏倒计时显示
               this.countdownVisible = false
             }
-            }
-              catch (e) {
-              this.ddingCode = '解析失败'
-              console.error('响应内容无法解析为JSON', response)
-            }
-          },
-          (error) => {
-            this.ddingCode = '获取失败'
-            Toast.fail('请求失败：' + error)
           }
+          catch (e) {
+            this.ddingCode = '解析失败'
+            console.error('响应内容无法解析为JSON', response)
+          }
+        },
+        (error) => {
+          this.ddingCode = '获取失败'
+          Toast.fail('请求失败：' + error)
+        }
       )
+    },
+
+    // 复制验证码到剪贴板
+// 复制验证码到剪贴板 - 改进版本
+    copyCode() {
+      if (!this.ddingCode) return;
+
+      const cleanCode = this.ddingCode.trim();
+
+      // 检查是否支持 clipboard API
+      if (navigator.clipboard && window.isSecureContext) {
+        // 使用现代 clipboard API
+        navigator.clipboard.writeText(cleanCode).then(() => {
+          Toast.success('密钥已复制到剪贴板');
+        }).catch(err => {
+          Toast.fail('复制失败');
+          console.error('复制失败:', err);
+        });
+      } else {
+        // 降级处理：使用传统方法
+        try {
+          const textArea = document.createElement('textarea');
+          textArea.value = cleanCode;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          Toast.success('密钥已复制到剪贴板');
+        } catch (err) {
+          Toast.fail('复制失败');
+          console.error('复制失败:', err);
+        }
+      }
     }
   },
   beforeDestroy() {
@@ -155,6 +186,7 @@ export default {
   color: #999;
   margin-left: 8px;
 }
+
 /*  background-color: #73b3fa;*/
 .custom-button {
   background-color: #4098f8;
@@ -174,6 +206,10 @@ export default {
   margin-right: 2px;
 }
 
+.clickable {
+  cursor: pointer;
+  user-select: text;
+}
 
 .van-button--small {
   height: 30px;
