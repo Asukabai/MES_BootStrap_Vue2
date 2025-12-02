@@ -127,7 +127,7 @@ export function PostData(method, data, callSuccess, callFail) {
   // let urlSend = "/pack" //systemConfigure.serverrUrl + postURL    systemConfigure.serverr802
   // let urlSend = systemConfigure.serverrUrl
 
-  axios.post(baseURL, JSON.stringify(postPack), {
+  axios.post(systemConfigure.serverrUrl, JSON.stringify(postPack), {
     headers: {
       "content-type": "application/json"
     }
@@ -186,7 +186,7 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
   // }
 
   //    axios.post(urlSend, postJson, {
-  axios.post(baseURL, postJson, {
+  axios.post(systemConfigure.serverrUrl, postJson, {
     headers: {
       "content-type": dataType
     }

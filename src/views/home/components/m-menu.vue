@@ -28,8 +28,8 @@ import projectListIcon from '@/assets/项目管理.png'
 import fileStatIcon from '@/assets/项目类型统计.png'
 import feedbackIcon from '@/assets/评论列表-高亮.png'
 import progressTrackIcon from '@/assets/进度跟踪.png'
-import contactIcon from '@/assets/联系人123.png'
 import allIcon from '@/assets/省略号.png'
+import inventoryIcon from '@/assets/库存-库存单据.png'
 import scanConfigIcon from '@/assets/流程汇总日志.png'
 import {departmentPrefix} from "../../../utils/Dingding";
 
@@ -64,13 +64,13 @@ export default {
           path: '',
         },
         {
-          icon: contactIcon,
-          title: '联系人',
+          icon: inventoryIcon,
+          title: '库存管理',
           path: '',
         },
         {
           icon: scanConfigIcon,
-          title: '单板扫码',
+          title: '库存扫码',
           path: '',
         },
         {
