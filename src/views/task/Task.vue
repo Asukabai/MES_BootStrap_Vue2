@@ -141,6 +141,7 @@
 import SensorRequest from '@/utils/SensorRequest';
 import { Toast } from 'vant';
 import {departmentPrefix, key_DingUserPhone} from '@/utils/Dingding';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 function getLocalUserInfo() {
   const phone = localStorage.getItem(key_DingUserPhone);
@@ -172,12 +173,13 @@ export default {
     };
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     // 页面加载时请求 "我参与的" 和 "我负责的" 任务数据
     this.loadParticipatedTasks();
     this.loadResponsibleTasks();
   },
   methods: {
-
     // 切换排序方式
     toggleSortOrder() {
       this.sortByDate = this.sortByDate === 'asc' ? 'desc' : 'asc';
@@ -372,8 +374,9 @@ export default {
         Id: taskId, // 注意这里使用 "Id" 而不是 "taskId"
         taskDescription: taskDescription
       };
+      const department = this.$route.params.department;
       this.$router.push({
-        path: `/${departmentPrefix}/task-detail-last`,
+        path: `/${department}/task-detail-last`,
         query: query
       });
     },    // 跳转到任务提交页面
@@ -392,17 +395,18 @@ export default {
         Id: taskId, // 注意这里使用 "Id" 而不是 "taskId"
         taskDescription: taskDescription
       };
+      const department = this.$route.params.department;
       this.$router.push({
-        path: `/${departmentPrefix}/task-detail-progress`,
+        path: `/${department}/task-detail-progress`,
         query: query
       });
     },
     // 跳转到任务详情页
     goToTaskDetailLook(item) {
+      const department = this.$route.params.department;
       console.log("跳转到任务详情页面:", item);
-
       this.$router.push({
-        path: `/${departmentPrefix}/task-detail-look`,
+        path: `/${department}/task-detail-look`,
         query: {
           taskId: item.ID_TaskInfo,
           taskData: encodeURIComponent(JSON.stringify(item)) // 新增：传递完整对象

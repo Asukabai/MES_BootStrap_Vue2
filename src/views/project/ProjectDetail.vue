@@ -63,6 +63,7 @@
 
 <script>
 import * as echarts from 'echarts';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'ProjectDetail',
@@ -100,6 +101,8 @@ export default {
     }
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.renderPieChart();
     window.addEventListener('resize', this.resizePieChart);
   },

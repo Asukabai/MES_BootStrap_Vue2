@@ -392,7 +392,8 @@ export default {
           this.$message.success('所有记录保存成功!');
           setTimeout(() => {
             this.resetTestingFields(); // 重置表单字段
-            this.$router.push(`/${departmentPrefix}/history222`); // 跳转回扫码页面
+            const department = this.$route.params.department;
+            this.$router.push(`/${department}/history222`); // 跳转回扫码页面
           }, 500); // 0.5 秒后跳转
         })
         .catch(error => {

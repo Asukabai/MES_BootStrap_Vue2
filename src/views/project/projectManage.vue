@@ -96,6 +96,7 @@
 
 <script>import SensorRequest from '@/utils/SensorRequest';
 import BasePagination from '@/components/BasePagination.vue';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'ProjectManage',
@@ -113,6 +114,8 @@ export default {
     };
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.fetchProjectData();
     window.vueApp = this; // 挂载到 window，供 HTML 调用
   },

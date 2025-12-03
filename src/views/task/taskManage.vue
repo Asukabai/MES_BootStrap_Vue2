@@ -78,6 +78,7 @@
 import CustomCalendar from '@/components/CustomCalendar.vue';
 import SensorRequest from "@/utils/SensorRequest";
 import {departmentPrefix, key_DingUserPhone} from "@/utils/Dingding";
+import {GetDingUserToken} from "../../utils/Dingding";
 
 
 function getLocalUserInfo() {
@@ -112,6 +113,8 @@ export default {
     this.onDateSelected(this.formatDate(new Date()));
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     // 页面加载时请求 "我参与的" 和 "我负责的" 任务数据
     this.loadParticipatedTasks();
     this.loadResponsibleTasks();
@@ -317,7 +320,12 @@ export default {
       });
     },
     goToTaskDetail() {
-      this.$router.push(`/${departmentPrefix}/task`);
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}/taskList`);
+      } else {
+        console.error('未找到 department 参数');
+      }
     },
 
     formatDate(date) {
@@ -377,23 +385,6 @@ export default {
   margin-top: -10px;
   position: relative;
   z-index: 1;
-}
-
-/deep/ .van-tabs {
-  background: transparent;
-}
-
-/deep/ .van-tabs__wrap {
-  background: transparent;
-  padding: 0 10px;
-}
-
-/deep/ .van-tab {
-  font-weight: 500;
-}
-
-/deep/ .van-tabs__nav {
-  background: transparent;
 }
 
 .task-list {

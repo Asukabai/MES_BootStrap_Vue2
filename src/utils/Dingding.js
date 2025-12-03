@@ -3,7 +3,6 @@ import axios from 'axios'
 import * as jwt from 'jsonwebtoken';
 
 
-
 // 定义了一个常量 postUrlV1，用于存储后端服务器的请求路径    https://api-v2.sensor-smart.cn:29028/ddinguic/index.html  https://api-v2.sensor-smart.cn:22027/ss-proxy/p35001
 const systemConfigure = {
   // isDebugMode: true,
@@ -11,18 +10,18 @@ const systemConfigure = {
   // serverrUrl: "https://api-v1.sensor-smart.cn:28023",
   serverr802: "https://api-v2.sensor-smart.cn:22027/ding/pack",
   // serverrUrl: "https://api-v2.sensor-smart.cn:29028/ss-proxy/p29001"
-  serverrUrl: "./ss-proxy/p35001"
+  serverrUrl: "/ss-proxy/p35001"
 }
 
 
 // 设置 Axios 库的默认请求基础路径为 "/ding"，这意味着所有的请求会发送到以 "/ding" 开头的路径下
 // axios.defaults.baseURL = "/ding"
 // axios.defaults.baseURL = "/"
-const baseURL = process.env.VUE_APP_API_URL || '/ding/pack';
+const baseURL =  '/ding/pack';
 
 // 定义了两个常量，分别用于存储钉钉用户令牌和时间戳在本地存储中的键名。
 export const key_DingTokenJWT = "sensor_DingTokenJWT"
-const key_DingTokenTS = "sensor_DingTokenTS"
+export const key_DingTokenTS = "sensor_DingTokenTS"
 export const key_DingName = "sensor_DingName"
 export const key_DingUserIndex = "key_DingUserIndex"
 export const key_DingUserPhone = "key_DingUserPhone"
@@ -36,9 +35,6 @@ export let cachedProductPerson = '晟思'; // 默认值
 export let cachedPersonIndex = 333; // 默认值
 export let cachedResponseUsed = "未领用1"; // 默认值
 export let cachedResponseStored = "未入库1"; // 默认值
-
-// 调用获取部门信息
-export const departmentPrefix = getCurrentDepartment()
 
 export function updateCachedProductId(newId) {
   cachedProductId = newId;
@@ -60,13 +56,6 @@ export function updateCachedResponseUsed(responseUsed) {
   console.log("cachedResponseUsed 是： ",cachedResponseUsed)
 }
 
-// 获取当前部门信息的通用函数
-export function getCurrentDepartment() {
-  const department = localStorage.getItem('department') || 'xian';
-  console.log('从 localStorage 获取的部门信息:', department); // 调试日志
-  return department;
-}
-
 // 根据部门获取对应的 corpId
 export function getCorpIdByDepartment(department) {
   console.log('调用根据部门获取对应的 corpId,部门号是：', department); // 调试日志
@@ -74,8 +63,7 @@ export function getCorpIdByDepartment(department) {
     'xian': 'ding103faa9c7d30c144', // 晟思 - 钉钉企业id
     'taiyuan': 'ding1fa39ac9b223238435c2f4657eb6378f' // 山西 - 钉钉企业id
   };
-
-  return corpIds[department] || corpIds['xian']; // 默认使用晟思的 corpId
+  return corpIds[department];
 }
 
 // 获取登录方法名
@@ -107,8 +95,6 @@ export function setUrlTarget(uuri) {
 export function getUrlTarget() {
   return urlTarget
 }
-
-
 // 钉钉免登-发送POST请求
 export function PostData(method, data, callSuccess, callFail) {
   let userToken = localStorage.getItem(key_DingTokenJWT)
@@ -123,11 +109,8 @@ export function PostData(method, data, callSuccess, callFail) {
     token: userToken,
     reqData: data
   }
-
-  // let urlSend = "/pack" //systemConfigure.serverrUrl + postURL    systemConfigure.serverr802
-  // let urlSend = systemConfigure.serverrUrl
-
-  axios.post(baseURL, JSON.stringify(postPack), {
+  axios.post(systemConfigure.serverrUrl, JSON.stringify(postPack), {
+  // axios.post(baseURL, JSON.stringify(postPack), {
     headers: {
       "content-type": "application/json"
     }
@@ -173,20 +156,10 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
   } else {
     dataType = "multipart/form-data"
   }
-  // let urlSend = "/pack" //systemConfigure.serverrUrl + postURL
-  // let urlSend = systemConfigure.serverrUrl
-
-  // let urlSend = "/"+postUrlName;
-  // let urlSend = postUrlName;
-
   let postJson = JSON.stringify(postPack)
-  // if (systemConfigure.isDebugMode) {
-  //   alert('urlSend: ' + urlSend);
-  //   alert('postJson: ' + postJson);
-  // }
 
-  //    axios.post(urlSend, postJson, {
-  axios.post(baseURL, postJson, {
+  axios.post(systemConfigure.serverrUrl, postJson, {
+  // axios.post(baseURL, postJson, {
     headers: {
       "content-type": dataType
     }
@@ -245,8 +218,7 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
 // 用于获取钉钉授权码
 // 在 GetDingCode 的成功回调中，info.code 被作为参数传递给 GetDingCode 的第一个回调函数参数
 // 然后这个 code 被作为参数传递给 PostData("Ding_LoginByCode", code, ...) 方法
-export function GetDingCode(callSuccess, callFail) {
-  const department = getCurrentDepartment();
+export function GetDingCode(department,callSuccess, callFail) {
   console.log('用于获取钉钉授权码 - 获取到的部门信息:', department); // 调试日志
   const corpId = getCorpIdByDepartment(department);
   console.log('用于获取钉钉授权码 - 对应的 corpId:', corpId); // 调试日志
@@ -280,87 +252,85 @@ export function setNewToken(newToken) {
   localStorage.setItem(key_DingTokenTS, tsNow)
   localStorage.setItem(key_DingTokenJWT, newToken)
 }
-
-
-// 用于获取钉钉用户令牌 ———— 如果本地没有有效的令牌，则会调用GetDingCode获取授权码
-export function GetDingUserToken(callSuccess, callFail) {
-  // 第一次登录时
+export function GetDingUserToken(department, callSuccess, callFail) {
+  console.log('[GetDingUserToken] 开始执行函数，部门参数:', department);
+  console.log('[GetDingUserToken] === GetDingUserToken 调用开始 ===');
   let userToken = localStorage.getItem(key_DingTokenJWT)
-  // alert(userToken)
-  // alert(userToken)
-  // let decodedToken = jwt.decode(userToken);
-  // let name = decodedToken.userName;
-  // let userIndex = decodedToken.userIndex;
-  // localStorage.setItem(key_DingName, name);
-  // localStorage.setItem(key_DingUserIndex, userIndex);
-  // alert("name"+name)
-  // alert("userIndex"+userIndex)
+  console.log('[GetDingUserToken] 从localStorage获取的token:', userToken);
 
-  if (userToken) {
-    let tokenTS = localStorage.getItem(key_DingTokenTS)
-    if (tokenTS) {
-      let tsLast = parseInt(tokenTS)
-      let tsNow = GetTSSecond()
-      if (tsNow - tsLast < 1) {
-        // Token 在有效期内，直接从缓存中获取用户信息
-        // alert("11111")
-        let name = localStorage.getItem(key_DingName);
-        let userIndex = localStorage.getItem(key_DingUserIndex);
-        console.info(name, userIndex)
-        callSuccess(userToken)
-        return
-      }
+  // 检查是否有有效 token
+  if (!userToken) {
+    console.log("[GetDingUserToken] 未找到 token，启动登录流程");
+    requestNewToken(department, callSuccess, callFail);
+    return;
+  }
+
+  // 检查 token 是否过期
+  let tokenTS = localStorage.getItem(key_DingTokenTS);
+  console.log("[GetDingUserToken] 获取到token时间戳:", tokenTS);
+  if (tokenTS) {
+    let tsLast = parseInt(tokenTS);
+    console.log("[GetDingUserToken] 解析后的时间戳:", tsLast);
+    let tsNow = GetTSSecond();
+    console.log("[GetDingUserToken] 当前时间戳:", tsNow);
+    let tsValid = tsNow-tokenTS;
+    console.log("[GetDingUserToken] 时间间隔差值:", tsValid);
+    if (tsValid < 100) {
+      // Token 在有效期内，直接使用
+      console.log("[GetDingUserToken] Token 在有效期内");
+      callSuccess(userToken);
+      return;
     }
   }
-  // Token 过期或者没有缓存中的用户信息，重新获取 Token
-  // 这个 code 是一个临时的一次性授权码，具有以下特点：
-  // 临时性：有效期很短（通常几分钟）
-  // 一次性：只能使用一次，使用后立即失效
-  // 安全性：用于换取用户的访问令牌（access_token）
-  // 后端服务器收到这个 code 后，会结合应用的 corpId 和 secret 向钉钉服务器请求换取用户的访问令牌和身份信息，从而完成免登过程。
-  GetDingCode(
-    // 将code发送给后端 → 后端用code换取用户信息 → 返回JWT Token给前端
-    (code) => { // Ding_LoginByCode   Dajun_LoginByCode
+  // Token 过期或时间戳不存在，重新获取
+  console.log("[GetDingUserToken] Token 过期或无效，重新获取");
+  requestNewToken(department, callSuccess, callFail);
+}
 
-      // 获取当前部门对应的登录方法
-      const department = getCurrentDepartment();
-      console.log('Token_获取到的部门信息:', department); // 调试日志
+
+function requestNewToken(department, callSuccess, callFail) {
+  console.log('[requestNewToken] 开始请求新令牌，部门参数:', department);
+  GetDingCode(department,
+    (code) => {
+      console.log('[requestNewToken] GetDingCode成功回调，获取到code:', code);
       const loginMethod = getLoginMethodByDepartment(department);
-      console.log('Token_对应的登录方法:', loginMethod); // 调试日志
+      console.log('[requestNewToken] 根据部门获取登录方法:', loginMethod);
       PostData(loginMethod, code, (newToken) => {
-        // alert("22222")
+        console.log('[requestNewToken] PostData成功回调，获取到newToken');
         let decodedToken = jwt.decode(newToken);
-        console.log(decodedToken);
-        // alert("Token: "+newToken)
-        // alert("decodedToken: "+decodedToken)
+        console.log('[requestNewToken] 解码JWT令牌结果:', decodedToken);
         let name = decodedToken.userName;
+        console.log('[requestNewToken] 从令牌中提取用户名:', name);
         let userPhone = decodedToken.userPhone;
+        console.log('[requestNewToken] 从令牌中提取用户手机号:', userPhone);
         let userIndex = decodedToken.userID;
-        // alert("姓名"+name + "用户Index"+userIndex + "电话"+userPhone)
+        console.log('[requestNewToken] 从令牌中提取用户ID:', userIndex);
+
         // 将用户信息放入缓存
         localStorage.setItem(key_DingName, name);
+        console.log('[requestNewToken] 已设置用户名到localStorage');
         localStorage.setItem(key_DingUserIndex, userIndex);
+        console.log('[requestNewToken] 已设置用户ID到localStorage');
         localStorage.setItem(key_DingUserPhone, userPhone);
+        console.log('[requestNewToken] 已设置用户手机号到localStorage');
 
         // 更新 Token 和 Token 时间戳
-        setNewToken(newToken)
-        callSuccess(newToken)
-      }, callFail)
+        setNewToken(newToken);
+        console.log('[requestNewToken] 调用setNewToken完成');
+        callSuccess(newToken);
+        console.log('[requestNewToken] 调用外部成功回调');
+      }, (error) => {
+        console.log('[requestNewToken] PostData失败回调:', error);
+        callFail(error);
+      });
     },
     (err) => {
-      console.log(err, 456)
+      console.log('[requestNewToken] GetDingCode失败回调:', err);
       if (callFail) {
-        callFail(err)
+        callFail(err);
+        console.log('[requestNewToken] 调用外部失败回调');
       }
-    })
+    }
+  );
 }
-
-
-// 用于获取文件下载令牌
-export function GetFileDownloadToken(fileHash, callSuccess, callFail) {
-  PostData("Ding_GenrateDownloadUrlOnce", fileHash, (newToken) => {
-    callSuccess(newToken)
-  }, callFail)
-}
-
 export default systemConfigure;

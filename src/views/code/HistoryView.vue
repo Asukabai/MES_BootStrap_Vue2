@@ -74,9 +74,9 @@ export default {
       return sessionStorage.getItem(key_DingScannedResult) || cachedProductId; // 返回存储的产品 ID 或者 cachedProductId
     },
     goBackQR() {
-      this.$router.push(`/${departmentPrefix}/index`)
+      const department = this.$route.params.department;
+      this.$router.push(`/${department}/index`);
     },
-
     resetForm(){
       this.count = 0; // 正确重置 count
       this.getAllCardRecordsWithImages();

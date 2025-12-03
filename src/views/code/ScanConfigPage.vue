@@ -71,6 +71,7 @@
 import * as dd from 'dingtalk-jsapi'
 import SensorRequest from "@/utils/SensorRequest";
 import {departmentPrefix} from "@/utils/Dingding";
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'ScanConfigPage',
@@ -94,6 +95,10 @@ export default {
       // 操作类型
       operationActions: ['焊接', '测试', '装配', '焊接/装配', '焊接/测试', '装配/测试', '焊接/装配/测试'].map(text => ({ name: text })),
     };
+  },
+  mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
   },
   methods: {
     handleScanClick() {
@@ -191,7 +196,8 @@ export default {
             // alert('提交成功:'+ response);
             this.$toast.success('配置提交成功 ！');
             setTimeout(() => {
-              this.$router.push(`/${departmentPrefix}/code/configList`);
+              const department = this.$route.params.department;
+              this.$router.push(`/${department}/code/configList`);
             }, 1000);
           },
           (error) => {
@@ -206,7 +212,8 @@ export default {
       this.showOperationSheet = false;
     },
     goToConfigList() {
-      this.$router.push(`/${departmentPrefix}/code/configList`);
+      const department = this.$route.params.department;
+      this.$router.push(`/${department}/code/configList`);
     },
   },
 };

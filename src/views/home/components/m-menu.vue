@@ -82,49 +82,59 @@ export default {
     };
   },
   methods: {
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     handleGridClick(item) {
       if (item.title === '项目编码') {
-        this.$router.push(`/${departmentPrefix}/project-code`)
+        this.navigateTo('/project-code');
       }
       if (item.title === '扫码记录') {
-        this.$router.push(`/${departmentPrefix}/code/codeList`)
+        this.navigateTo('/code/codeList');
       }
       if (item.title === '问题反馈') {
-        this.$toast.success('感谢您的反馈')
+        this.$toast.success('感谢您的反馈');
       }
       if (item.title === '文件统计') {
-        this.$router.push(`/${departmentPrefix}/statistical-report`)
+        this.navigateTo('/statistical-report');
       }
       if (item.title === '进度跟踪') {
-        this.$router.push(`/${departmentPrefix}/progress-tracking`)
+        this.navigateTo('/progress-tracking');
       }
       if (item.title === '项目列表') {
-        this.$router.push(`/${departmentPrefix}/project-manage`)
+        this.navigateTo('/project-manage');
       }
       if (item.title === '任务日历') {
-        this.$router.push(`/${departmentPrefix}/task-manage`)
+        this.navigateTo('/task-manage');
       }
       if (item.title === '单板扫码') {
-        // this.scanQRCode();
-        this.$toast.success('正在开发中 ！')
+        this.$toast.success('正在开发中 ！');
       }
       if (item.title === '批量扫码') {
-        // this.scanQRCodeList();
-        this.$toast.success('正在开发中 ！')
+        this.$toast.success('正在开发中 ！');
       }
       if (item.title === '联系人') {
-        this.$toast.success('正在开发中 ！')
+        this.$toast.success('正在开发中 ！');
       }
       if (item.title === '扫码配置') {
-        this.$router.push(`/${departmentPrefix}/code/config`)
+        this.navigateTo('/code/config');
       }
       if (item.title === '扫码看板') {
-        this.$toast.success('正在开发中 ！')
+        this.$toast.success('正在开发中 ！');
       }
       if (item.title === '查看全部') {
-        this.$toast.success('已展示全部 ！')
+        this.$toast.success('已展示全部 ！');
       }
-
+      if (item.title === '库存管理') {
+        // this.navigateTo('/inventory');
+        this.$toast.success('正在开发中 ！');
+      }
     },
   }
 };

@@ -156,6 +156,7 @@
 import SensorRequest from "@/utils/SensorRequest";
 import noEvidenceImg from '@/assets/智能办公.png';
 import { downloadFile, previewFile } from "@/utils/fileUtils";
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: "EvidenceDetail",
@@ -187,10 +188,11 @@ export default {
     }
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     if (this.internalTaskId && this.internalTaskId !== "未知ID") {
       this.fetchTaskInfo()
     }
-
     console.log("🧾 mounted 中的 taskData:", this.taskData)
   },
   methods: {
@@ -271,7 +273,8 @@ export default {
       previewFile(file);
     },
     downloadFile(file) {
-      downloadFile(file);
+      const department = this.$route.params.department;
+      downloadFile(file, department);
     },
     formatDate(dateString) {
       const date = new Date(dateString)

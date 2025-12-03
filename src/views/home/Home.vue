@@ -24,6 +24,7 @@
 import MBanner from './components/m-banner.vue';
 import MMenu from './components/m-menu.vue';
 import TaskProgressBoard from '@/components/TaskProgressBoard.vue';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'HomePage',
@@ -41,6 +42,8 @@ export default {
     };
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.checkDeviceType();
   },
   methods: {

@@ -371,7 +371,8 @@ export default {
         this.$message.success('保存成功!');
         setTimeout(() => {
           this.resetTestingFields(); // 重置表单字段
-          this.$router.push(`/${departmentPrefix}/code/HistoryView`)
+          const department = this.$route.params.department;
+          this.$router.push(`/${department}/code/HistoryView`)
         }, 500); // 0.5 秒后跳转
       }, (error) => {
         console.error('保存失败:', error);
@@ -432,10 +433,13 @@ export default {
       return evidenceList;
     },
     goBack() {
-      this.$router.push(`/${departmentPrefix}/code/HistoryView`);
+      const department = this.$route.params.department;
+      this.$router.push(`/${department}/code/HistoryView`);
     },
     goBack1() {
-      this.$router.push(`/${departmentPrefix}/index`);
+      const department = this.$route.params.department;
+      this.$router.push(`/${department}/index`);
+
     },
   },
 };

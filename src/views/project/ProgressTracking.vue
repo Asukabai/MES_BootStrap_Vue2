@@ -58,6 +58,7 @@
 <script>
 import * as echarts from 'echarts';
 import SensorRequest from '@/utils/SensorRequest';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'ProgressTracking',
@@ -75,6 +76,8 @@ export default {
     };
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.renderCharts();
     this.fetchProjectData(); // 获取项目数据
     this.fetchBarChartData(); // 获取后端数据
@@ -170,7 +173,7 @@ export default {
             onTime: item.CountString[2],
             delayed: item.CountString[3]
           }));
-          
+
           // 数据获取成功后重新渲染条形图
           this.$nextTick(() => {
             this.renderBarChart();
@@ -224,7 +227,7 @@ export default {
 
       // 使用新的数据结构
       const owners = this.superintendentData.map(item => item.owner);
-      
+
       // 获取容器宽度，适配屏幕
       const containerWidth = this.$refs.barChartContainer.clientWidth;
       const chartHeight = Math.max(200, 50 + owners.length * 25); // 增加高度

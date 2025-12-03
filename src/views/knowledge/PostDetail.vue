@@ -69,7 +69,8 @@
 
 <script>
 import { Cell, CellGroup, Loading, Toast, Button } from 'vant'
-import { downloadFile, previewFile } from '@/utils/fileUtils'
+import { downloadFile, previewFile } from '../../utils/fileUtils'
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'PostDetail',
@@ -88,6 +89,10 @@ export default {
   },
   created() {
     this.loadPostDetail()
+  },
+  mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
   },
   methods: {
     loadPostDetail() {
@@ -109,7 +114,8 @@ export default {
       return date.toLocaleString('zh-CN')
     },
     handleDownload(file) {
-      downloadFile(file)
+      const department = this.$route.params.department;
+      downloadFile(file, department)
     },
     handlePreview(file) {
       previewFile(file)

@@ -45,7 +45,9 @@ export default {
   methods: {
     clearAndRescan() {
       this.results = []; // 清空结果列表
-      this.$router.push(`/${departmentPrefix}/index`); // 跳转回扫码页面
+      const department = this.$route.params.department;
+      this.$router.push(`/${department}/index`);
+
     },
     navigateToForm() {
       if (this.results.length > 0) {

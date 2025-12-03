@@ -8,7 +8,7 @@
     <van-tabbar-item
         v-for="(item, index) in tabbars"
         :key="index"
-        :to="item.path"
+        :to= "item.path"
         :badge="item.badge"
     >
       <!-- 自定义图标 -->
@@ -27,7 +27,6 @@
 </template>
 
 <script>
-import { departmentPrefix } from '../utils/Dingding.js'
 export default {
   props: {
     showRouterView: {
@@ -67,35 +66,37 @@ export default {
   },
   computed: {
     tabbars() {
-      const base = `/${departmentPrefix}/`; // 添加部门前缀到基础路径
+      const base = this.$route.params.department;
+      console.log('进入 MainTabBar.vue', base);
+      // alert( "4455 "+base)
       return [
         {
           title: '知识库',
-          path: base + 'chat_category',
+          path: `/${base}/chat_category`,  // ✅ 使用模板字符串
           iconActive: this.icons.message.active,
           iconInactive: this.icons.message.inactive
         },
         {
           title: '任务',
-          path: base + 'task',
+          path: `/${base}/taskList`,       // ✅ 使用模板字符串
           iconActive: this.icons.task.active,
           iconInactive: this.icons.task.inactive
         },
         {
           title: '工作台',
-          path: base + 'index',
+          path: `/${base}/index`,          // ✅ 使用模板字符串
           iconActive: this.icons.home.active,
           iconInactive: this.icons.home.inactive
         },
         {
           title: '分享',
-          path: base + 'cart',
+          path: `/${base}/cartList`,       // ✅ 使用模板字符串
           iconActive: this.icons.share.active,
           iconInactive: this.icons.share.inactive
         },
         {
           title: '我的',
-          path: base + 'user',
+          path: `/${base}/user`,           // ✅ 修正后的写法
           iconActive: this.icons.user.active,
           iconInactive: this.icons.user.inactive
         }

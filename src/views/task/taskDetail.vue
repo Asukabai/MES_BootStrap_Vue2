@@ -49,7 +49,7 @@
 
 <script>
 import SensorRequest from '@/utils/SensorRequest.js';
-import {departmentPrefix} from "@/utils/Dingding";
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   data() {
@@ -68,6 +68,10 @@ export default {
     taskDescriptionLines() {
       return this.taskDescription ? this.taskDescription.split(/\r?\n/) : [];
     }
+  },
+  mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
   },
   methods: {
     onAfterRead(files) {
@@ -168,7 +172,7 @@ export default {
         this.resetForm();
         // 新增：提交成功后延迟 1 秒跳转
         setTimeout(() => {
-          this.$router.push(`/${departmentPrefix}/task-manage`);
+          this.navigateTo('/task-manage');
         }, 1000);
       } catch (error) {
         console.error('❌ 提交失败:', error.message);
@@ -199,6 +203,15 @@ export default {
       this.evidenceList = [];
       this.fileList = [];
       this.isSubmitting = false;
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
     },
 
     generateSimpleMd5(str) {

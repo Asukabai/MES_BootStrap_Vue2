@@ -71,6 +71,7 @@ import * as echarts from 'echarts';
 
 // 引入 BasePagination 组件
 import BasePagination from '@/components/BasePagination.vue';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'UploadSummary',
@@ -93,6 +94,8 @@ export default {
     };
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.fetchUploadSummary();
   },
   methods: {

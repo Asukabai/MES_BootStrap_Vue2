@@ -19,6 +19,7 @@
 
 <script>
 import { Toast } from 'vant'
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: "ProfilePage",
@@ -35,6 +36,8 @@ export default {
     };
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.loadSecretKey();
   },
   methods: {

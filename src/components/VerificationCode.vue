@@ -23,7 +23,7 @@
 
 <script>
 import {
-  getCurrentDepartment,
+  GetDingUserToken,
   getLoginCodeByDepartment,
   key_DingTokenJWT
 } from '../utils/Dingding.js'
@@ -46,6 +46,10 @@ export default {
       keyIcon: require('@/assets/key.png')
     }
   },
+  mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
+  },
   methods: {
     fetchDDingCode() {
       if (this.isRefreshing) return
@@ -65,7 +69,7 @@ export default {
       // 发起请求
       const token = localStorage.getItem(key_DingTokenJWT)
       // 获取当前部门和对应的登录方法
-      const department = getCurrentDepartment()
+      const department = this.$route.params.department
       console.log('调用获取验证码的方法,部门是：', department); // 调试日志
       const loginMethod = getLoginCodeByDepartment(department)
       console.log('调用获取验证码的方法,方法名是：', loginMethod); // 调试日志

@@ -34,7 +34,7 @@
 
       <!-- 其他功能入口 -->
       <van-cell-group style="margin-top: 15px;">
-        <van-cell title="个人资料" is-link @click="$router.push(`/${departmentPrefix}/profile`)" />
+        <van-cell title="个人资料" is-link @click="$router.push(`/${$route.params.department}/profile`)"  />
         <van-cell title="缓存清理" is-link @click="handleInviteClick" />
         <van-cell title="推送通知" is-link @click="handlePushNotification" />
         <van-cell title="在线支持" is-link @click="handleOnlineSupport" />
@@ -49,14 +49,11 @@
 import * as dd from 'dingtalk-jsapi'
 import { Cell, CellGroup, Toast } from 'vant'
 import VerificationCode from "@/components/VerificationCode.vue";
-import {getCurrentDepartment,departmentPrefix} from '@/utils/Dingding.js';
+import {GetDingUserToken} from "../../utils/Dingding";
 export default {
   // eslint-disable-next-line vue/multi-word-component-names
   name: "MyUser",
   computed: {
-    departmentPrefix() {
-      return departmentPrefix
-    }
   },
   components: {
     VerificationCode,
@@ -76,14 +73,19 @@ export default {
         name: ''
       },
       // 添加版本号
-      version: 'V0.1.2'
+      version: 'V1.1.5'
     };
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.loadUserInfo();
     this.detectIOS();
     // 加载公司信息
-    this.loadCompanyInfo();
+    this.$nextTick(() => {
+      // 确保公司信息已加载
+      this.loadCompanyInfo();
+    });
   },
   methods: {
     detectIOS() {
@@ -102,13 +104,14 @@ export default {
     },
     // 新增方法：加载公司信息
     loadCompanyInfo() {
-      const department = getCurrentDepartment();
+      const department =  this.$route.params.department;
+      // alert( "112233 "+department)
       const companyNames = {
         'xian': '陕西晟思智能测控有限公司',
         'taiyuan': '山西大钧自动化设备有限公司'
       };
 
-      this.companyInfo.name = companyNames[department] || companyNames['xian'];
+      this.companyInfo.name = companyNames[department] || "异常请联系管理员！abs2";
     },
     handleInviteClick() {
       this.$dialog.confirm({

@@ -108,7 +108,8 @@ import {
   key_DingUserIndex,
   key_DingUserPhone
 } from "@/utils/Dingding";
-import uploadUtils from "@/utils/uploadUtils"; // 引入上传工具
+import uploadUtils from "@/utils/uploadUtils";
+import {GetDingUserToken} from "../../utils/Dingding"; // 引入上传工具
 
 function getLocalUserInfo() {
   const name = localStorage.getItem(key_DingName);
@@ -140,6 +141,10 @@ export default {
     taskDescriptionLines() {
       return this.taskDescription ? this.taskDescription.split(/\r?\n/) : [];
     }
+  },
+  mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
   },
   methods: {
     setProgress(value) {
@@ -235,7 +240,8 @@ export default {
         this.$toast.success('提交成功');
         uploadUtils.resetForm(this.fileList, this.evidenceList);
         setTimeout(() => {
-          this.$router.push(`/${departmentPrefix}/task`);
+          const department = this.$route.params.department;
+          this.$router.push(`/${department}/taskList`);
         }, 1000);
       } catch (error) {
         this.$toast.fail('提交失败：' + error.message);

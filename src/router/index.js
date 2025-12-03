@@ -13,11 +13,10 @@ import UploadSummary from "@/views/summary/UploadSummary.vue"
 import ChatCategory from "@/views/knowledge/ChatCategory.vue"
 import CreatePost from "@/views/knowledge/CreatePost.vue"
 import PostDetail from "@/views/knowledge/PostDetail.vue"
-// 导入 getCurrentDepartment 方法
-import { departmentPrefix } from '../utils/Dingding.js'
+
 Vue.use(Router)
 
-const basePath = `/sensor/ddingWork/`
+const basePath = '/sensor/ddingWork/'
 // 获取当前部门前缀
 const router = new Router({
   mode: 'history',
@@ -28,199 +27,204 @@ const router = new Router({
     //   redirect: '/login'
     // },
     {
-      path: `/${departmentPrefix}/index`,
+      path: '/:department/index',
       name: 'Home',
       component: Home,
       meta: { title: '首页' }
     },
     {
-      path: `/${departmentPrefix}/chat_category`,
+      path: '/:department/chat_category',
       name: 'ChatCategory',
       component: ChatCategory,
       meta: { title: '知识库' }
     },
     {
-      path: `/${departmentPrefix}/create_post`,
+      path: '/:department/create_post',
       name: 'CreatePost',
       component: CreatePost,
       meta: { title: '创建帖子' }
     },
     {
-      path: `/${departmentPrefix}/post-detail`,
+      path: '/:department/post-detail',
       name: 'PostDetail',
       component: PostDetail,
       meta: { title: '详情信息' }
     },
     {
-      path: `/${departmentPrefix}/cart`,
+      path: '/:department/cartList',
       name: 'CartFile',
       component: CartFile,
       meta: { title: '文件分享' }
     },
     {
-      path: `/${departmentPrefix}/user`,
+      path: '/:department/user',
       name: 'User',
       component: User,
       meta: { title: '用户中心' }
     },
     {
-      path: `/${departmentPrefix}/task`,
+      path: '/:department/taskList',
       name: 'Task',
       component: Task,
       meta: { title: '任务管理' }
     },
     {
-      path: `/${departmentPrefix}/download`,
+      path: '/:department/download',
       name: 'FileDownload',
       component: () => import('@/views/share/FileDownload.vue'),
       meta: { title: '文件下载' }
     },
     {
-      path: `/${departmentPrefix}/profile`,
+      path: '/:department/profile',
       name: 'Profile',
       component: () => import('@/views/user/Profile.vue'),
       meta: { title: '个人资料' }
     },
     {
-      path: `/${departmentPrefix}/project-code`,
+      path: '/:department/project-code',
       name: 'ProjectCode',
       component: () => import('@/views/project/ProjectCode.vue'),
       meta: { title: '项目编码' }
     },
     {
-      path: `/${departmentPrefix}/code-recode`,
+      path: '/:department/code-recode',
       name: 'CodeRecode',
       component: () => import('@/views/share/CodeRecode.vue'),
       meta: { title: '编码记录' }
     },
     {
-      path: `/${departmentPrefix}/notice-detail`,
+      path: '/:department/notice-detail',
       name: 'NoticeDetail',
       component: () => import('../components/NoticeDetail.vue'),
       meta: { title: '公告详情', showTabBar: false }
     },
     {
-      path: `/${departmentPrefix}/task-record`,
+      path: '/:department/task-record',
       name: 'taskRecord',
       component: () => import('../views/task/taskRecord.vue'),
       meta: { title: '任务记录' }
     },
     {
-      path: `/${departmentPrefix}/statistical-report`,
+      path: '/:department/statistical-report',
       name: 'StatisticalReport',
       component: StatisticalReport,
       meta: { title: '统计报表' }
     },
     {
-      path: `/${departmentPrefix}/upload-summary`,
+      path: '/:department/upload-summary',
       name: 'UploadSummary',
       component: UploadSummary,
       meta: { title: '上传文件信息汇总' }
     },
     {
-      path: `/${departmentPrefix}/file-type-stats`,
+      path: '/:department/file-type-stats',
       name: 'FileTypeStats',
       component: () => import('@/views/summary/FileTypeStats.vue'),
       meta: { title: '文件类型统计' }
     },
     {
-      path: `/${departmentPrefix}/recent-logs`,
+      path: '/:department/recent-logs',
       name: 'RecentLogs',
       component: () => import('@/views/summary/RecentLogs.vue'),
       meta: { title: '系统日志' }
     },
     {
-      path: `/${departmentPrefix}/project-manage`,
+      path: '/:department/project-manage',
       name: 'projectManage',
       component: () => import('@/views/project/projectManage.vue'),
       meta: { title: '项目列表' }
     },
     {
-      path: `/${departmentPrefix}/task-manage`,
+      path: '/:department/task-manage',
       name: 'taskManage',
       component: () => import('@/views/task/taskManage.vue'),
       meta: { title: '任务日历' }
     },
     {
-      path: `/${departmentPrefix}/task-detail`,
+      path: '/:department/task-detail',
       name: 'TaskDetail',
       component: () => import('@/views/task/taskDetail.vue'),
       meta: { title: '任务详情' }
     },
     {
-      path: `/${departmentPrefix}/task-detail-last`,
+      path: '/:department/task-detail-last',
       name: 'TaskDetailLast',
       component: () => import('@/views/task/taskDetailLast.vue'),
       meta: { title: '任务完成提交表单' }
     },
     {
-      path: `/${departmentPrefix}/task-detail-progress`,
+      path: '/:department/task-detail-progress',
       name: 'TaskDetailProgress',
       component: () => import('@/views/task/taskDetailProgress.vue'),
       meta: { title: '任务进度提交表单' }
     },
     {
-      path: `/${departmentPrefix}/task-detail-look`,
+      path: '/:department/task-detail-look',
       name: 'TaskDetailLook',
       component: () => import('@/views/task/taskDetailLook.vue'),
       meta: { title: '查看任务详情' }
     },
     {
-      path: `/${departmentPrefix}/task/evidence-detail`,
+      path: '/:department/task/evidence-detail',
       name: 'EvidenceDetail',
       component: () => import('@/views/task/EvidenceDetail.vue'),
       meta: { title: '证据详情' },
     },
     {
-      path: `/${departmentPrefix}/code/codeList`,
+      path: '/:department/code/codeList',
       name: 'CodeList',
       component: () => import('@/views/code/CodeList.vue'),
       meta: { title: '扫码记录日志时间列表' }
     },
     {
-      path: `/${departmentPrefix}/code/config`,
+      path: '/:department/code/config',
       name: 'ScanConfigPage',
       component: () => import('@/views/code/ScanConfigPage.vue'),
       meta: { title: '扫码配置' }
     },
     {
-      path: `/${departmentPrefix}/code/configList`,
+      path: '/:department/code/configList',
       name: 'ScanConfigList',
       component: () => import('@/views/code/ScanConfigList.vue'),
       meta: { title: '配置列表' }
     },
     {
-      path: `/${departmentPrefix}/code/batch_scan_results`,
+      path: '/:department/code/batch_scan_results',
       name: 'ScanConfigList',
       component: () => import('@/views/code/BatchScanResults.vue'),
       meta: { title: '批量扫码结果' }
     },
     {
-      path: `/${departmentPrefix}/code/AddStored`,
+      path: '/:department/code/AddStored',
       name: 'AddStored',
       component: () => import('@/views/code/AddStored.vue'),
       meta: { title: '晟思资产出入库表单' }
     },
     {
-      path: `/${departmentPrefix}/code/AddHistory`,
+      path: '/:department/code/AddHistory',
       name: 'AddHistory',
       component: () => import('@/views/code/AddHistory.vue'),
       meta: { title: '资产记录表单' }
     },
     {
-      path: `/${departmentPrefix}/code/HistoryView`,
+      path: '/:department/code/HistoryView',
       name: 'HistoryView',
       component: () => import('@/views/code/HistoryView.vue'),
       meta: { title: '资产记录详情' }
     },
     {
-      path: `/${departmentPrefix}/progress-tracking`,
+      path: '/:department/progress-tracking',
       name: 'ProgressTracking',
       component: () => import('@/views/project/ProgressTracking.vue'),
       meta: { title: '进度跟踪' }
+    },    {
+      path: '/:department/inventory',
+      name: 'InventoryManagement',
+      component: () => import('@/views/inventory/InventoryManagement.vue'),
+      meta: { title: '库存管理' }
     },
     {
-      path: `/${departmentPrefix}/project-detail/:id`,
+      path: '/:department/project-detail/:id',
       name: 'ProjectDetail',
       component: () => import('@/views/project/ProjectDetail.vue'),
       meta: { title: '项目详情' }
@@ -233,7 +237,7 @@ const router = new Router({
     },
     {
       path: '*',
-      redirect: `/${departmentPrefix}/login`
+      redirect: '/:department/login'
     }
   ]
 })

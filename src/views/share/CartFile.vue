@@ -110,7 +110,8 @@
 <script>
 import SensorRequest from '@/utils/SensorRequest';
 import { key_DingUserPhone } from '@/utils/Dingding';
-import { downloadFile as utilsDownloadFile, previewFile as utilsPreviewFile } from '@/utils/fileUtils';
+import { downloadFile as utilsDownloadFile, previewFile as utilsPreviewFile } from '../../utils/fileUtils';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 function getLocalUserInfo() {
   const phone = localStorage.getItem(key_DingUserPhone);
@@ -140,7 +141,10 @@ export default {
       sentRefreshing: false,
     };
   },
+
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.loadReceivedData();
     this.loadSentData(); // 页面加载时也请求发送的数据
   },
@@ -232,7 +236,8 @@ export default {
     },
 
     handleDownload(file) {
-      utilsDownloadFile(file);
+      const department = this.$route.params.department;
+      utilsDownloadFile(file,department);
     },
 
     handlePreview(file) {

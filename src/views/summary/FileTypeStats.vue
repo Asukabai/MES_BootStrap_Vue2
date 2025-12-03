@@ -43,6 +43,7 @@
 <script>
 import SensorRequest from '@/utils/SensorRequest';
 import moment from 'moment';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'FileTypeStats',
@@ -58,6 +59,10 @@ export default {
       minDate: new Date(2024, 0, 1),
       maxDate: new Date(2026, 11, 31)
     };
+  },
+  mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
   },
   methods: {
     formatDate(date) {

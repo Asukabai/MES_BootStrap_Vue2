@@ -5,7 +5,7 @@
         <router-view />
       </div>
       <div
-        v-if="!$route.path.includes('login')"
+        v-if="!$route.path.includes('login') && !$route.path.includes('inventory')"
         class="tabbar-content"
         :class="{ 'ios-tabbar': isIOS, 'android-tabbar': !isIOS && !isHarmonyOS, 'harmony-tabbar': isHarmonyOS }"
       >

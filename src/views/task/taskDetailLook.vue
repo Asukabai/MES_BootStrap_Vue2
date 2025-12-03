@@ -140,7 +140,8 @@
 
 <script>
 import EvidenceDetail from '@/views/task/EvidenceDetail.vue'
-import { downloadFile as utilsDownloadFile, previewFile as utilsPreviewFile } from '@/utils/fileUtils';
+import { downloadFile as utilsDownloadFile, previewFile as utilsPreviewFile } from '../../utils/fileUtils';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'TaskDetail',
@@ -160,6 +161,8 @@ export default {
     }
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.loadTaskData()
   },
   methods: {
@@ -298,7 +301,8 @@ export default {
       return clone
     },
     downloadFile(file) {
-      utilsDownloadFile(file);
+      const department = this.$route.params.department;
+      utilsDownloadFile(file, department);
     },
     previewFile(file) {
       utilsPreviewFile(file);

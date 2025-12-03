@@ -37,8 +37,8 @@
 
 <script>
 import { List, Cell, Search } from 'vant'
-import SensorRequest from '@/utils/SensorRequest.js'
-import { departmentPrefix } from '@/utils/Dingding.js'
+import SensorRequest from '../../utils/SensorRequest.js'
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'KnowledgeBasePage',
@@ -68,13 +68,16 @@ export default {
     }
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.loadData()
   },
   methods: {
     viewPostDetail(post) {
+      const department = this.$route.params.department;
       // 传递整个post对象到详情页
       this.$router.push({
-        path: `/${departmentPrefix}/post-detail`,
+        path: `/${department}/post-detail`,
         query: {
           data: JSON.stringify(post)
         }

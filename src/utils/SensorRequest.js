@@ -8,6 +8,12 @@ import * as ssDing from '../utils/Dingding.js';
           callSuccess(respData);
         }, callFail);
       },
+      // 获取库存信息表格数据
+      InventoryItemsGetFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("InventoryItemsGetFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       // 获取项目信息 --展示到下拉框中
       ProjectInfoGetFun(param, callSuccess, callFail) {
         ssDing.PostDataUrl("ProjectInfoGetFun", param, true, respData => {

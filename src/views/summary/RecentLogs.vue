@@ -40,6 +40,7 @@
 
 <script>
 import SensorRequest from '@/utils/SensorRequest';
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'RecentLogs',
@@ -95,6 +96,8 @@ export default {
     }
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.onLoad();
   },
   methods: {

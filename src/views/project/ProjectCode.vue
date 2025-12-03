@@ -39,6 +39,7 @@
 import 'vant/lib/pagination/style'
 import BasePagination from "@/components/BasePagination.vue";
 import BaseFooter from "@/components/BaseFooter.vue";
+import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'ProjectCode',
@@ -59,6 +60,8 @@ export default {
     }
   },
   mounted() {
+    const department = this.$route.params.department
+    GetDingUserToken(department,(token) => {},(token) => {})
     this.initData()
   },
   methods: {
