@@ -42,8 +42,6 @@ export default {
     };
   },
   mounted() {
-    const department = this.$route.params.department
-    GetDingUserToken(department,(token) => {},(token) => {})
     this.checkDeviceType();
   },
   methods: {

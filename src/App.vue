@@ -17,6 +17,7 @@
 
 <script>
 import MainTabBar from '@/components/MainTabBar.vue'
+import { GetDingUserToken } from '@/utils/Dingding'
 
 export default {
   name: 'App',
@@ -31,15 +32,42 @@ export default {
   },
   mounted() {
     this.detectOS();
+    this.checkUserToken();
+  },
+  watch: {
+    // 监听路由变化，在每次路由切换时检查 token
+    '$route'(to, from) {
+      // 避免在登录页面重复检查
+      if (!to.path.includes('login')) {
+        console.log('监听路由变化，在每次路由切换时检查 token, [App] 检查用户token，部门:', this.$route.params.department);
+        this.checkUserToken();
+      }
+    }
   },
   methods: {
-    // 使用 Vue 的条件渲染通过 JavaScript 检测操作系统比 CSS 媒体查询更准确   可扩展性：可以在 JavaScript 中进行更多与平台相关的逻辑处理   可维护性：逻辑集中在一个地方，便于维护和修改   灵活性：可以根据需要添加更多的平台特定逻辑
     detectOS() {
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
       this.isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+      this.isHarmonyOS = /HarmonyOS|OpenHarmony/i.test(userAgent);
+    },
 
-      // 检测鸿蒙系统
-      this.isHarmonyOS = /HarmonyOS|OpenHarmony/i.test(userAgent);  // 兼容新旧版本标识
+    checkUserToken() {
+      console.log('调用 checkUserToken 方法，从当前路由获取部门信息');
+      // 从当前路由获取部门信息
+      const department = this.$route.params.department;
+      if (department) {
+        console.log('[App] 检查用户token，部门:', department);
+        GetDingUserToken(department,
+          (token) => {
+            console.log('[App] Token有效或已更新 :', token);
+          },
+          (error) => {
+            console.error('[App] 获取token失败 :', error);
+          }
+        );
+      } else {
+        console.log('[App] 未检测到部门信息，跳过token检查');
+      }
     }
   }
 }
