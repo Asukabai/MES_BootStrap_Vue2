@@ -68,7 +68,6 @@
 <script>
 import SensorRequest from "@/utils/SensorRequest";
 import uploadUtils from "@/utils/uploadUtils";
-import {departmentPrefix} from "@/utils/Dingding";
 import {GetDingUserToken} from "../../utils/Dingding"; // 引入上传工具
 
 export default {

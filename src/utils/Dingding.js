@@ -26,11 +26,13 @@ export const key_DingName = "sensor_DingName"
 export const key_DingUserIndex = "key_DingUserIndex"
 export const key_DingUserPhone = "key_DingUserPhone"
 export const key_DingScannedResult = "key_DingScannedResult"
+export const key_DingScannedInventoryQRCodeResult = "key_DingScannedInventoryQRCodeResult"
 export const key_DingResponseStored = "key_DingResponseStored"
 export const key_DingResponseUsed = "key_DingResponseUsed"
 
 // 定义全局变量
 export let cachedProductId = '晟思'; // 默认值
+export let cachedInventoryProductId = '库存物品二维码ID'; // 默认值
 export let cachedProductPerson = '晟思'; // 默认值
 export let cachedPersonIndex = 333; // 默认值
 export let cachedResponseUsed = "未领用1"; // 默认值
@@ -38,8 +40,9 @@ export let cachedResponseStored = "未入库1"; // 默认值
 
 export function updateCachedProductId(newId) {
   cachedProductId = newId;
+}export function updateCachedInventoryProductId(newId) {
+  cachedInventoryProductId = newId;
 }
-
 export function updateCachedProductPerson(newPerson) {
   cachedProductPerson = newPerson;
 }

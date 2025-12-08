@@ -222,6 +222,11 @@ const router = new Router({
       name: 'InventoryManagement',
       component: () => import('@/views/inventory/InventoryManagement.vue'),
       meta: { title: '库存管理' }
+    }, {
+      path: '/:department/inventoryDetail',
+      name: 'InventoryDetail',
+      component: () => import('@/views/inventory/InventoryDetail.vue'),
+      meta: { title: '库存扫码' }
     },
     {
       path: '/:department/project-detail/:id',

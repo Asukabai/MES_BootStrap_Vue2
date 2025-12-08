@@ -70,7 +70,6 @@
 <script>
 import * as dd from 'dingtalk-jsapi'
 import SensorRequest from "@/utils/SensorRequest";
-import {departmentPrefix} from "@/utils/Dingding";
 import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {

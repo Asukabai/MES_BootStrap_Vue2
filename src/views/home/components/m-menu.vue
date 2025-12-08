@@ -31,7 +31,11 @@ import progressTrackIcon from '@/assets/进度跟踪.png'
 import allIcon from '@/assets/省略号.png'
 import inventoryIcon from '@/assets/库存-库存单据.png'
 import scanConfigIcon from '@/assets/流程汇总日志.png'
-import {departmentPrefix} from "../../../utils/Dingding";
+import {
+  key_DingScannedInventoryQRCodeResult,
+  updateCachedInventoryProductId,
+} from "../../../utils/Dingding";
+import * as dd from 'dingtalk-jsapi'
 
 export default {
   name: 'MMenu',
@@ -135,6 +139,38 @@ export default {
         // this.navigateTo('/inventory');
         this.$toast.success('正在开发中 ！');
       }
+      if (item.title === '库存扫码') {
+        this.scanInventoryQRCode();
+      }
+    },
+    // 库存扫码逻辑...
+    scanInventoryQRCode() {
+      console.log("开始扫码");
+      alert("开始扫码")
+      dd.ready(() => {
+        dd.biz.util.scan({
+          type: 'qrCode',
+          onSuccess: (data) => {
+            const result = data.text; // 获取扫描结果
+            if (result) {
+              // 存储扫码结果
+              sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, result);
+              // 更新全局变量
+              updateCachedInventoryProductId(result);
+              this.navigateTo('/inventoryDetail');
+            } else {
+              alert("扫描的二维码不符合要求，请重新扫描！");
+            }
+          },
+          onFail: (err) => {
+            if (err.errorCode !== 300001) {
+              // alert("未扫描到二维码！");
+              let errorMessage = '未扫描到二维码 ！';
+              this.$toast.fail(errorMessage);
+            }
+          }
+        });
+      });
     },
   }
 };

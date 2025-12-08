@@ -41,9 +41,9 @@ export default {
       const type = this.$route.params.type
       const department = this.$route.params.department
       console.log('获取到的 type 类型是：', type)
-      // alert('获取到的 type 类型是：' + type)
+      alert('获取到的 type 类型是：' + type)
       console.log('进入 GetDingUserToken 方法')
-      // alert('进入 GetDingUserToken 方法')
+      alert('进入 GetDingUserToken 方法')
         GetDingUserToken(department,
           (token) => {
             // 不需要重复设置 token，因为 setNewToken 已处理

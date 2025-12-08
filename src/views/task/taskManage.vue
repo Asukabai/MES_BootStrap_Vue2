@@ -77,7 +77,7 @@
 <script>
 import CustomCalendar from '@/components/CustomCalendar.vue';
 import SensorRequest from "@/utils/SensorRequest";
-import {departmentPrefix, key_DingUserPhone} from "@/utils/Dingding";
+import {key_DingUserPhone} from "@/utils/Dingding";
 import {GetDingUserToken} from "../../utils/Dingding";
 
 

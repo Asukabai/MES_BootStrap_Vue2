@@ -140,7 +140,7 @@
 <script>
 import SensorRequest from '@/utils/SensorRequest';
 import { Toast } from 'vant';
-import {departmentPrefix, key_DingUserPhone} from '@/utils/Dingding';
+import {key_DingUserPhone} from '@/utils/Dingding';
 import {GetDingUserToken} from "../../utils/Dingding";
 
 function getLocalUserInfo() {

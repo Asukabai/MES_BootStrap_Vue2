@@ -103,7 +103,6 @@
 <script>
 import SensorRequest from "@/utils/SensorRequest";
 import {
-  departmentPrefix,
   key_DingName,
   key_DingUserIndex,
   key_DingUserPhone
