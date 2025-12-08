@@ -1,28 +1,61 @@
 <template>
   <div class="inventory-detail-page">
-
     <div class="container">
       <van-loading v-if="loading" size="24px" vertical>加载中...</van-loading>
 
       <div v-else>
-        <van-cell-group v-if="inventoryItems.length > 0">
-          <van-cell title="物品名称" value="物品数量"  />
-          <van-cell
-            v-for="(item, index) in inventoryItems"
-            :key="item.Id"
-            :title="item.Item_Name"
-            :label="`位置: ${item.Shelf_Location}`"
-            is-link
-            @click="showItemDetail(item)"
-          >
-            <template #right-icon>
-              <span :class="['stock-status', { 'low-stock': item.Is_Low_Stock === '是' }]">
-                {{ item.Current_Stock }}
-              </span>
-            </template>
-          </van-cell>
-        </van-cell-group>
-        <van-empty v-else description="暂无库存信息" />
+<!--        <van-cell-group v-if="inventoryItems.length > 0">-->
+<!--          <van-cell-->
+<!--            v-for="(item, index) in inventoryItems"-->
+<!--            :key="item.Id"-->
+<!--            :title="item.Item_Name"-->
+<!--            is-link-->
+<!--            @click="selectItem(index)"-->
+<!--            :class="{ 'selected-item': selectedIndex === index }"-->
+<!--          >-->
+<!--            <template #label>-->
+<!--              <div class="item-details">-->
+<!--                <div>位置: {{ item.Shelf_Location }}</div>-->
+<!--                <div>当前库存:-->
+<!--                  <span :class="['stock-status', { 'low-stock': item.Is_Low_Stock === '是' }]">-->
+<!--                    {{ item.Current_Stock }}-->
+<!--                  </span>-->
+<!--                </div>-->
+<!--              </div>-->
+<!--            </template>-->
+<!--          </van-cell>-->
+<!--        </van-cell-group>-->
+
+        <!-- 展示详细信息的卡片 -->
+        <van-card
+          v-if="currentItem && !showDetail"
+          class="detail-card"
+        >
+          <div slot="desc" class="detail-content">
+            <van-cell-group>
+              <van-cell title="物品名称" :value="currentItem.Item_Name" />
+              <van-cell title="货架位置" :value="currentItem.Shelf_Location" />
+              <van-cell title="物品型号" :value="currentItem.Item_Model" />
+              <van-cell title="当前库存" :value="currentItem.Current_Stock" />
+              <van-cell title="物品品牌" :value="currentItem.Item_Brand" />
+              <van-cell title="类别类型" :value="currentItem.Category_Type" />
+<!--              <van-cell title="项目编码" :value="currentItem.Project_Code || '无'" />-->
+              <van-cell title="预警阈值" :value="currentItem.Warning_Threshold" />
+              <van-cell title="库存状态">
+                <template #value>
+                  <van-tag :type="currentItem.Is_Low_Stock === '是' ? 'danger' : 'success'">
+                    {{ currentItem.Is_Low_Stock === '是' ? '低库存' : '正常' }}
+                  </van-tag>
+                </template>
+              </van-cell>
+              <van-cell title="备注" :value="currentItem.Remark" />
+              <van-cell title="公司" :value="currentItem.Company" />
+            </van-cell-group>
+          </div>
+        </van-card>
+
+        <van-empty v-else-if="!currentItem" description="暂无库存信息" />
+
         <div class="button-group-container">
           <div class="button-row">
             <van-button size="small" class="action-button" @click="onClickLeft">返回首页</van-button>
@@ -37,60 +70,31 @@
         </div>
       </div>
     </div>
-
-    <!-- 商品详情弹窗 -->
-    <van-popup v-model="showDetail" position="bottom" :style="{ height: '80%' }">
-      <van-cell-group v-if="currentItem">
-        <van-cell title="物品名称" :value="currentItem.Item_Name" />
-        <van-cell title="货架位置" :value="currentItem.Shelf_Location" />
-        <van-cell title="物品型号" :value="currentItem.Item_Model" />
-        <van-cell title="当前库存" :value="currentItem.Current_Stock" />
-        <van-cell title="物品品牌" :value="currentItem.Item_Brand" />
-        <van-cell title="类别类型" :value="currentItem.Category_Type" />
-        <van-cell title="项目编码" :value="currentItem.Project_Code || '无'" />
-        <van-cell title="预警阈值" :value="currentItem.Warning_Threshold" />
-        <van-cell title="库存状态">
-          <template #value>
-            <van-tag :type="currentItem.Is_Low_Stock === '是' ? 'danger' : 'success'">
-              {{ currentItem.Is_Low_Stock === '是' ? '低库存' : '正常' }}
-            </van-tag>
-          </template>
-        </van-cell>
-        <van-cell title="备注" :value="currentItem.Remark" />
-        <van-cell title="公司" :value="currentItem.Company" />
-      </van-cell-group>
-    </van-popup>
   </div>
 </template>
 
 <script>
-import {Cell, CellGroup, Empty, Loading, NavBar, Popup, Tag} from 'vant';
 import SensorRequest from '@/utils/SensorRequest';
 import {key_DingScannedInventoryQRCodeResult} from '@/utils/Dingding';
 
 export default {
   name: 'InventoryDetail',
-  components: {
-    [NavBar.name]: NavBar,
-    [Cell.name]: Cell,
-    [CellGroup.name]: CellGroup,
-    [Loading.name]: Loading,
-    [Empty.name]: Empty,
-    [Popup.name]: Popup,
-    [Tag.name]: Tag
-  },
   data() {
     return {
       loading: true,
       inventoryItems: [],
-      showDetail: false,
-      currentItem: null
+      currentItem: null,
+      selectedIndex: 0 // 新增选中索引
     };
   },
   created() {
     this.loadInventoryData();
   },
   methods: {
+    selectItem(index) {
+      this.selectedIndex = index;
+      this.currentItem = this.inventoryItems[index];
+    },
     onClickLeft() {
       this.$router.go(-1);
     },
@@ -172,6 +176,26 @@ export default {
 </script>
 
 <style scoped>
+/* 添加新样式 */
+.selected-item {
+  background-color: #e8f4ff;
+}
+
+.detail-card {
+  margin-top: 15px;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+}
+
+.item-details {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.5;
+}
+
+.detail-content {
+  width: 100%;
+}
 .button-group-container {
   display: flex;
   flex-direction: column;
