@@ -228,6 +228,19 @@ const router = new Router({
       component: () => import('@/views/inventory/InventoryDetail.vue'),
       meta: { title: '库存扫码' }
     },
+    // 在 router/index.js 中添加路由
+    {
+      path: '/:department/inventory-outbound',
+      name: 'InventoryOutbound',
+      component: () => import('@/views/inventory/InventoryOutbound.vue'),
+      meta: { title: '快速出库' }
+    },
+    {
+      path: '/:department/inventory-inbound',
+      name: 'InventoryInbound',
+      component: () => import('@/views/inventory/InventoryInbound.vue'),
+      meta: { title: '快速入库' }
+    },
     {
       path: '/:department/project-detail/:id',
       name: 'ProjectDetail',

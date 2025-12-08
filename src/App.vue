@@ -52,6 +52,7 @@ export default {
     },
 
     checkUserToken() {
+      // alert('检查用户token')
       console.log('调用 checkUserToken 方法，从当前路由获取部门信息');
       // 从当前路由获取部门信息
       const department = this.$route.params.department;

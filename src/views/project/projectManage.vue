@@ -94,7 +94,7 @@
   </div>
 </template>
 
-<script>import SensorRequest from '@/utils/SensorRequest';
+<script>import SensorRequest from '../../utils/SensorRequest';
 import BasePagination from '@/components/BasePagination.vue';
 import {GetDingUserToken} from "../../utils/Dingding";
 
