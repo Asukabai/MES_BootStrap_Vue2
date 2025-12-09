@@ -15,8 +15,20 @@ import * as ssDing from '../utils/Dingding.js';
         }, callFail);
       },
       // 更新库存信息表格数据
-    InventoryItemsUpdateFun(param, callSuccess, callFail) {
+      InventoryItemsUpdateFun(param, callSuccess, callFail) {
         ssDing.PostDataUrl("InventoryItemsUpdateFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 库存操作信息添加
+      InventoryTransactionsAddFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("InventoryTransactionsAddFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 获取库存操作信息
+      InventoryTransactionsGetFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("InventoryTransactionsGetFun", param, true, respData => {
           callSuccess(respData);
         }, callFail);
       },

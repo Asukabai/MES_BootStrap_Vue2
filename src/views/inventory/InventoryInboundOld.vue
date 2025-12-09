@@ -28,32 +28,28 @@
           <div class="form-group">
             <label class="form-label">入库数量</label>
             <div class="input-group">
+              <button
+                class="btn-stepper minus"
+                @click="decrementQuantity"
+                :disabled="outboundQuantity <= 0"
+              >-</button>
               <input
                 v-model.number="outboundQuantity"
                 type="number"
                 class="form-input number-input"
                 placeholder="0"
                 min="0"
+                :max="itemData.Current_Stock"
                 @input="validateQuantity"
               >
+              <button
+                class="btn-stepper plus"
+                @click="incrementQuantity"
+                :disabled="outboundQuantity >= itemData.Current_Stock"
+              >+</button>
             </div>
             <div class="input-hint">
               入库后库存: <span class="highlight">{{ itemData.Current_Stock + outboundQuantity }}</span>
-            </div>
-          </div>
-          <!-- 入库类型 -->
-          <div class="form-group">
-            <label class="form-label">入库类型</label>
-            <div class="type-selector">
-              <button
-                v-for="type in outboundTypeColumns"
-                :key="type.value"
-                class="type-option"
-                :class="{ 'active': outboundType === type.value }"
-                @click="outboundType = type.value"
-              >
-                {{ type.text }}
-              </button>
             </div>
           </div>
           <!-- 备注 -->
@@ -82,12 +78,14 @@
           <button
             class="btn-confirm submit-btn"
             @click="onConfirm"
+            :disabled="!canSubmit"
           >
             确认入库
           </button>
         </div>
       </div>
     </div>
+
     <!-- 成功提示 -->
     <div v-if="showSuccess" class="success-overlay">
       <div class="success-content">
@@ -101,20 +99,9 @@
 </template>
 
 <script>import SensorRequest from '../../utils/SensorRequest.js';
-import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
-function getLocalUserInfo() {
-  const name = localStorage.getItem(key_DingName);
-  const phone = localStorage.getItem(key_DingUserPhone);
-  const dingID = localStorage.getItem(key_DingUserIndex); // 使用 key_DingUserIndex 作为 DingID
 
-  return {
-    name: name || '',
-    phone: phone || '',
-    dingID: dingID || ''
-  };
-}
 export default {
-  name: 'InventoryInbound',
+  name: 'InventoryOutboundMobile',
   data() {
     return {
       itemData: {
@@ -127,18 +114,22 @@ export default {
       },
       outboundQuantity: 0,
       outboundType: 4,
+      selectedProjectCode: '', // 修改为存储项目编码
+      projectId: '', // 实际提交的项目编码
       remark: '',
       showSuccess: false,
       outboundTypeColumns: [
-        { text: '采购入库', value: 4 },
-        { text: '生产入库', value: 5 },
-        { text: '其他入库', value: 6 }
+        { text: '项目领用', value: 4 },
+        { text: '日常领用', value: 5 },
+        { text: '其他出库', value: 6 }
       ],
+      projectList: [] // 新增项目列表数据
     };
   },
   computed: {
     canSubmit() {
-      return this.outboundQuantity > 0; // 只要求大于0，不限制上限
+      return this.outboundQuantity > 0 &&
+        this.outboundQuantity <= this.itemData.Current_Stock;
     }
   },
   created() {
@@ -146,47 +137,105 @@ export default {
     if (this.$route.query.item) {
       this.itemData = JSON.parse(this.$route.query.item);
     }
+    // 获取项目列表
+    this.fetchProjectList();
   },
   methods: {
+    // 获取项目列表
+    fetchProjectList() {
+      SensorRequest.ProjectInfoGetFun(
+        '',
+        (respData) => {
+          try {
+            const data = JSON.parse(respData);
+            const list = Array.isArray(data) ? data : [data];
+            // 只提取需要的两个字段
+            this.projectList = list.map(p => ({
+              Project_Code: p.Project_Code,
+              Project_Name: p.Project_Name
+            }));
+          } catch (error) {
+            console.error('解析项目数据失败:', error);
+            this.$toast.fail('项目数据解析失败');
+          }
+        },
+        (error) => {
+          console.error('获取项目列表失败:', error);
+          this.$toast.fail('获取项目列表失败');
+        }
+      );
+    },
+    // 项目选择变化时更新projectId
+    onProjectChange() {
+      this.projectId = this.selectedProjectCode;
+    },
+
     onClickLeft() {
       this.$router.go(-1);
     },
+
+    incrementQuantity() {
+      if (this.outboundQuantity < this.itemData.Current_Stock) {
+        this.outboundQuantity++;
+      }
+    },
+
+    decrementQuantity() {
+      if (this.outboundQuantity > 0) {
+        this.outboundQuantity--;
+      }
+    },
+
     validateQuantity() {
+      if (this.outboundQuantity > this.itemData.Current_Stock) {
+        this.outboundQuantity = this.itemData.Current_Stock;
+      }
       if (this.outboundQuantity < 0) {
         this.outboundQuantity = 0;
       }
     },
+
     async onConfirm() {
       if (!this.canSubmit) {
-        this.$toast.fail('入库数量必须大于0');
+        this.$toast.fail('请填写有效的入库信息');
         return;
       }
+
       try {
-        // 根据入库类型设置Transaction_Type
-        let transactionType = '';
-        const type = this.outboundTypeColumns.find(t => t.value === this.outboundType);
-        transactionType = type ? type.text : '';
+        // 根据出库类型设置Project_Code
+        let projectCodeValue = '';
+        if (this.outboundType === 4) {
+          // 项目领用 - 使用用户选择的项目
+          projectCodeValue = this.projectId;
+        } else {
+          // 日常领用或其他出库 - 直接使用出库类型的文本作为项目代码
+          const type = this.outboundTypeColumns.find(t => t.value === this.outboundType);
+          projectCodeValue = type ? type.text : '';
+        }
         // 构造请求参数
         const requestData = {
-          PageIndex: 0,
-          PageSize: 10,
-          Inventory_ID: this.itemData.Id.toString(), // 确保是字符串类型
-          Transaction_Type: transactionType,
-          Quantity_Change: this.outboundQuantity,
-          Current_Quantity: this.itemData.Current_Stock + this.outboundQuantity,
-          Report_Person: {
-            Person_Name: getLocalUserInfo().name || '缓存过期',
-            Person_ID: getLocalUserInfo().dingID || '缓存过期'
-          },
-          Remark: this.remark || this.itemData.Remark || ''
+          Id: this.itemData.Id,
+          Item_Name: this.itemData.Item_Name,
+          Shelf_Location: this.itemData.Shelf_Location,
+          Item_Model: this.itemData.Item_Model,
+          Current_Stock: this.itemData.Current_Stock + this.outboundQuantity, // 入库后的库存量
+          Item_Brand: this.itemData.Item_Brand || '',
+          Category_Type: this.itemData.Category_Type || '',
+          Project_Code: projectCodeValue,
+          Warning_Threshold: this.itemData.Warning_Threshold || 0,
+          Is_Low_Stock: this.itemData.Current_Stock + this.outboundQuantity <= (this.itemData.Warning_Threshold || 0) ? "是" : "否",
+          Remark: this.remark || this.itemData.Remark || '',
+          Company: this.itemData.Company
         };
+
         // 调用出库接口
-        SensorRequest.InventoryTransactionsAddFun(
+        SensorRequest.InventoryItemsUpdateFun(
           JSON.stringify(requestData),
           (respData) => {
             console.log('入库成功:', respData);
             // 显示成功提示
             this.showSuccess = true;
+
             // 2秒后自动返回
             setTimeout(() => {
               if (this.showSuccess) {
@@ -199,11 +248,13 @@ export default {
             this.$toast.fail('入库操作失败: ' + (error.message || '未知错误'));
           }
         );
+
       } catch (error) {
         console.error('入库操作异常:', error);
         this.$toast.fail('入库操作异常');
       }
     },
+
     closeSuccess() {
       this.showSuccess = false;
       this.$router.go(-1);
@@ -213,6 +264,29 @@ export default {
 </script>
 
 <style scoped>
+
+/* 项目选择框样式 */
+.form-select {
+  width: 100%;
+  height: 44px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  padding: 0 16px;
+  font-size: 16px;
+  color: #333;
+  background: white;
+  transition: border-color 0.2s;
+  appearance: none; /* 去除默认样式 */
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 16px;
+}
+
+.form-select:focus {
+  outline: none;
+  border-color: #3f83f8;
+}
 .inventory-outbound-mobile {
   background: white;
 }
@@ -308,6 +382,39 @@ export default {
   align-items: center;
   gap: 8px;
   margin-bottom: 8px;
+}
+
+.btn-stepper {
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  border: 2px solid #e0e0e0;
+  background: white;
+  font-size: 20px;
+  font-weight: 600;
+  color: #3f83f8;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.btn-stepper:active {
+  transform: scale(0.95);
+}
+
+.btn-stepper:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-stepper.minus {
+  color: #ff6b6b;
+}
+
+.btn-stepper.plus {
+  color: #4cd964;
 }
 
 .number-input {

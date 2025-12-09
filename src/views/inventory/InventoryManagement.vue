@@ -9,7 +9,6 @@
           placeholder="请输入搜索关键词"
           class="search-input"
         />
-
         <!-- 搜索按钮 -->
         <van-button
           type="primary"
@@ -45,161 +44,6 @@
         </van-dropdown-menu>
       </div>
     </div>
-
-    <!-- 快速入库弹窗 -->
-    <van-popup v-model="showInboundPopup" position="bottom" :style="{ height: '60%' }">
-      <div class="quick-operation-popup">
-        <div class="popup-header">
-          <span>快速入库</span>
-          <van-icon name="close" @click="showInboundPopup = false" />
-        </div>
-
-        <div class="item-info">
-          <div class="item-name">{{ currentItem.Item_Name }} {{ currentItem.Item_Model }}</div>
-          <div class="item-details">
-            公司：{{ currentItem.Company }} 位置：{{ currentItem.Shelf_Location }}
-          </div>
-          <div class="stock-info">
-            当前：{{ currentItem.Current_Stock }} 入库后：{{ currentItem.Current_Stock + inboundQuantity }}
-          </div>
-        </div>
-
-        <van-cell-group>
-          <van-field
-            v-model.number="inboundQuantity"
-            label="入库数量"
-            type="number"
-            placeholder="请输入入库数量"
-          />
-          <van-field
-            label="入库类型"
-            :value="getInboundTypeText(inboundType)"
-            is-link
-            @click="showInboundTypePicker = true"
-          />
-          <van-field
-            v-if="inboundType === 1 || inboundType === 2"
-            label="关联项目"
-            :value="inboundProject"
-            is-link
-            @click="showProjectPicker = true"
-            placeholder="请选择关联项目"
-          />
-          <van-field
-            v-model="inboundRemark"
-            label="备注"
-            type="textarea"
-            autosize
-            placeholder="请输入备注"
-          />
-        </van-cell-group>
-
-        <div class="popup-actions">
-          <van-button @click="showInboundPopup = false">取消</van-button>
-          <van-button type="primary" @click="confirmInbound">确定</van-button>
-        </div>
-      </div>
-    </van-popup>
-
-    <!-- 入库类型选择器 -->
-    <van-popup v-model="showInboundTypePicker" position="bottom">
-      <van-picker
-        show-toolbar
-        :columns="inboundTypeColumns"
-        @confirm="onInboundTypeConfirm"
-        @cancel="showInboundTypePicker = false"
-      />
-    </van-popup>
-
-    <!-- 项目选择器 -->
-    <van-popup v-model="showProjectPicker" position="bottom">
-      <van-picker
-        show-toolbar
-        :columns="projectColumns"
-        @confirm="onProjectConfirm"
-        @cancel="showProjectPicker = false"
-      />
-    </van-popup>
-
-    <!-- 快速出库弹窗 -->
-    <van-popup v-model="showOutboundPopup" position="bottom" :style="{ height: '60%' }">
-      <div class="quick-operation-popup">
-        <div class="popup-header">
-          <span>快速出库</span>
-          <van-icon name="close" @click="showOutboundPopup = false" />
-        </div>
-
-        <div class="item-info">
-          <div class="item-name">{{ currentItem.Item_Name }} {{ currentItem.Item_Model }}</div>
-          <div class="item-details">
-            公司：{{ currentItem.Company }} 位置：{{ currentItem.Shelf_Location }}
-          </div>
-          <div class="stock-info">
-            当前：{{ currentItem.Current_Stock }} 出库后：{{ currentItem.Current_Stock - outboundQuantity }}
-          </div>
-          <div class="max-outbound">
-            最大可领：{{ currentItem.Current_Stock }}
-          </div>
-        </div>
-
-        <van-cell-group>
-          <van-field
-            v-model.number="outboundQuantity"
-            label="出库数量"
-            type="number"
-            placeholder="请输入出库数量"
-            :error-message="outboundError"
-          />
-          <van-field
-            label="出库类型"
-            :value="getOutboundTypeText(outboundType)"
-            is-link
-            @click="showOutboundTypePicker = true"
-          />
-          <van-field
-            v-if="outboundType === 4"
-            label="关联项目"
-            :value="outboundProject"
-            is-link
-            @click="showOutboundProjectPicker = true"
-            placeholder="请选择关联项目"
-          />
-          <van-field
-            v-model="outboundRemark"
-            label="备注"
-            type="textarea"
-            autosize
-            placeholder="请输入备注"
-          />
-        </van-cell-group>
-
-        <div class="popup-actions">
-          <van-button @click="showOutboundPopup = false">取消</van-button>
-          <van-button type="primary" @click="confirmOutbound">确定</van-button>
-        </div>
-      </div>
-    </van-popup>
-
-    <!-- 出库类型选择器 -->
-    <van-popup v-model="showOutboundTypePicker" position="bottom">
-      <van-picker
-        show-toolbar
-        :columns="outboundTypeColumns"
-        @confirm="onOutboundTypeConfirm"
-        @cancel="showOutboundTypePicker = false"
-      />
-    </van-popup>
-
-    <!-- 出库项目选择器 -->
-    <van-popup v-model="showOutboundProjectPicker" position="bottom">
-      <van-picker
-        show-toolbar
-        :columns="projectColumns"
-        @confirm="onOutboundProjectConfirm"
-        @cancel="showOutboundProjectPicker = false"
-      />
-    </van-popup>
-
     <!-- 结果列表 -->
     <div class="results-section">
       <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
@@ -235,11 +79,6 @@
                     <span class="value">{{ item.Category_Type }}</span>
                   </div>
                 </div>
-              </div>
-              <div class="cell-footer">
-                <van-button size="mini" @click.stop="quickOutbound(item)">-</van-button>
-                <van-button size="mini" @click.stop="quickInbound(item)">+</van-button>
-                <van-button size="mini" @click.stop="viewDetail(item)">详情</van-button>
               </div>
             </div>
           </van-cell>
@@ -333,12 +172,6 @@ export default {
       } else {
         Toast('请输入搜索关键词或选择筛选条件');
       }
-    },
-
-    onClear() {
-      this.searchValue = '';
-      this.hasSearched = false;
-      this.resetFilter();
     },
 
     resetFilter() {
@@ -477,105 +310,6 @@ export default {
       // 这里可以跳转到详情页面
       // this.$router.push(`/inventory/detail/${item.Id}`);
     },
-
-    quickInbound(item) {
-      this.currentItem = item;
-      this.inboundQuantity = 1;
-      this.inboundType = 1;
-      this.inboundProject = '';
-      this.inboundRemark = '';
-      this.showInboundPopup = true;
-    },
-
-    quickOutbound(item) {
-      this.currentItem = item;
-      this.outboundQuantity = 1;
-      this.outboundType = 4;
-      this.outboundProject = '';
-      this.outboundRemark = '';
-      this.outboundError = '';
-      this.showOutboundPopup = true;
-    },
-
-    onInboundTypeConfirm(value) {
-      this.inboundType = value.value;
-      this.showInboundTypePicker = false;
-    },
-
-    onOutboundTypeConfirm(value) {
-      this.outboundType = value.value;
-      this.showOutboundTypePicker = false;
-    },
-
-    onProjectConfirm(value) {
-      this.inboundProject = value;
-      this.showProjectPicker = false;
-    },
-
-    onOutboundProjectConfirm(value) {
-      this.outboundProject = value;
-      this.showOutboundProjectPicker = false;
-    },
-
-    getInboundTypeText(type) {
-      const types = {
-        1: '采购入库',
-        2: '生产入库',
-        3: '其他入库'
-      };
-      return types[type] || '';
-    },
-
-    getOutboundTypeText(type) {
-      const types = {
-        4: '项目领用',
-        5: '日常领用',
-        6: '其他出库'
-      };
-      return types[type] || '';
-    },
-
-    confirmInbound() {
-      if (!this.inboundQuantity || this.inboundQuantity <= 0) {
-        Toast('请输入有效的入库数量');
-        return;
-      }
-
-      // 模拟入库操作
-      Toast.success('入库成功');
-      this.showInboundPopup = false;
-
-      // 更新列表中的库存
-      const index = this.list.findIndex(item => item.Id === this.currentItem.Id);
-      if (index !== -1) {
-        this.list[index].Current_Stock += this.inboundQuantity;
-        this.list[index].stock += this.inboundQuantity;
-      }
-    },
-
-    confirmOutbound() {
-      if (!this.outboundQuantity || this.outboundQuantity <= 0) {
-        this.outboundError = '请输入有效的出库数量';
-        return;
-      }
-
-      if (this.outboundQuantity > this.currentItem.Current_Stock) {
-        this.outboundError = '出库数量不能大于当前库存';
-        return;
-      }
-      this.outboundError = '';
-
-      // 模拟出库操作
-      Toast.success('出库成功');
-      this.showOutboundPopup = false;
-
-      // 更新列表中的库存
-      const index = this.list.findIndex(item => item.Id === this.currentItem.Id);
-      if (index !== -1) {
-        this.list[index].Current_Stock -= this.outboundQuantity;
-        this.list[index].stock -= this.outboundQuantity;
-      }
-    }
   }
 };
 </script>

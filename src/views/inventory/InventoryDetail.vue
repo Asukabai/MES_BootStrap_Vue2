@@ -37,7 +37,7 @@
           <div class="button-row">
             <van-button size="small" class="action-button" @click="goToOutbound">快速出库</van-button>
             <van-button size="small" class="action-button" @click="goToInbound">快速入库</van-button>
-            <van-button size="small" class="action-button">操作日志</van-button>
+            <van-button size="small" class="action-button" @click="goToLog">操作日志</van-button>
           </div>
         </div>
       </div>
@@ -46,8 +46,8 @@
 </template>
 
 <script>
-import SensorRequest from '@/utils/SensorRequest';
-import {key_DingScannedInventoryQRCodeResult} from '@/utils/Dingding';
+import SensorRequest from '../../utils/SensorRequest';
+import {key_DingScannedInventoryQRCodeResult} from '../../utils/Dingding';
 
 export default {
   name: 'InventoryDetail',
@@ -91,10 +91,6 @@ export default {
         this.refreshing = false;
       }, 1000);
     },
-    onClickLeft() {
-      this.$router.go(-1);
-    },
-
     loadInventoryData() {
       // 从 sessionStorage 获取扫码结果
       const scannedResult = sessionStorage.getItem(key_DingScannedInventoryQRCodeResult);
@@ -160,6 +156,22 @@ export default {
         });
       } else {
         this.$toast.fail('未查询到入库物品');
+      }
+    },
+    goToLog() {
+      // 跳转到日志页面，传递当前选中的物品信息
+      if (this.currentItem) {
+        this.$router.push({
+          name: 'InventoryLog',
+          params: {
+            department: this.$route.params.department
+          },
+          query: {
+            item: JSON.stringify(this.currentItem)
+          }
+        });
+      } else {
+        this.$toast.fail('未查询到库存物品');
       }
     },
   }

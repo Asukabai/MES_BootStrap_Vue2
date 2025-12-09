@@ -238,8 +238,14 @@ const router = new Router({
     {
       path: '/:department/inventory-inbound',
       name: 'InventoryInbound',
-      component: () => import('@/views/inventory/InventoryInbound.vue'),
+      component: () => import('../views/inventory/InventoryInbound.vue'),
       meta: { title: '快速入库' }
+    },
+    {
+      path: '/:department/inventoryLog',
+      name: 'InventoryLog',
+      component: () => import('../views/inventory/InventoryLog.vue'),
+      meta: { title: '日志记录' }
     },
     {
       path: '/:department/project-detail/:id',

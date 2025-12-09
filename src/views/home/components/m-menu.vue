@@ -136,11 +136,11 @@ export default {
         this.$toast.success('已展示全部 ！');
       }
       if (item.title === '库存管理') {
-        // this.navigateTo('/inventory');
-        this.$toast.success('正在开发中 ！');
+        this.navigateTo('/inventory');
+        // this.$toast.success('正在开发中 ！');
       }
       if (item.title === '库存扫码') {
-        this.testScanInventoryQRCode();
+        this.scanInventoryQRCode();
       }
     },
     // 库存扫码逻辑...
