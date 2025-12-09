@@ -2,70 +2,42 @@
   <div class="inventory-detail-page">
     <div class="container">
       <van-loading v-if="loading" size="24px" vertical>加载中...</van-loading>
-
       <div v-else>
-<!--        <van-cell-group v-if="inventoryItems.length > 0">-->
-<!--          <van-cell-->
-<!--            v-for="(item, index) in inventoryItems"-->
-<!--            :key="item.Id"-->
-<!--            :title="item.Item_Name"-->
-<!--            is-link-->
-<!--            @click="selectItem(index)"-->
-<!--            :class="{ 'selected-item': selectedIndex === index }"-->
-<!--          >-->
-<!--            <template #label>-->
-<!--              <div class="item-details">-->
-<!--                <div>位置: {{ item.Shelf_Location }}</div>-->
-<!--                <div>当前库存:-->
-<!--                  <span :class="['stock-status', { 'low-stock': item.Is_Low_Stock === '是' }]">-->
-<!--                    {{ item.Current_Stock }}-->
-<!--                  </span>-->
-<!--                </div>-->
-<!--              </div>-->
-<!--            </template>-->
-<!--          </van-cell>-->
-<!--        </van-cell-group>-->
-
+        <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
         <!-- 展示详细信息的卡片 -->
         <van-card
-          v-if="currentItem && !showDetail"
+          v-if="currentItem "
           class="detail-card"
         >
           <div slot="desc" class="detail-content">
             <van-cell-group>
-              <van-cell title="物品名称" :value="currentItem.Item_Name" />
+              <van-cell title="物品名称">
+                <span class="item-name" slot="default">{{ currentItem.Item_Name }}</span>
+              </van-cell>
               <van-cell title="货架位置" :value="currentItem.Shelf_Location" />
               <van-cell title="物品型号" :value="currentItem.Item_Model" />
-              <van-cell title="当前库存" :value="currentItem.Current_Stock" />
+              <van-cell title="当前库存">
+                <span :class="stockStatusClass" slot="default">{{ currentItem.Current_Stock }}</span>
+              </van-cell>
               <van-cell title="物品品牌" :value="currentItem.Item_Brand" />
               <van-cell title="类别类型" :value="currentItem.Category_Type" />
 <!--              <van-cell title="项目编码" :value="currentItem.Project_Code || '无'" />-->
               <van-cell title="预警阈值" :value="currentItem.Warning_Threshold" />
               <van-cell title="库存状态">
-                <template #value>
-                  <van-tag :type="currentItem.Is_Low_Stock === '是' ? 'danger' : 'success'">
-                    {{ currentItem.Is_Low_Stock === '是' ? '低库存' : '正常' }}
-                  </van-tag>
-                </template>
+                <span :class="stockStatusClass" slot="default">{{ stockStatusText }}</span>
               </van-cell>
               <van-cell title="备注" :value="currentItem.Remark" />
               <van-cell title="公司" :value="currentItem.Company" />
             </van-cell-group>
           </div>
         </van-card>
-
         <van-empty v-else-if="!currentItem" description="暂无库存信息" />
-
+        </van-pull-refresh>
         <div class="button-group-container">
-          <div class="button-row">
-            <van-button size="small" class="action-button" @click="onClickLeft">返回首页</van-button>
-            <van-button size="small" class="action-button" @click="loadInventoryData">数据刷新</van-button>
-            <van-button size="small" class="action-button">操作日志</van-button>
-          </div>
           <div class="button-row">
             <van-button size="small" class="action-button" @click="goToOutbound">快速出库</van-button>
             <van-button size="small" class="action-button" @click="goToInbound">快速入库</van-button>
-            <van-button size="small" class="action-button">更新信息</van-button>
+            <van-button size="small" class="action-button">操作日志</van-button>
           </div>
         </div>
       </div>
@@ -82,6 +54,7 @@ export default {
   data() {
     return {
       loading: true,
+      refreshing: false, // 添加刷新状态
       inventoryItems: [],
       currentItem: null,
       selectedIndex: 0 // 新增选中索引
@@ -90,10 +63,33 @@ export default {
   created() {
     this.loadInventoryData();
   },
+  computed: {
+    stockStatusClass() {
+      if (!this.currentItem) return 'stock-normal';
+
+      const isLowStock = this.currentItem.Is_Low_Stock;
+      if (isLowStock === '是' || isLowStock === true || isLowStock === 1) {
+        return 'stock-low';
+      }
+      return 'stock-normal';
+    },
+    stockStatusText() {
+      if (!this.currentItem) return '正常';
+
+      const isLowStock = this.currentItem.Is_Low_Stock;
+      if (isLowStock === '是' || isLowStock === true || isLowStock === 1) {
+        return '低库存';
+      }
+      return '正常';
+    }
+  },
   methods: {
-    selectItem(index) {
-      this.selectedIndex = index;
-      this.currentItem = this.inventoryItems[index];
+    // 添加下拉刷新处理方法
+    onRefresh() {
+      this.loadInventoryData();
+      setTimeout(() => {
+        this.refreshing = false;
+      }, 1000);
     },
     onClickLeft() {
       this.$router.go(-1);
@@ -116,7 +112,7 @@ export default {
       SensorRequest.InventoryItemsGetFun(
         JSON.stringify(params),
         (respData) => {
-          alert('获取库存信息成功  :'+ respData)
+          // alert('获取库存信息成功  :'+ respData)
           this.inventoryItems = JSON.parse(respData);
           this.loading = false;
           // 自动选择第一个物品
@@ -166,31 +162,28 @@ export default {
         this.$toast.fail('未查询到入库物品');
       }
     },
-
-    showItemDetail(item) {
-      this.currentItem = item;
-      this.showDetail = true;
-    }
   }
 };
 </script>
 
 <style scoped>
-/* 添加新样式 */
-.selected-item {
-  background-color: #e8f4ff;
+.item-name {
+  color: #ffc107;
+  font-weight: bold;
+}
+.stock-low {
+  color: #ee0a24;
+  font-weight: bold;
 }
 
+.stock-normal {
+  color: #07c160;
+  font-weight: bold;
+}
 .detail-card {
   margin-top: 15px;
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-}
-
-.item-details {
-  font-size: 12px;
-  color: #666;
-  line-height: 1.5;
 }
 
 .detail-content {
@@ -217,8 +210,8 @@ export default {
   max-width: 100px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
   border-radius: 8px;
-  font-size: 12px;
-  height: 32px;
+  font-size: 14px;
+  height: 40px;
 }
 
 .action-button::after {
@@ -238,19 +231,5 @@ export default {
 
 .container {
   padding: 10px;
-}
-
-.stock-status {
-  font-weight: bold;
-  color: #00c853;
-}
-
-.low-stock {
-  color: #ff5252;
-}
-
-.van-popup {
-  border-top-left-radius: 16px;
-  border-top-right-radius: 16px;
 }
 </style>

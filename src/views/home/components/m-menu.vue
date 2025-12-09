@@ -140,7 +140,7 @@ export default {
         this.$toast.success('正在开发中 ！');
       }
       if (item.title === '库存扫码') {
-        this.scanInventoryQRCode();
+        this.testScanInventoryQRCode();
       }
     },
     // 库存扫码逻辑...
@@ -172,6 +172,15 @@ export default {
         });
       });
     },
+    testScanInventoryQRCode() {
+            const result = "1号货架一层01"; // 获取扫描结果
+            if (result) {
+              // 存储扫码结果
+              sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, result);
+              // 更新全局变量
+              updateCachedInventoryProductId(result);
+              this.navigateTo('/inventoryDetail');}}
+
   }
 };
 </script>
