@@ -6,8 +6,10 @@
         <!-- 搜索输入框 -->
         <van-field
           v-model="searchValue"
-          placeholder="请输入搜索关键词"
+          placeholder="请输入库存物品关键词"
           class="search-input"
+          inputmode="search"
+          enterkeyhint="search"
         />
         <!-- 搜索按钮 -->
         <van-button
@@ -57,12 +59,13 @@
             v-for="item in list"
             :key="item.Id"
             class="inventory-cell"
-            @click="viewDetail(item)"
+            @click="viewDetail(item.Shelf_Location)"
           >
             <div class="cell-content">
               <div class="cell-header">
-                <div class="item-title">{{ item.Item_Name }} {{ item.Item_Model }}</div>
-                <div class="item-stock">库存: {{ item.Current_Stock }}</div>
+                <div class="item-title">物品名称：{{ item.Item_Name }}</div>
+                <div class="item-title">物品类型：{{ item.Item_Model }}</div>
+                <div class="item-stock">库存数量: {{ item.Current_Stock }}</div>
               </div>
               <div class="cell-body">
                 <div class="item-info">
@@ -90,15 +93,24 @@
     <div v-if="hasSearched && list.length === 0 && !loading" class="empty-state">
       <van-empty description="暂无相关库存信息" />
     </div>
+    <!-- 添加悬浮按钮 -->
+    <FloatingActionButton
+      @click="onFloatingButtonClick"
+      :initial-position="{ bottom: 80, right: 20 }"
+    />
   </div>
 </template>
 
 <script>
 import { Toast } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
-
+import FloatingActionButton from '../../components/FloatingActionButton.vue';
+import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding"; // 引入组件
 export default {
   name: 'InventoryManagement',
+  components: {
+    FloatingActionButton // 注册组件
+  },
   data() {
     return {
       searchValue: '',
@@ -162,6 +174,13 @@ export default {
     this.loadProjectOptions();
   },
   methods: {
+    onFloatingButtonClick() {
+      // 跳转到新页面，这里假设路由名为 'add-inventory'
+      this.$router.push('/inventory/add');
+
+      // 或者如果使用命名路由
+      // this.$router.push({ name: 'AddInventory' });
+    },
     onSearch() {
       if (this.searchValue || this.filter.category || this.filter.status) {
         this.hasSearched = true;
@@ -306,24 +325,73 @@ export default {
     },
 
     viewDetail(item) {
-      Toast(`查看 ${item.Item_Name} 的详细信息`);
-      // 这里可以跳转到详情页面
-      // this.$router.push(`/inventory/detail/${item.Id}`);
+      sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, item);
+      // 跳转到库存详情页面
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}/inventoryDetail`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
     },
   }
 };
 </script>
 
 <style scoped>
+.search-section {
+  position: sticky;
+  top: 0;
+  z-index: 1000;
+  background: #3f83f8;
+  padding: 16px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  border-bottom-left-radius: 20px;
+  border-bottom-right-radius: 20px;
+}
+
+.search-container {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.search-input {
+  flex: 1;
+  border: 2px solid #fff;
+  border-radius: 25px;
+  background-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.search-btn, .reset-btn {
+  border-radius: 25px;
+  padding: 10px 20px;
+  font-weight: 500;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+  transition: all 0.3s ease;
+  border: none;
+}
+
+.search-btn {
+  background: white;
+  color: black;
+}
+
+.reset-btn {
+  background: white;
+  color: black;
+}
+
+.search-btn:active, .reset-btn:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
 .inventory-page {
   min-height: 100vh;
   background-color: #f5f5f5;
-}
-
-.search-section {
-  padding: 0;
-  background-color: white;
-  transition: all 0.3s ease;
 }
 
 .search-top {
@@ -333,38 +401,20 @@ export default {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
 }
 
-.search-container {
-  display: flex;
-  padding: 10px 16px 0 16px;
-  gap: 10px;
-}
-
-.search-input {
-  flex: 1;
-}
-
-.search-btn {
-  width: 80px;
-}
-
-.reset-btn {
-  width: 80px;
-}
-
 .filter-container {
-  padding: 10px 16px;
+  padding: 8px 12px;
 }
 
 .results-section {
-  padding: 16px;
-  padding-top: 0;
+  padding: 18px;
 }
 
 .inventory-cell {
-  margin-bottom: 12px;
-  border-radius: 8px;
+  margin-bottom: 16px;
+  border-radius: 12px;
   overflow: hidden;
   background-color: white;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .cell-content {
@@ -373,26 +423,31 @@ export default {
 
 .cell-header {
   display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-bottom: 12px;
 }
 
 .item-title {
-  font-size: 16px;
+  font-size: 17px;
   font-weight: 500;
   color: #333;
+  flex: 1;
+  margin-right: 4px;
 }
 
 .item-stock {
-  font-size: 14px;
-  color: #666;
+  font-size: 16px;
+  font-weight: 600;
+  color: orange;
+  white-space: nowrap;
+  align-self: flex-end;/* 确保库存数量在右侧 */
 }
 
 .cell-body {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .item-info {
@@ -401,19 +456,30 @@ export default {
 
 .info-row {
   display: flex;
+  margin-bottom: 6px;
+  font-size: 14px;
+  align-items: baseline;
+}
+
+/* 确保所有 info-row 内的文本统一 */
+.info-row {
+  display: flex;
   margin-bottom: 4px;
-  font-size: 13px;
+  font-size: 14px;
+  align-items: baseline; /* 确保文本基线对齐 */
 }
 
 .label {
   color: #999;
   margin-right: 4px;
   min-width: 40px;
+  flex-shrink: 0; /* 防止标签被压缩 */
 }
 
 .value {
   color: #666;
   flex: 1;
+  word-break: break-all; /* 防止长文本溢出 */
 }
 
 .cell-footer {

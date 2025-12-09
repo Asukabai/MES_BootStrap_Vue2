@@ -208,7 +208,7 @@ export default {
   data() {
     return {
       activeTab: 0, // 当前选中的 tab index
-      inventory_ID: "692fba193b76928fd0393799", // 固定的库存ID
+      inventory_ID: "",// 固定的库存ID
 
       // 排序状态
       inventorySortOrder: 'desc', // 'asc' 或 'desc'
@@ -239,8 +239,18 @@ export default {
   },
 
   mounted() {
-    const department = this.$route.params.department
-    GetDingUserToken(department,(token) => {},(token) => {})
+    // 从路由参数中获取 inventory_ID
+    const routeItem = this.$route.query.item;
+    if (routeItem) {
+      try {
+        const parsedItem = JSON.parse(routeItem);
+        this.inventory_ID = parsedItem.Id || parsedItem.id || "";
+      } catch (e) {
+        console.error('解析路由参数失败:', e);
+      }
+    }
+    // const department = this.$route.params.department
+    // GetDingUserToken(department,(token) => {},(token) => {})
 
     // 根据默认选中的标签加载对应数据
     if (this.activeTab === 0) {

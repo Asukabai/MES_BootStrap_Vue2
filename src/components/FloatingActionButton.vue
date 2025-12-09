@@ -119,9 +119,9 @@ export default {
 /* 悬浮按钮样式 */
 .floating-action-button{
   position: fixed;
-  width: 40px; /* 缩小按钮宽度 */
-  height: 40px; /* 缩小按钮高度 */
-  background-color: #1989fa;
+  width: 55px; /* 缩小按钮宽度 */
+  height: 55px; /* 缩小按钮高度 */
+  background-color: #3f83f8;
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -130,6 +130,6 @@ export default {
   cursor: pointer;
   user-select: none; /* 防止拖动时选中文字 */
   touch-action: none; /* 禁用默认触摸行为 */
-  //z-index: 999;
+  /* z-index: 999; */
 }
 </style>
