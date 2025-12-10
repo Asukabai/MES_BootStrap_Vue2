@@ -1,22 +1,21 @@
 <template>
   <van-tabbar
-      v-model="active"
-      class="fixed-tabbar"
-      :safe-area-inset-bottom="true"
-      route
+    v-model="active"
+    class="fixed-tabbar"
+    :safe-area-inset-bottom="true"
+    @change="onTabChange"
   >
     <van-tabbar-item
-        v-for="(item, index) in tabbars"
-        :key="index"
-        :to= "item.path"
-        :badge="item.badge"
+      v-for="(item, index) in tabbars"
+      :key="index"
+      :badge="item.badge"
     >
       <!-- 自定义图标 -->
-      <template #icon="{ active }">
+      <template #icon>
         <img
-            :src="active ? item.iconActive : item.iconInactive"
-            :alt="item.title"
-            style="width: 20px; height: 20px;"
+          :src="active === index ? item.iconActive : item.iconInactive"
+          :alt="item.title"
+          style="width: 20px; height: 20px;"
         />
       </template>
 
@@ -66,37 +65,35 @@ export default {
   },
   computed: {
     tabbars() {
-      const base = this.$route.params.department;
-      console.log('进入 MainTabBar.vue', base);
-      // alert( "4455 "+base)
+      const base = this.$route.params.department || 'default';
       return [
         {
           title: '知识库',
-          path: `/${base}/chat_category`,  // ✅ 使用模板字符串
+          path: `/${base}/chat_category`,
           iconActive: this.icons.message.active,
           iconInactive: this.icons.message.inactive
         },
         {
           title: '任务',
-          path: `/${base}/taskList`,       // ✅ 使用模板字符串
+          path: `/${base}/taskList`,
           iconActive: this.icons.task.active,
           iconInactive: this.icons.task.inactive
         },
         {
           title: '工作台',
-          path: `/${base}/index`,          // ✅ 使用模板字符串
+          path: `/${base}/index`,
           iconActive: this.icons.home.active,
           iconInactive: this.icons.home.inactive
         },
         {
           title: '分享',
-          path: `/${base}/cartList`,       // ✅ 使用模板字符串
+          path: `/${base}/cartList`,
           iconActive: this.icons.share.active,
           iconInactive: this.icons.share.inactive
         },
         {
           title: '我的',
-          path: `/${base}/user`,           // ✅ 修正后的写法
+          path: `/${base}/user`,
           iconActive: this.icons.user.active,
           iconInactive: this.icons.user.inactive
         }
@@ -104,25 +101,59 @@ export default {
     }
   },
   watch: {
-    '$route.path': function (newPath) {
-      this.updateActiveTab(newPath);
+    '$route': {
+      handler(newRoute) {
+        this.updateActiveTab(newRoute);
+      },
+      immediate: true
     }
   },
+
   methods: {
-    updateActiveTab(path) {
-      const index = this.tabbars.findIndex(item => item.path === path);
-      if (index !== -1) {
-        this.active = index;
+    onTabChange(index) {
+      const targetPath = this.tabbars[index].path;
+      if (this.$route.path !== targetPath) {
+        this.$router.push(targetPath);
       }
     },
+
+    updateActiveTab(route) {
+      const fullPath = route.path;
+      const department = route.params.department;
+
+      // 精确匹配路径
+      for (let i = 0; i < this.tabbars.length; i++) {
+        const tabPath = this.tabbars[i].path;
+        if (fullPath === tabPath) {
+          this.active = i;
+          return;
+        }
+      }
+
+      // 模糊匹配（处理带参数的情况）
+      if (department) {
+        if (fullPath.includes(`/${department}/chat_category`)) {
+          this.active = 0;
+        } else if (fullPath.includes(`/${department}/taskList`)) {
+          this.active = 1;
+        } else if (fullPath.includes(`/${department}/index`)) {
+          this.active = 2;
+        } else if (fullPath.includes(`/${department}/cartList`)) {
+          this.active = 3;
+        } else if (fullPath.includes(`/${department}/user`)) {
+          this.active = 4;
+        }
+      }
+    },
+
     detectIOS() {
       // 检测是否为iOS设备
       const userAgent = navigator.userAgent || navigator.vendor || window.opera;
       this.isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
     }
   },
+
   mounted() {
-    this.updateActiveTab(this.$route.path);
     this.detectIOS();
   }
 };

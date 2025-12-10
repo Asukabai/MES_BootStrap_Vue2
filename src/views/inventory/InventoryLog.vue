@@ -70,7 +70,7 @@
                   <van-tag plain type="primary" style="margin-right: 8px; margin-bottom: 8px;">
                     数量变化：{{ formatQuantityChange(item) }}
                   </van-tag>
-                  <van-tag plain type="success" style="margin-right: 8px; margin-bottom: 8px;">当前库存：{{ item.Current_Quantity }}</van-tag>
+                  <van-tag plain type="success" style="margin-right: 8px; margin-bottom: 8px;">操作后库存：{{ item.Current_Quantity }}</van-tag>
                 </template>
 
                 <template #footer>
@@ -170,7 +170,7 @@
                   <van-tag plain type="primary" style="margin-right: 8px; margin-bottom: 8px;">
                     数量变化：{{ formatQuantityChange(item) }}
                   </van-tag>
-                  <van-tag plain type="success" style="margin-right: 8px; margin-bottom: 8px;">当前库存：{{ item.Current_Quantity }}</van-tag>
+                  <van-tag plain type="success" style="margin-right: 8px; margin-bottom: 8px;">操作后库存：{{ item.Current_Quantity }}</van-tag>
                 </template>
 
                 <template #footer>

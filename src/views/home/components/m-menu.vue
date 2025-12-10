@@ -86,6 +86,28 @@ export default {
     };
   },
   methods: {
+    isValidQRCode(content) {
+      // 检查是否为网址
+      const urlPattern = /^(https?:\/\/|www\.)/i;
+      // 检查是否为邮箱
+      const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      // 检查是否为纯数字（可能为无效编码）
+      const pureNumberPattern = /^\d+$/;
+
+      // 如果匹配以上模式，则认为是无效的库存位置二维码
+      if (urlPattern.test(content) ||
+        emailPattern.test(content) ||
+        pureNumberPattern.test(content)) {
+        return false;
+      }
+
+      // 检查内容长度，过短的内容可能无效
+      if (content.length < 3) {
+        return false;
+      }
+
+      return true;
+    },
     navigateTo(path) {
       const department = this.$route.params.department;
       if (department) {
@@ -145,14 +167,19 @@ export default {
     },
     // 库存扫码逻辑...
     scanInventoryQRCode() {
+      // 判断是否为PC端（非钉钉环境或钉钉PC端）
+      if (typeof dd === 'undefined' || !dd.env || dd.env.platform === 'pc') {
+        this.$toast.fail('PC端暂不支持扫码功能，请在钉钉移动端使用');
+        return;
+      }
       console.log("开始扫码");
-      alert("开始扫码")
+      // alert("开始扫码")
       dd.ready(() => {
         dd.biz.util.scan({
           type: 'qrCode',
           onSuccess: (data) => {
             const result = data.text; // 获取扫描结果
-            if (result) {
+            if (this.isValidQRCode(result)) {
               // 存储扫码结果
               sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, result);
               // 更新全局变量
