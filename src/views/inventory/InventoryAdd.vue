@@ -1,3 +1,4 @@
+<!-- src/views/inventory/InventoryAdd.vue -->
 <template>
   <div class="inventory-add-page">
     <div class="form-container">
@@ -11,13 +12,34 @@
             :rules="[{ required: true, message: '请填写物品名称' }]"
           />
 
+<!--          <van-field-->
+<!--            v-model="itemForm.Shelf_Location"-->
+<!--            name="Shelf_Location"-->
+<!--            label="货架位置"-->
+<!--            placeholder="请输入货架位置或直接扫码获取"-->
+<!--            :rules="[{ required: true, message: '请填写货架位置' }]"-->
+<!--            readonly-->
+<!--            :right-icon="scanIcon"-->
+<!--            @click-right-icon="handleScanClick"-->
+<!--          >-->
+<!--            <template #label>-->
+<!--              <span>货架位置</span>-->
+<!--            </template>-->
+<!--          </van-field>-->
+
           <van-field
             v-model="itemForm.Shelf_Location"
             name="Shelf_Location"
             label="货架位置"
             placeholder="请输入货架位置或直接扫码获取"
             :rules="[{ required: true, message: '请填写货架位置' }]"
-          />
+            :right-icon="scanIcon"
+            @click-right-icon="handleScanClick"
+          >
+            <template #label>
+              <span>货架位置</span>
+            </template>
+          </van-field>
 
           <van-field
             v-model="itemForm.Item_Model"
@@ -131,11 +153,13 @@
 <script>
 import { Toast } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
+import * as dd from 'dingtalk-jsapi';
 
 export default {
   name: 'InventoryAdd',
   data() {
     return {
+      scanIcon: require('../../assets/scan_icon.png'), // 添加扫码图标
       itemForm: {
         Item_Name: '',
         Shelf_Location: '',
@@ -161,6 +185,41 @@ export default {
   methods: {
     onClickLeft() {
       this.$router.go(-1);
+    },
+
+    // 添加扫码点击处理函数
+    handleScanClick() {
+      this.scanQRCode();
+    },
+
+    // 扫码功能实现
+    scanQRCode() {
+      // 判断是否在钉钉环境中且为移动端
+      if (typeof dd === 'undefined' || !dd.env || dd.env.platform === 'pc') {
+        Toast.fail('请在钉钉移动端中使用扫码功能');
+        return;
+      }
+
+      // 调用钉钉扫码功能
+      dd.ready(() => {
+        dd.biz.util.scan({
+          type: 'qrCode', // 只扫描二维码
+          onSuccess: (data) => {
+            const result = data.text; // 获取扫描结果
+            if (result) {
+              // 将扫描结果填入货架位置字段
+              this.itemForm.Shelf_Location = result;
+            } else {
+              Toast.fail('未获取到二维码内容');
+            }
+          },
+          onFail: (err) => {
+            if (err.errorCode !== 300001) {
+              Toast.fail('未扫描到二维码！');
+            }
+          }
+        });
+      });
     },
 
     onCategoryChange(value) {
@@ -211,44 +270,90 @@ export default {
       });
     },
 
+// 在 methods 中修改 onSubmit 方法
     onSubmit(values) {
-      // 构造请求参数
-      const param = {
-        ...this.itemForm,
-        Current_Stock: 0, // 新增物品初始库存为0
-        Is_Low_Stock: '' // 初始状态不设置低库存标记
-      };
+      // 先检查货架位置是否已存在
+      this.checkShelfLocationExists()
+        .then(exists => {
+          if (exists) {
+            Toast.fail('该位置信息已存在，请更换位置新增物品');
+            return;
+          }
 
-      // 如果是项目分类，需要查找对应的项目代码
-      if (param.Category_Type === '项目' && this.selectedProjectName) {
-        const selectedProject = this.fullProjectList.find(project =>
-          (project.Project_Name || project.name || project.projectName) === this.selectedProjectName
-        );
+          // 构造请求参数
+          const param = {
+            ...this.itemForm,
+            Current_Stock: 0, // 新增物品初始库存为0
+            Is_Low_Stock: '' // 初始状态不设置低库存标记
+          };
 
-        if (selectedProject) {
-          param.Project_Code = selectedProject.Project_Code || '';
-        } else {
-          param.Project_Code = '';
-        }
-      }
+          // 如果是项目分类，需要查找对应的项目代码
+          if (param.Category_Type === '项目' && this.selectedProjectName) {
+            const selectedProject = this.fullProjectList.find(project =>
+              (project.Project_Name || project.name || project.projectName) === this.selectedProjectName
+            );
 
-      // 如果不是耗材分类，清除预警阈值
-      if (param.Category_Type !== '耗材') {
-        param.Warning_Threshold = 0;
-      }
+            if (selectedProject) {
+              param.Project_Code = selectedProject.Project_Code || '';
+            } else {
+              param.Project_Code = '';
+            }
+          }
 
-      // 如果不是项目分类，清除项目代码
-      if (param.Category_Type !== '项目') {
-        param.Project_Code = '';
-      }
+          // 如果不是耗材分类，清除预警阈值
+          if (param.Category_Type !== '耗材') {
+            param.Warning_Threshold = 0;
+          }
 
-      SensorRequest.InventoryItemsAddFun(JSON.stringify(param), (respData) => {
-        Toast.success('新增物品成功');
-        // 返回上一页
-        this.$router.go(-1);
-      }, (error) => {
-        console.error('新增物品失败:', error);
-        Toast.fail('新增物品失败');
+          // 如果不是项目分类，清除项目代码
+          if (param.Category_Type !== '项目') {
+            param.Project_Code = '';
+          }
+
+          SensorRequest.InventoryItemsAddFun(JSON.stringify(param), (respData) => {
+            Toast.success('新增物品成功');
+            // 返回上一页
+            this.$router.go(-1);
+          }, (error) => {
+            console.error('新增物品失败:', error);
+            Toast.fail('新增物品失败');
+          });
+        })
+        .catch(error => {
+          console.error('检查货架位置失败:', error);
+          Toast.fail('检查货架位置失败');
+        });
+    },
+
+    // 新增检查货架位置是否已存在的方法
+    checkShelfLocationExists() {
+      return new Promise((resolve, reject) => {
+        // 构造检查参数
+        const checkParam = {
+          PageIndex: 0,
+          PageSize: 10,
+          Item_Name: "",
+          Shelf_Location: this.itemForm.Shelf_Location,
+          Item_Model: "",
+          Item_Brand: "",
+          Category_Type: "",
+          Company: this.itemForm.Company
+        };
+
+        SensorRequest.InventoryItemsGetFun(JSON.stringify(checkParam), (respData) => {
+          try {
+            const data = JSON.parse(respData);
+            // 如果返回空数组，说明位置不存在，可以新增
+            const exists = Array.isArray(data) && data.length > 0;
+            resolve(exists);
+          } catch (error) {
+            console.error('解析检查结果失败:', error);
+            reject(error);
+          }
+        }, (error) => {
+          console.error('检查货架位置失败:', error);
+          reject(error);
+        });
       });
     }
   }

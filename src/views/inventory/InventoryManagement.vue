@@ -130,16 +130,15 @@ export default {
       categoryOptions: [
         { text: '全部分类', value: '' },
         { text: '耗材', value: '耗材' },
-        { text: '半成品', value: '半成品' },
-        { text: '成品', value: '成品' },
-        { text: '辅助材料', value: '辅助材料' }
+        { text: '公用', value: '公用' },
+        { text: '项目', value: '项目' },
+        { text: '其他', value: '其他' }
       ],
       statusOptions: [
-        { text: '全部状态', value: '' },
-        { text: '充足', value: '充足' },
-        { text: '紧张', value: '紧张' },
-        { text: '缺货', value: '缺货' },
-        { text: '停产', value: '停产' }
+        { text: '全部公司', value: '' },
+        { text: '晟思', value: '晟思' },
+        { text: '大钧', value: '大钧' },
+        { text: '星移', value: '星移' }
       ],
       inboundTypeColumns: [
         { text: '采购入库', value: 1 },
@@ -266,7 +265,7 @@ export default {
           Item_Model: "", // 物品型号搜索
           Item_Brand: "", // 物品品牌搜索
           Category_Type: this.filter.category, // 分类筛选
-          Company: "" // 公司筛选
+          Company: this.filter.status // 公司筛选
         };
 
         // 调用后端接口获取库存数据
@@ -424,34 +423,35 @@ export default {
 }
 
 .inventory-cell {
-  margin-bottom: 16px;
-  border-radius: 12px;
+  margin-bottom: 12px;
+  border-radius: 8px;
   overflow: hidden;
   background-color: white;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
 .cell-content {
-  padding: 12px 16px;
+  padding: 10px 12px;
 }
 
 .cell-header {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  margin-bottom: 12px;
+  margin-bottom: 8px;
 }
 
 .item-title {
-  font-size: 17px;
+  font-size: 15px;
   font-weight: 500;
   color: #333;
   flex: 1;
   margin-right: 4px;
+  line-height: 1.3;
 }
 
 .item-stock {
-  font-size: 16px;
+  font-size: 14px;
   font-weight: 600;
   color: orange;
   white-space: nowrap;
@@ -461,7 +461,7 @@ export default {
 .cell-body {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .item-info {
@@ -470,8 +470,8 @@ export default {
 
 .info-row {
   display: flex;
-  margin-bottom: 6px;
-  font-size: 14px;
+  margin-bottom: 3px;
+  font-size: 12px;
   align-items: baseline;
 }
 
@@ -486,7 +486,7 @@ export default {
 .label {
   color: #999;
   margin-right: 4px;
-  min-width: 40px;
+  min-width: 30px;
   flex-shrink: 0; /* 防止标签被压缩 */
 }
 

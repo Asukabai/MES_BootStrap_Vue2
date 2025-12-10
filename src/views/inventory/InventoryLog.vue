@@ -67,7 +67,9 @@
                 class="share-card"
               >
                 <template #tags>
-                  <van-tag plain type="primary" style="margin-right: 8px; margin-bottom: 8px;">数量变化：{{ item.Quantity_Change }}</van-tag>
+                  <van-tag plain type="primary" style="margin-right: 8px; margin-bottom: 8px;">
+                    数量变化：{{ formatQuantityChange(item) }}
+                  </van-tag>
                   <van-tag plain type="success" style="margin-right: 8px; margin-bottom: 8px;">当前库存：{{ item.Current_Quantity }}</van-tag>
                 </template>
 
@@ -165,7 +167,9 @@
                   </div>
                 </template>
                 <template #tags>
-                  <van-tag plain type="primary" style="margin-right: 8px; margin-bottom: 8px;">数量变化：{{ item.Quantity_Change }}</van-tag>
+                  <van-tag plain type="primary" style="margin-right: 8px; margin-bottom: 8px;">
+                    数量变化：{{ formatQuantityChange(item) }}
+                  </van-tag>
                   <van-tag plain type="success" style="margin-right: 8px; margin-bottom: 8px;">当前库存：{{ item.Current_Quantity }}</van-tag>
                 </template>
 
@@ -239,6 +243,7 @@ export default {
   },
 
   mounted() {
+
     // 从路由参数中获取 inventory_ID
     const routeItem = this.$route.query.item;
     if (routeItem) {
@@ -261,6 +266,17 @@ export default {
   },
 
   methods: {
+    // 格式化数量变化显示
+    formatQuantityChange(item) {
+      const quantity = item.Quantity_Change || 0;
+      // alert( "quantity:"+quantity)
+      // 如果操作类型包含"入库"，显示为正数并加上"+"号
+      if (item.Transaction_Type && item.Transaction_Type.includes('入库')) {
+        return `+${quantity}`;
+      }
+      // 其他情况显示为负数并加上"-"号
+      return `-${quantity}`;
+    },
     // 库存操作日志过滤变更
     onInventoryFilterChange(name) {
       this.inventoryFilterTab = name;
