@@ -43,7 +43,8 @@ export default {
       countdownTime: 30,
       countdownVisible: false,
       hideInterval: null,
-      keyIcon: require('@/assets/key.png')
+      keyIcon: require('@/assets/key.png'),
+      isCopying: false // 添加防重复点击状态
     }
   },
   mounted() {
@@ -122,8 +123,10 @@ export default {
     // 复制验证码到剪贴板
 // 复制验证码到剪贴板 - 改进版本
     copyCode() {
-      if (!this.ddingCode) return;
+      // 防止重复点击
+      if (!this.ddingCode || this.isCopying) return;
 
+      this.isCopying = true;
       const cleanCode = this.ddingCode.trim();
 
       // 检查是否支持 clipboard API
@@ -134,6 +137,11 @@ export default {
         }).catch(err => {
           Toast.fail('复制失败');
           console.error('复制失败:', err);
+        }).finally(() => {
+          // 确保无论成功失败都重置状态
+          setTimeout(() => {
+            this.isCopying = false;
+          }, 100); // 短暂延迟防止用户连续快速点击
         });
       } else {
         // 降级处理：使用传统方法
@@ -148,6 +156,11 @@ export default {
         } catch (err) {
           Toast.fail('复制失败');
           console.error('复制失败:', err);
+        } finally {
+          // 确保无论成功失败都重置状态
+          setTimeout(() => {
+            this.isCopying = false;
+          }, 100); // 短暂延迟防止用户连续快速点击
         }
       }
     }
