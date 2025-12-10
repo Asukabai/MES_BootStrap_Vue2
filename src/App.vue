@@ -5,7 +5,7 @@
         <router-view />
       </div>
       <div
-        v-if="!$route.path.includes('login') && !$route.path.includes('inventory')"
+        v-if="!$route.path.includes('login') && !$route.path.includes('inventory') && !$route.path.includes('weeklyReport')"
         class="tabbar-content"
         :class="{ 'ios-tabbar': isIOS, 'android-tabbar': !isIOS && !isHarmonyOS, 'harmony-tabbar': isHarmonyOS }"
       >
@@ -16,8 +16,8 @@
 </template>
 
 <script>
-import MainTabBar from '@/components/MainTabBar.vue'
-import { GetDingUserToken } from '@/utils/Dingding'
+import { GetDingUserToken } from './utils/Dingding'
+import MainTabBar from "./components/MainTabBar.vue";
 
 export default {
   name: 'App',

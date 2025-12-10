@@ -24,7 +24,6 @@
 import MBanner from './components/m-banner.vue';
 import MMenu from './components/m-menu.vue';
 import TaskProgressBoard from '@/components/TaskProgressBoard.vue';
-import {GetDingUserToken} from "../../utils/Dingding";
 
 export default {
   name: 'HomePage',

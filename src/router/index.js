@@ -217,12 +217,32 @@ const router = new Router({
       name: 'ProgressTracking',
       component: () => import('@/views/project/ProgressTracking.vue'),
       meta: { title: '进度跟踪' }
-    },    {
+    },
+    {
+      path: '/:department/weeklyReportManagement',
+      name: 'WeeklyReportManagement',
+      component: () => import('../views/weeklyReport/WeeklyReportManagement.vue'),
+      meta: { title: '周报管理' }
+    },
+    {
+      path: '/:department/weeklyReport/detail/:id',
+      name: 'WeeklyReportDetail',
+      component: () => import('@/views/weeklyReport/WeeklyReportDetail.vue'),
+      meta: { title: '周报详情' }
+    },
+    {
+      path: '/:department/weeklyReport/edit/:id',
+      name: 'WeeklyReportEdit',
+      component: () => import('@/views/weeklyReport/WeeklyReportEdit.vue'),
+      meta: { title: '编辑周报' }
+    },
+    {
       path: '/:department/inventory',
       name: 'InventoryManagement',
-      component: () => import('@/views/inventory/InventoryManagement.vue'),
+      component: () => import('../views/inventory/InventoryManagement.vue'),
       meta: { title: '库存管理' }
-    }, {
+    },
+    {
       path: '/:department/inventoryDetail',
       name: 'InventoryDetail',
       component: () => import('@/views/inventory/InventoryDetail.vue'),
