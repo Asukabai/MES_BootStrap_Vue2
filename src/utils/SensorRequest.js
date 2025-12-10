@@ -26,6 +26,12 @@ import * as ssDing from '../utils/Dingding.js';
           callSuccess(respData);
         }, callFail);
       },
+      // 库存信息添加
+    InventoryItemsAddFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("InventoryItemsAddFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       // 获取库存操作信息
       InventoryTransactionsGetFun(param, callSuccess, callFail) {
         ssDing.PostDataUrl("InventoryTransactionsGetFun", param, true, respData => {

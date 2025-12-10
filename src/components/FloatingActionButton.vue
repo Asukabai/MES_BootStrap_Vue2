@@ -10,12 +10,15 @@
 -->
 <template>
   <div
-      class="floating-action-button"
-      :style="{ bottom: position.bottom + 'px', right: position.right + 'px' }"
-      @touchstart="onTouchStart"
-      @touchmove="onTouchMove"
-      @touchend="onTouchEnd"
-      @click="handleClick"
+    class="floating-action-button"
+    :style="{ bottom: position.bottom + 'px', right: position.right + 'px' }"
+    @touchstart="onTouchStart"
+    @touchmove="onTouchMove"
+    @touchend="onTouchEnd"
+    @mousedown="onMouseDown"
+    @mousemove="onMouseMove"
+    @mouseup="onMouseUp"
+    @click="handleClick"
   >
     <van-icon name="plus" size="20px" color="#fff" />
   </div>
@@ -48,13 +51,15 @@ export default {
         startY: 0,
         initialBottom: 0,
         initialRight: 0,
-        isDragging: false
+        isDragging: false,
+        startTime: 0
       },
       // 屏幕尺寸
       screenSize: {
         width: window.innerWidth,
         height: window.innerHeight
-      }
+      },
+      isMouseDown: false
     }
   },
   mounted() {
@@ -66,49 +71,99 @@ export default {
     window.removeEventListener('resize', this.updateScreenSize)
   },
   methods: {
-    handleClick() {
+    handleClick(event) {
+      // 阻止事件冒泡
+      event.stopPropagation();
       // 只有在非拖拽状态下才触发点击事件
       if (!this.touchState.isDragging) {
         this.$emit('click');
       }
     },
+
+    // 触摸事件处理
     onTouchStart(event) {
-      const touch = event.touches[0]
-      this.touchState.startX = touch.clientX
-      this.touchState.startY = touch.clientY
-      this.touchState.initialBottom = this.position.bottom
-      this.touchState.initialRight = this.position.right
-      this.touchState.isDragging = true
+      const touch = event.touches[0];
+      this.touchState.startX = touch.clientX;
+      this.touchState.startY = touch.clientY;
+      this.touchState.initialBottom = this.position.bottom;
+      this.touchState.initialRight = this.position.right;
+      this.touchState.isDragging = false;
+      this.touchState.startTime = Date.now();
     },
+
     onTouchMove(event) {
-      if (!this.touchState.isDragging) return
+      const touch = event.touches[0];
+      const deltaX = touch.clientX - this.touchState.startX;
+      const deltaY = touch.clientY - this.touchState.startY;
 
-      const touch = event.touches[0]
-      const deltaX = touch.clientX - this.touchState.startX
-      const deltaY = touch.clientY - this.touchState.startY
+      // 判断是否为拖拽操作（移动距离超过5px或时间超过150ms）
+      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5 || (Date.now() - this.touchState.startTime) > 150) {
+        this.touchState.isDragging = true;
 
-      // 计算新的按钮位置
-      let newBottom = this.touchState.initialBottom - deltaY
-      let newRight = this.touchState.initialRight - deltaX
+        // 计算新的按钮位置
+        let newBottom = this.touchState.initialBottom - deltaY;
+        let newRight = this.touchState.initialRight - deltaX;
 
-      // 限制按钮的活动范围
-      const buttonRadius = 32 // 按钮半径（包括 padding 和 border）
-      newBottom = Math.max(buttonRadius, Math.min(newBottom, this.screenSize.height - buttonRadius))
-      newRight = Math.max(buttonRadius, Math.min(newRight, this.screenSize.width - buttonRadius))
+        // 限制按钮的活动范围
+        const buttonRadius = 32;
+        newBottom = Math.max(buttonRadius, Math.min(newBottom, this.screenSize.height - buttonRadius));
+        newRight = Math.max(buttonRadius, Math.min(newRight, this.screenSize.width - buttonRadius));
 
-      // 更新按钮位置
-      this.position.bottom = newBottom
-      this.position.right = newRight
+        // 更新按钮位置
+        this.position.bottom = newBottom;
+        this.position.right = newRight;
+      }
     },
-    onTouchEnd() {
-      // 延迟重置拖拽状态，确保点击事件能正确处理
+
+    onTouchEnd(event) {
+      // 延迟重置拖拽状态
       setTimeout(() => {
-        this.touchState.isDragging = false
-      }, 100)
+        this.touchState.isDragging = false;
+      }, 50);
     },
-    updateScreenSize() {
-      this.screenSize.width = window.innerWidth
-      this.screenSize.height = window.innerHeight
+
+    // 鼠标事件处理（用于PC端）
+    onMouseDown(event) {
+      this.isMouseDown = true;
+      this.touchState.startX = event.clientX;
+      this.touchState.startY = event.clientY;
+      this.touchState.initialBottom = this.position.bottom;
+      this.touchState.initialRight = this.position.right;
+      this.touchState.isDragging = false;
+      this.touchState.startTime = Date.now();
+    },
+
+    onMouseMove(event) {
+      if (!this.isMouseDown) return;
+
+      const deltaX = event.clientX - this.touchState.startX;
+      const deltaY = event.clientY - this.touchState.startY;
+
+      // 判断是否为拖拽操作
+      if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5 || (Date.now() - this.touchState.startTime) > 150) {
+        this.touchState.isDragging = true;
+
+        // 计算新的按钮位置
+        let newBottom = this.touchState.initialBottom - deltaY;
+        let newRight = this.touchState.initialRight - deltaX;
+
+        // 限制按钮的活动范围
+        const buttonRadius = 32;
+        newBottom = Math.max(buttonRadius, Math.min(newBottom, this.screenSize.height - buttonRadius));
+        newRight = Math.max(buttonRadius, Math.min(newRight, this.screenSize.width - buttonRadius));
+
+        // 更新按钮位置
+        this.position.bottom = newBottom;
+        this.position.right = newRight;
+      }
+    },
+
+    onMouseUp(event) {
+      this.isMouseDown = false;
+      // 延迟重置拖拽状态
+      setTimeout(() => {
+        this.touchState.isDragging = false;
+      }, 50);
     }
   }
 }
@@ -130,6 +185,9 @@ export default {
   cursor: pointer;
   user-select: none; /* 防止拖动时选中文字 */
   touch-action: none; /* 禁用默认触摸行为 */
-  /* z-index: 999; */
+  z-index: 999;
+  /* 添加以下样式解决移动端点击问题 */
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
 }
 </style>

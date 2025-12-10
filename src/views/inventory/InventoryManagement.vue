@@ -113,6 +113,7 @@ export default {
   },
   data() {
     return {
+      isNavigating: false, // 添加导航状态标识
       searchValue: '',
       hasSearched: false,
       showInboundPopup: false,
@@ -174,12 +175,25 @@ export default {
     this.loadProjectOptions();
   },
   methods: {
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     onFloatingButtonClick() {
-      // 跳转到新页面，这里假设路由名为 'add-inventory'
-      this.$router.push('/inventory/add');
-
-      // 或者如果使用命名路由
-      // this.$router.push({ name: 'AddInventory' });
+      // 防止重复点击
+      if (this.isNavigating) return;
+      this.isNavigating = true;
+      // alert('点击了悬浮按钮')
+      this.navigateTo('/inventory/add');
+      // 延迟重置导航状态
+      setTimeout(() => {
+        this.isNavigating = false;
+      }, 10);
     },
     onSearch() {
       if (this.searchValue || this.filter.category || this.filter.status) {
