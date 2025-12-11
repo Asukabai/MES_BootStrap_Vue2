@@ -16,7 +16,7 @@
 </template>
 
 <script>
-import { GetDingUserToken } from './utils/Dingding'
+import {GetDingUserToken} from './utils/Dingding'
 import MainTabBar from "./components/MainTabBar.vue";
 
 export default {
@@ -75,24 +75,31 @@ export default {
 </script>
 
 <style>
-body {
+/* 全局样式修复键盘推顶问题 */
+html, body {
+  position: fixed;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
   margin: 0;
   padding: 0;
-  height: 100vh;
-  overflow: hidden;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
 #app {
-  height: 100vh;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
   overflow: hidden;
 }
 
 .app-content {
   display: flex;
   flex-direction: column;
-  height: 100vh;
+  height: 100%;
   overflow: hidden;
 }
 
@@ -105,10 +112,12 @@ body {
 .tabbar-content {
   height: 50px;
   flex-shrink: 0;
+  background-color: #fff; /* 确保背景色覆盖 */
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1); /* 可选：添加阴影提升视觉效果 */
 }
 
 .tabbar-content.ios-tabbar {
-  height: 80px;
+  height: 50px;
 }
 
 .tabbar-content.android-tabbar {
@@ -119,13 +128,33 @@ body {
   height: 60px;
 }
 
-html, body {
-  height: 100%;
-  overflow: hidden;
-  -webkit-overflow-scrolling: touch;
-}
-
 * {
   box-sizing: border-box;
+}
+
+/* 防止移动端长按菜单 */
+input, textarea, select {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* 优化滚动条 */
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 2px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #a8a8a8;
 }
 </style>

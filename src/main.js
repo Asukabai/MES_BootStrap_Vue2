@@ -31,7 +31,23 @@ Vue.use(VueMeta, {
 import Vant from 'vant'
 import 'vant/lib/index.css'
 import store from "./store";
-Vue.use(Vant)
+
+// 全局配置 Vant，禁用 Field 组件的自动调整位置功能
+Vue.use(Vant, {
+  // 全局配置字段，解决键盘推顶问题
+  field: {
+    adjustPosition: false
+  },
+  // 其他全局配置（可选）
+  toast: {
+    duration: 2000,
+    position: 'bottom'
+  },
+  dialog: {
+    confirmButtonText: '确定',
+    cancelButtonText: '取消'
+  }
+})
 
 // 解析 URL 查询参数
 function getURLParams() {
