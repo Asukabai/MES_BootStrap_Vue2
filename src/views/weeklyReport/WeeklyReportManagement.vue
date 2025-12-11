@@ -61,35 +61,42 @@
                 <div class="item-title">汇报人：{{ item.Report_Person.Person_Name }}</div>
                 <div class="item-stock">周次: {{ item.Week_Display }}</div>
               </div>
-              <div class="cell-body">
-                <div class="item-info">
-                  <div class="info-row">
-                    <span class="label">项目经理:</span>
-                    <span class="value">{{ item.Project_Manager.Person_Name }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="label">汇报时间:</span>
-                    <span class="value">{{ formatDate(item.Ts_create) }}</span>
-                  </div>
-                  <div class="info-row">
-                    <span class="label">实际工作:</span>
-                    <span class="value">{{ truncateText(item.Actual_Work, 50) }}</span>
-                  </div>
-                </div>
-              </div>
+<!--              <div class="cell-body">-->
+<!--                <div class="item-info">-->
+<!--                  <div class="info-row">-->
+<!--                    <span class="label">项目经理:</span>-->
+<!--                    <span class="value">{{ item.Project_Manager.Person_Name }}</span>-->
+<!--                  </div>-->
+<!--                  <div class="info-row">-->
+<!--                    <span class="label">汇报时间:</span>-->
+<!--                    <span class="value">{{ formatDate(item.Ts_create) }}</span>-->
+<!--                  </div>-->
+<!--                  <div class="info-row">-->
+<!--                    <span class="label">实际工作:</span>-->
+<!--                    <span class="value">{{ truncateText(item.Actual_Work, 50) }}</span>-->
+<!--                  </div>-->
+<!--                </div>-->
+<!--              </div>-->
               <!-- 卡片底部操作栏 -->
               <div class="cell-footer">
                 <van-button
-                  size="mini"
-                  type="primary"
-                  @click.stop="editReport(item)"
+                  type="info"
+                  @click="viewDetail(item)"
+                  round
+                  size="small"    style="margin-right: 10px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"
                 >
-                  编辑
+                  查看详情
+                </van-button>
+                <van-button
+                  type="info"
+                  @click="editReport(item)"
+                  round
+                  size="small"    style="box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"
+                >
+                  周报编辑
                 </van-button>
               </div>
             </div>
-            <!-- 卡片主体点击区域 -->
-            <div class="cell-overlay" @click="viewDetail(item)"></div>
           </van-cell>
         </div>
 
@@ -97,22 +104,29 @@
         <div v-if="hasSearched && list.length === 0 && !loading" class="empty-state">
           <van-empty description="暂无相关周报信息" />
         </div>
-
         <!-- 加载完成提示 -->
         <div v-if="list.length > 0 && !loading" class="finished-text">没有更多了</div>
       </van-pull-refresh>
     </div>
+    <!-- 添加悬浮按钮 -->
+    <FloatingActionButton
+      @click="onFloatingButtonClick"
+      :initial-position="{ bottom: 80, right: 20 }"
+    />
   </div>
 </template>
 
 <script>
 import { Toast } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
+import FloatingActionButton from "../../components/FloatingActionButton.vue";
 
 export default {
   name: 'WeeklyReportManagement',
+  components: {FloatingActionButton},
   data() {
     return {
+      isNavigating: false,
       searchValue: '',
       hasSearched: false,
       filter: {
@@ -138,6 +152,26 @@ export default {
     this.onLoad();
   },
   methods: {
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
+    onFloatingButtonClick() {
+      // 防止重复点击
+      if (this.isNavigating) return;
+      this.isNavigating = true;
+      // alert('点击了悬浮按钮')
+      this.navigateTo('/weeklyReport/add');
+      // 延迟重置导航状态
+      setTimeout(() => {
+        this.isNavigating = false;
+      }, 10);
+    },
     onSearch() {
       if (this.searchValue || this.filter.reporter || this.filter.week) {
         this.hasSearched = true;
@@ -397,16 +431,6 @@ export default {
   z-index: 2;
 }
 
-.cell-overlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  z-index: 1;
-  cursor: pointer;
-}
-
 .cell-header {
   display: flex;
   flex-direction: column;
@@ -471,11 +495,11 @@ export default {
 
 .cell-footer {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start; /* 左对齐 */
   gap: 8px;
   margin-top: 8px;
-  position: relative;
-  z-index: 3;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
 }
 
 .empty-state {

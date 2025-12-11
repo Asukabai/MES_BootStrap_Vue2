@@ -1,13 +1,6 @@
 <!-- src/views/weeklyReport/WeeklyReportEdit.vue -->
 <template>
   <div class="weekly-report-edit">
-    <van-nav-bar
-      title="编辑周报"
-      left-text="返回"
-      left-arrow
-      @click-left="onClickLeft"
-    />
-
     <div class="content">
       <van-loading v-if="loading" size="24px" vertical>加载中...</van-loading>
 

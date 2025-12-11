@@ -237,6 +237,12 @@ const router = new Router({
       meta: { title: '编辑周报' }
     },
     {
+      path: '/:department/weeklyReport/add',
+      name: 'WeeklyReportAdd',
+      component: () => import('@/views/weeklyReport/WeeklyReportAdd.vue'),
+      meta: { title: '新增周报' }
+    },
+    {
       path: '/:department/inventory',
       name: 'InventoryManagement',
       component: () => import('../views/inventory/InventoryManagement.vue'),
