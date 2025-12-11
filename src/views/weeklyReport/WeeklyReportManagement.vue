@@ -61,22 +61,6 @@
                 <div class="item-title">汇报人：{{ item.Report_Person.Person_Name }}</div>
                 <div class="item-stock">周次: {{ item.Week_Display }}</div>
               </div>
-<!--              <div class="cell-body">-->
-<!--                <div class="item-info">-->
-<!--                  <div class="info-row">-->
-<!--                    <span class="label">项目经理:</span>-->
-<!--                    <span class="value">{{ item.Project_Manager.Person_Name }}</span>-->
-<!--                  </div>-->
-<!--                  <div class="info-row">-->
-<!--                    <span class="label">汇报时间:</span>-->
-<!--                    <span class="value">{{ formatDate(item.Ts_create) }}</span>-->
-<!--                  </div>-->
-<!--                  <div class="info-row">-->
-<!--                    <span class="label">实际工作:</span>-->
-<!--                    <span class="value">{{ truncateText(item.Actual_Work, 50) }}</span>-->
-<!--                  </div>-->
-<!--                </div>-->
-<!--              </div>-->
               <!-- 卡片底部操作栏 -->
               <div class="cell-footer">
                 <van-button
@@ -204,17 +188,16 @@ export default {
 
       // 显示所有数据
       this.list = [...this.allData];
+      this.$toast.success('数据已刷新');
     },
 
     onLoad() {
       this.loading = true;
-
       // 构造请求参数
       const param = {
         Project_Name: "",
         Week_Display: ""
       };
-
       // 调用后端接口获取周报数据
       SensorRequest.WeeklyReportsInfoGetFun(JSON.stringify(param), (respData) => {
         try {
@@ -228,10 +211,8 @@ export default {
           }
 
           this.allData = newData;
-
           // 提取唯一的汇报人和周次
           this.extractUniqueFilters();
-
           // 显示数据
           this.list = [...this.allData];
 
@@ -242,6 +223,7 @@ export default {
           this.loading = false;
           this.refreshing = false;
         }
+        Toast('数据刷新成功');
       }, (error) => {
         console.error('获取周报信息失败:', error);
         Toast('获取周报信息失败');
@@ -311,24 +293,37 @@ export default {
       // 跳转到周报详情页面
       const department = this.$route.params.department;
       if (department) {
-        this.$router.push(`/${department}/weeklyReport/detail/${item.Id}`);
+        // 使用 query 参数传递项目信息
+        this.$router.push({
+          path: `/${department}/weeklyReport/detail/${item.Id}`,
+          query: {
+            projectInfo: encodeURIComponent(JSON.stringify({
+              Project_Name: item.Project_Name,
+              Week_Display: item.Week_Display
+            }))
+          }
+        });
       } else {
         console.error('未找到 department 参数');
         this.$toast.fail('路由参数缺失');
       }
     },
-
     editReport(item) {
       // 跳转到周报编辑页面
       const department = this.$route.params.department;
       if (department) {
-        this.$router.push(`/${department}/weeklyReport/edit/${item.Id}`);
+        // 传递完整的周报信息作为路由参数
+        this.$router.push({
+          path: `/${department}/weeklyReport/edit/${item.Id}`,
+          query: {
+            reportData: encodeURIComponent(JSON.stringify(item))
+          }
+        });
       } else {
         console.error('未找到 department 参数');
         this.$toast.fail('路由参数缺失');
       }
     },
-
     // 格式化日期
     formatDate(dateString) {
       if (!dateString) return '';

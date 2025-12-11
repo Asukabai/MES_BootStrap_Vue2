@@ -47,9 +47,24 @@
           />
         </van-cell-group>
 
-        <div style="margin: 16px;">
-          <van-button round block type="primary" native-type="submit">
-            提交
+        <div style="margin: 16px; display: flex; justify-content: center; gap: 16px;">
+          <van-button
+            round
+            type="default"
+            @click="goBack"
+            size="large"
+            style="padding: 12px 24px; border-radius: 18px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"
+          >
+            取消返回
+          </van-button>
+          <van-button
+            round
+            type="info"
+            native-type="submit"
+            size="large"
+            style="padding: 12px 24px; border-radius: 18px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"
+          >
+            保存
           </van-button>
         </div>
       </van-form>
@@ -81,10 +96,9 @@ export default {
     };
   },
   methods: {
-    onClickLeft() {
+    goBack() {
       this.$router.go(-1);
     },
-
     onSubmit() {
       // 这里需要调用新增周报的接口
       // 示例代码：

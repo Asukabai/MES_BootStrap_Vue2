@@ -1,4 +1,3 @@
-<!-- src/views/weeklyReport/WeeklyReportEdit.vue -->
 <template>
   <div class="weekly-report-edit">
     <div class="content">
@@ -10,28 +9,24 @@
             v-model="formData.Project_Name"
             label="项目名称"
             placeholder="请输入项目名称"
-            readonly
           />
 
           <van-field
             v-model="formData.Week_Display"
             label="周次"
             placeholder="请输入周次"
-            readonly
           />
 
           <van-field
             v-model="formData.Report_Person.Person_Name"
             label="汇报人"
             placeholder="请输入汇报人"
-            readonly
           />
 
           <van-field
             v-model="formData.Project_Manager.Person_Name"
             label="项目经理"
             placeholder="请输入项目经理"
-            readonly
           />
 
           <van-field
@@ -53,8 +48,23 @@
           />
         </van-cell-group>
 
-        <div style="margin: 16px;">
-          <van-button round block type="primary" native-type="submit">
+        <div style="margin: 16px; display: flex; justify-content: center; gap: 16px;">
+          <van-button
+            round
+            type="default"
+            @click="goBack"
+            size="large"
+            style="padding: 12px 24px; border-radius: 18px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"
+          >
+            取消返回
+          </van-button>
+          <van-button
+            round
+            type="info"
+            native-type="submit"
+            size="large"
+            style="padding: 12px 24px; border-radius: 18px; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);"
+          >
             保存
           </van-button>
         </div>
@@ -91,65 +101,79 @@ export default {
     this.loadReportDetail();
   },
   methods: {
-    onClickLeft() {
+    goBack() {
       this.$router.go(-1);
     },
 
     loadReportDetail() {
-      const reportId = this.$route.params.id;
-      // 这里需要根据实际情况调用获取周报详情的接口
-      const param = {
-        Id: reportId
-      };
+      // 从路由查询参数中获取传递的数据
+      const query = this.$route.query;
 
-      SensorRequest.WeeklyReportsInfoGetFun(JSON.stringify(param), (respData) => {
+      if (query.reportData) {
         try {
-          const data = JSON.parse(respData);
-          const report = Array.isArray(data) ? data[0] : data;
+          // 解析传递的报告数据
+          const reportData = JSON.parse(decodeURIComponent(query.reportData));
+          console.log("解析传递的报告数据: ", reportData);
 
+          // 将数据赋值给 formData
           this.formData = {
             ...this.formData,
-            ...report,
+            ...reportData,
             Report_Person: {
               ...this.formData.Report_Person,
-              ...report.Report_Person
+              ...reportData.Report_Person
             },
             Project_Manager: {
               ...this.formData.Project_Manager,
-              ...report.Project_Manager
+              ...reportData.Project_Manager
             }
           };
         } catch (error) {
-          console.error('解析周报详情失败:', error);
+          console.error('解析报告数据失败:', error);
           Toast.fail('数据解析失败');
-        } finally {
-          this.loading = false;
         }
-      }, (error) => {
-        console.error('获取周报详情失败:', error);
-        Toast.fail('获取周报详情失败');
-        this.loading = false;
-      });
+      }
+
+      // 无论成功或失败，都设置 loading 为 false
+      this.loading = false;
     },
 
     onSubmit() {
-      // 这里需要调用更新周报的接口
-      // 假设有一个更新周报的接口 WeeklyReportsUpdateFun
-      const param = {
-        ...this.formData
-      };
+      // 显示确认弹窗
+      this.$dialog.confirm({
+        title: '确认保存',
+        message: '确定要保存当前修改吗？',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消'
+      }).then(() => {
+        // 调用更新周报接口
+        const param = {
+          ...this.formData
+        };
 
-      // 示例更新接口调用
-      // SensorRequest.WeeklyReportsUpdateFun(JSON.stringify(param), (respData) => {
-      //   Toast.success('保存成功');
-      //   this.$router.go(-1);
-      // }, (error) => {
-      //   console.error('保存失败:', error);
-      //   Toast.fail('保存失败');
-      // });
-
-      Toast.success('保存成功');
-      this.$router.go(-1);
+        SensorRequest.WeeklyReportsInfoUpdateFun(JSON.stringify(param), (respData) => {
+          try {
+            const result = JSON.parse(respData);
+            console.log('保存周报结果:', result);
+            if (result) {
+              Toast.success('保存成功');
+              setTimeout(() => {
+                this.$router.go(-1);
+              }, 1000);
+            } else {
+              Toast.fail('保存失败');
+            }
+          } catch (error) {
+            console.error('处理响应失败:', error);
+            Toast.fail('保存失败');
+          }
+        }, (error) => {
+          console.error('保存失败:', error);
+          Toast.fail('保存失败');
+        });
+      }).catch(() => {
+        // 用户点击取消，不执行保存操作
+      });
     }
   }
 };
