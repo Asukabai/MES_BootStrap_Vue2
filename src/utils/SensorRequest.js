@@ -56,6 +56,18 @@ import * as ssDing from '../utils/Dingding.js';
           callSuccess(respData);
         }, callFail);
       },
+      // 获取所有会议的周次编号 --展示到下拉框中
+      MeetingWeekDisplayGetFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("MeetingWeekDisplayGetFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 周报信息添加
+      WeeklyReportsInfoAddFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("WeeklyReportsInfoAddFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       // 获取服务器本地时间
       GetServerTime(param, callSuccess, callFail) {
           ssDing.PostDataUrl("GetLocalTimeFun", param, true, respData => {

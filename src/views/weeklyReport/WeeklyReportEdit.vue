@@ -5,17 +5,83 @@
 
       <van-form v-else @submit="onSubmit">
         <van-cell-group inset>
+          <!-- 修改项目名称为下拉选择框 -->
           <van-field
             v-model="formData.Project_Name"
             label="项目名称"
-            placeholder="请输入项目名称"
+            placeholder="请选择项目名称"
+            is-link
+            readonly
+            @click="showProjectPicker = true"
           />
+          <van-popup v-model="showProjectPicker" position="bottom">
+            <van-picker
+              show-toolbar
+              :columns="projectList"
+              :default-index="selectedProjectIndex"
+              @confirm="onProjectConfirm"
+              @cancel="showProjectPicker = false"
+            />
+          </van-popup>
 
+          <!-- 修改周次为下拉选择框 -->
           <van-field
             v-model="formData.Week_Display"
             label="周次"
-            placeholder="请输入周次"
+            placeholder="请选择周次"
+            is-link
+            readonly
+            @click="showWeekPicker = true"
           />
+          <van-popup v-model="showWeekPicker" position="bottom">
+            <van-picker
+              show-toolbar
+              :columns="weekList"
+              :default-index="selectedWeekIndex"
+              @confirm="onWeekConfirm"
+              @cancel="showWeekPicker = false"
+            />
+          </van-popup>
+
+          <!-- 新增开始日期选择 -->
+          <van-field
+            v-model="formData.Week_StartDate"
+            label="开始日期"
+            placeholder="请选择开始日期"
+            is-link
+            readonly
+            @click="showStartDatePicker = true"
+          />
+          <van-popup v-model="showStartDatePicker" position="bottom">
+            <van-datetime-picker
+              type="date"
+              :min-date="minDate"
+              :max-date="maxDate"
+              :formatter="formatter"
+              @confirm="onStartDateConfirm"
+              @cancel="showStartDatePicker = false"
+            />
+          </van-popup>
+
+          <!-- 新增结束日期选择 -->
+          <van-field
+            v-model="formData.Week_EndDate"
+            label="结束日期"
+            placeholder="请选择结束日期"
+            is-link
+            readonly
+            @click="showEndDatePicker = true"
+          />
+          <van-popup v-model="showEndDatePicker" position="bottom">
+            <van-datetime-picker
+              type="date"
+              :min-date="minDate"
+              :max-date="maxDate"
+              :formatter="formatter"
+              @confirm="onEndDateConfirm"
+              @cancel="showEndDatePicker = false"
+            />
+          </van-popup>
 
           <van-field
             v-model="formData.Report_Person.Person_Name"
@@ -82,10 +148,22 @@ export default {
   data() {
     return {
       loading: true,
+      showProjectPicker: false,
+      showWeekPicker: false,
+      showStartDatePicker: false,
+      showEndDatePicker: false,
+      projectList: [], // 项目列表
+      weekList: [], // 周次列表
+      selectedProjectIndex: 0,
+      selectedWeekIndex: 0,
+      minDate: new Date(2020, 0, 1),
+      maxDate: new Date(2030, 11, 31),
       formData: {
         Id: '',
         Project_Name: '',
         Week_Display: '',
+        Week_StartDate: '',
+        Week_EndDate: '',
         Report_Person: {
           Person_Name: ''
         },
@@ -99,10 +177,46 @@ export default {
   },
   created() {
     this.loadReportDetail();
+    this.fetchProjectList(); // 加载项目列表
+    this.fetchWeekList(); // 加载周次列表
   },
   methods: {
     goBack() {
       this.$router.go(-1);
+    },
+
+    // 日期格式化函数
+    formatter(type, val) {
+      if (type === 'year') {
+        return `${val}年`;
+      } else if (type === 'month') {
+        return `${val}月`;
+      } else if (type === 'day') {
+        return `${val}日`;
+      }
+      return val;
+    },
+
+    // 格式化日期为 YYYY-MM-DD 格式
+    formatDate(date) {
+      if (!date) return '';
+      const d = new Date(date);
+      let month = '' + (d.getMonth() + 1);
+      let day = '' + d.getDate();
+      const year = d.getFullYear();
+
+      if (month.length < 2) month = '0' + month;
+      if (day.length < 2) day = '0' + day;
+
+      return [year, month, day].join('-');
+    },
+
+    // 格式化日期显示（处理ISO格式日期）
+    formatDisplayDate(dateString) {
+      if (!dateString) return '';
+      // 处理 ISO 格式日期字符串
+      const date = new Date(dateString);
+      return this.formatDate(date);
     },
 
     loadReportDetail() {
@@ -114,6 +228,14 @@ export default {
           // 解析传递的报告数据
           const reportData = JSON.parse(decodeURIComponent(query.reportData));
           console.log("解析传递的报告数据: ", reportData);
+
+          // 格式化日期字段
+          if (reportData.Week_StartDate) {
+            reportData.Week_StartDate = this.formatDisplayDate(reportData.Week_StartDate);
+          }
+          if (reportData.Week_EndDate) {
+            reportData.Week_EndDate = this.formatDisplayDate(reportData.Week_EndDate);
+          }
 
           // 将数据赋值给 formData
           this.formData = {
@@ -128,6 +250,14 @@ export default {
               ...reportData.Project_Manager
             }
           };
+
+          // 设置默认选中项索引
+          if (this.formData.Project_Name) {
+            this.selectedProjectIndex = this.projectList.indexOf(this.formData.Project_Name);
+          }
+          if (this.formData.Week_Display) {
+            this.selectedWeekIndex = this.weekList.indexOf(this.formData.Week_Display);
+          }
         } catch (error) {
           console.error('解析报告数据失败:', error);
           Toast.fail('数据解析失败');
@@ -136,6 +266,86 @@ export default {
 
       // 无论成功或失败，都设置 loading 为 false
       this.loading = false;
+    },
+
+    // 获取项目列表
+    fetchProjectList() {
+      SensorRequest.ProjectInfoGetFun(
+        '',
+        (respData) => {
+          try {
+            const data = JSON.parse(respData);
+            const list = Array.isArray(data) ? data : [data];
+            // 提取项目名称字段
+            this.projectList = list.map(p => p.Project_Name);
+
+            // 设置默认选中项索引
+            if (this.formData.Project_Name) {
+              this.selectedProjectIndex = this.projectList.indexOf(this.formData.Project_Name);
+            }
+          } catch (error) {
+            console.error('解析项目数据失败:', error);
+            Toast.fail('项目数据解析失败');
+          }
+        },
+        (error) => {
+          console.error('获取项目列表失败:', error);
+          Toast.fail('获取项目列表失败');
+        }
+      );
+    },
+
+    // 获取周次列表
+    fetchWeekList() {
+      SensorRequest.MeetingWeekDisplayGetFun(
+        '',
+        (respData) => {
+          try {
+            const data = JSON.parse(respData);
+            const list = Array.isArray(data) ? data : [data];
+            // 提取周次显示字段
+            this.weekList = list.map(w => w.Week_Display || w);
+
+            // 设置默认选中项索引
+            if (this.formData.Week_Display) {
+              this.selectedWeekIndex = this.weekList.indexOf(this.formData.Week_Display);
+            }
+          } catch (error) {
+            console.error('解析周次数据失败:', error);
+            Toast.fail('周次数据解析失败');
+          }
+        },
+        (error) => {
+          console.error('获取周次列表失败:', error);
+          Toast.fail('获取周次列表失败');
+        }
+      );
+    },
+
+    // 项目选择确认
+    onProjectConfirm(value, index) {
+      this.formData.Project_Name = value;
+      this.selectedProjectIndex = index;
+      this.showProjectPicker = false;
+    },
+
+    // 周次选择确认
+    onWeekConfirm(value, index) {
+      this.formData.Week_Display = value;
+      this.selectedWeekIndex = index;
+      this.showWeekPicker = false;
+    },
+
+    // 开始日期选择确认
+    onStartDateConfirm(value) {
+      this.formData.Week_StartDate = this.formatDate(value);
+      this.showStartDatePicker = false;
+    },
+
+    // 结束日期选择确认
+    onEndDateConfirm(value) {
+      this.formData.Week_EndDate = this.formatDate(value);
+      this.showEndDatePicker = false;
     },
 
     onSubmit() {

@@ -209,7 +209,7 @@ export default {
           } else if (respData && respData.data) {
             newData = Array.isArray(respData.data) ? respData.data : [respData.data];
           }
-
+          console.log("获取周报数据 newData:",newData);
           this.allData = newData;
           // 提取唯一的汇报人和周次
           this.extractUniqueFilters();
