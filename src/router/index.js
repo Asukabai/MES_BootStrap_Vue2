@@ -242,6 +242,25 @@ const router = new Router({
       component: () => import('@/views/weeklyReport/WeeklyReportAdd.vue'),
       meta: { title: '新增周报' }
     },
+    // 在路由配置中添加以下路由
+    {
+      path: '/:department/chat',
+      name: 'ChatPage',
+      component: () => import('../views/chat/ChatPage.vue'),
+      meta: { title: '团队通讯' }
+    },
+    {
+      path: '/:department/chatDetail/:contactId',
+      name: 'ChatDetail',
+      component: () => import('../views/chat/ChatDetail.vue'),
+      meta: { title: '即时通讯' }
+    },
+    {
+      path: '/:department/chat/createGroup',
+      name: 'CreateGroup',
+      component: () => import('../views/chat/CreateGroup.vue'),
+      meta: { title: '创建群聊' }
+    },
     {
       path: '/:department/inventory',
       name: 'InventoryManagement',

@@ -5,7 +5,14 @@
         <router-view />
       </div>
       <div
-        v-if="!$route.path.includes('login') && !$route.path.includes('inventory') && !$route.path.includes('weeklyReport')"
+        v-if="!$route.path.includes('login')
+        && !$route.path.includes('inventory')
+        && !$route.path.includes('weeklyReport')
+        && !$route.path.includes('chatDetail')
+        && !$route.path.includes('chat_category')
+        && !$route.path.includes('post-detail')
+        && !$route.path.includes('createGroup')
+"
         class="tabbar-content"
         :class="{ 'ios-tabbar': isIOS, 'android-tabbar': !isIOS && !isHarmonyOS, 'harmony-tabbar': isHarmonyOS }"
       >

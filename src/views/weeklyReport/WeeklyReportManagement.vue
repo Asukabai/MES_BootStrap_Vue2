@@ -167,9 +167,9 @@ export default {
 
     // 新增筛选变化处理方法
     onFilterChange() {
-      if (this.searchValue || this.filter.reporter || this.filter.week) {
-        this.onSearch();
-      }
+      // 修改：总是执行筛选，不管筛选条件是否为空
+      this.hasSearched = true;
+      this.filterData();
     },
 
     // 新增重置按钮处理方法
@@ -299,7 +299,9 @@ export default {
           query: {
             projectInfo: encodeURIComponent(JSON.stringify({
               Project_Name: item.Project_Name,
-              Week_Display: item.Week_Display
+              Week_Display: item.Week_Display,
+              // 添加汇报人信息，供详情页面筛选使用
+              Report_Person: item.Report_Person.Person_Name
             }))
           }
         });
@@ -328,7 +330,7 @@ export default {
     formatDate(dateString) {
       if (!dateString) return '';
       const date = new Date(dateString);
-      return `${date.getFullYear()}-${(date.getMonth()+1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
+      return `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`;
     },
 
     // 截断文本
@@ -447,7 +449,7 @@ export default {
   font-weight: 600;
   color: orange;
   white-space: nowrap;
-  align-self: flex-end;/* 确保库存数量在右侧 */
+  align-self: flex-end; /* 确保库存数量在右侧 */
 }
 
 .cell-body {

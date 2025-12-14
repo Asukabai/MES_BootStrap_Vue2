@@ -59,7 +59,7 @@ export default {
         },
         {
           icon: feedbackIcon,
-          title: '问题反馈',
+          title: '知识库',
           path: '',
         },
         {
@@ -129,8 +129,9 @@ export default {
       if (item.title === '扫码记录') {
         this.navigateTo('/code/codeList');
       }
-      if (item.title === '问题反馈') {
-        this.$toast.success('感谢您的反馈');
+      if (item.title === '知识库') {
+        // this.$toast.success('感谢您的反馈');
+        this.navigateTo('/chat_category');
       }
       if (item.title === '文件统计') {
         this.navigateTo('/statistical-report');

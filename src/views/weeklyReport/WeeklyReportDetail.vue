@@ -83,7 +83,7 @@
 </template>
 
 <script>
-import { Toast } from 'vant';
+import {Toast} from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 
 export default {
@@ -136,6 +136,7 @@ export default {
           projectInfo = JSON.parse(decodeURIComponent(query.projectInfo));
           console.log('加载周报 Project_Name 详情:', projectInfo.Project_Name);
           console.log('加载周报 Week_Display 详情:', projectInfo.Week_Display);
+          console.log('加载周报 Report_Person 详情:', projectInfo.Report_Person.Person_Name);
         } catch (error) {
           console.error('解析 projectInfo 参数失败:', error);
           // 如果解析失败，使用默认值或提示错误
@@ -177,7 +178,21 @@ export default {
       SensorRequest.WeeklyReportsInfoGetFun(JSON.stringify(param), (respData) => {
         try {
           const data = JSON.parse(respData);
-          this.reportData = Array.isArray(data) ? data[0] : data;
+
+          // 如果只有一个对象，保持原有逻辑
+          if (!Array.isArray(data)) {
+            this.reportData = data;
+          } else if (data.length === 1) {
+            this.reportData = data[0];
+          } else {
+            // 如果有多个对象，根据汇报人姓名筛选
+            const cachedUserName = projectInfo.Report_Person;
+            // alert(cachedUserName)
+            // 如果找到匹配的报告，使用匹配的报告
+            this.reportData = data.find(item =>
+              item.Report_Person && item.Report_Person.Person_Name === cachedUserName
+            );
+          }
           console.log('获取周报详情，reportData数据是:', this.reportData);
           // 数据加载完成后计算倒计时
           this.calculateCountdown();

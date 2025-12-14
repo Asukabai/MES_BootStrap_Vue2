@@ -68,8 +68,8 @@ export default {
       const base = this.$route.params.department || 'default';
       return [
         {
-          title: '知识库',
-          path: `/${base}/chat_category`,
+          title: '消息',
+          path: `/${base}/chat`,
           iconActive: this.icons.message.active,
           iconInactive: this.icons.message.inactive
         },

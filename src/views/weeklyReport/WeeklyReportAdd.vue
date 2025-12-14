@@ -313,23 +313,30 @@ export default {
 
       // 获取选中项目的详细信息
       SensorRequest.ProjectInfoGetFun(
-        JSON.stringify({ Project_Name: value }),
+        JSON.stringify({Project_Name: value}),
         (respData) => {
           try {
             const data = JSON.parse(respData);
+            console.log("新增页面：获取选中项目的详细信息: ", data);
             if (data && data.length > 0) {
               const project = data[0];
-              // 生成随机 Project_Uuid (19位数字字符串)
-              this.formData.Project_Uuid = this.generateProjectUuid();
+              // alert( "新增：project.uuid: "+project.Uuid)
+              this.formData.Project_Uuid = project.Uuid;
               // 设置项目经理信息，确保不为空
-              this.formData.Project_Manager.Person_Name =
-                (project.Project_Manager && project.Project_Manager.Person_Name) || '未知经理';
-              this.formData.Project_Manager.Person_DingID =
-                (project.Project_Manager && project.Project_Manager.Person_DingID) || '0000000000';
-              this.formData.Project_Manager.Person_Phone =
-                (project.Project_Manager && project.Project_Manager.Person_Phone) || '0000000000';
-              this.formData.Project_Manager.Person_Department =
-                (project.Project_Manager && project.Project_Manager.Person_Department) || '未知部门';
+              // 注意：根据后端数据结构，项目经理信息在 Project_Leader 数组中
+              if (project.Project_Leader && project.Project_Leader.length > 0) {
+                const leader = project.Project_Leader[0]; // 取第一个作为项目经理
+                this.formData.Project_Manager.Person_Name = leader.Person_Name || '未知经理';
+                this.formData.Project_Manager.Person_DingID = leader.Person_DingID || '0000000000';
+                this.formData.Project_Manager.Person_Phone = leader.Person_Phone || '0000000000';
+                this.formData.Project_Manager.Person_Department = leader.Person_Department || '未知部门';
+              } else {
+                // 如果没有项目经理信息，设置默认值
+                this.formData.Project_Manager.Person_Name = '未知经理';
+                this.formData.Project_Manager.Person_DingID = '0000000000';
+                this.formData.Project_Manager.Person_Phone = '0000000000';
+                this.formData.Project_Manager.Person_Department = '未知部门';
+              }
             } else {
               // 如果没有获取到项目信息，设置默认值
               this.formData.Project_Uuid = this.generateProjectUuid();
@@ -361,9 +368,45 @@ export default {
     },
 
     // 周次选择确认
+// 周次选择确认
     onWeekConfirm(value) {
       this.formData.Week_Display = value;
       this.showWeekPicker = false;
+
+      // 检查周次格式是否为 XXXX-XXXX-XXXX 格式（如 2025-1101-1106）
+      const weekPattern = /^(\d{4})-(\d{4})-(\d{4})$/;
+      const match = value.match(weekPattern);
+
+      if (match) {
+        const year = match[1];        // 年份
+        const startDateStr = match[2]; // 开始日期部分
+        const endDateStr = match[3];   // 结束日期部分
+
+        // 解析开始日期：MMDD 格式
+        if (startDateStr.length === 4) {
+          const startMonth = startDateStr.substring(0, 2);
+          const startDay = startDateStr.substring(2, 4);
+          // 添加前导零格式化
+          const formattedStartMonth = startMonth.padStart(2, '0');
+          const formattedStartDay = startDay.padStart(2, '0');
+          this.formData.Week_StartDate = `${year}-${formattedStartMonth}-${formattedStartDay}`;
+        }
+
+        // 解析结束日期：MMDD 格式
+        if (endDateStr.length === 4) {
+          const endMonth = endDateStr.substring(0, 2);
+          const endDay = endDateStr.substring(2, 4);
+          // 添加前导零格式化
+          const formattedEndMonth = endMonth.padStart(2, '0');
+          const formattedEndDay = endDay.padStart(2, '0');
+          this.formData.Week_EndDate = `${year}-${formattedEndMonth}-${formattedEndDay}`;
+        }
+      } else {
+        // 如果格式不匹配，清空日期并提示用户手动选择
+        this.formData.Week_StartDate = '';
+        this.formData.Week_EndDate = '';
+        Toast.fail('周次格式不匹配，请手动选择日期');
+      }
     },
 
     // 开始日期选择确认

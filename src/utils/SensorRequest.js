@@ -8,6 +8,24 @@ import * as ssDing from '../utils/Dingding.js';
           callSuccess(respData);
         }, callFail);
       },
+      // 获取用户聊天室列表
+      Talk_GetUserRoom(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("Talk_GetUserRoom", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 获取聊天用户列表
+      Talk_GetUserList(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("Talk_GetUserList", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 创建聊天房间
+      Talk_CreateRoom(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("Talk_CreateRoom", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       // 获取周报信息表格数据
       WeeklyReportsInfoGetFun(param, callSuccess, callFail) {
         ssDing.PostDataUrl("WeeklyReportsInfoGetFun", param, true, respData => {
