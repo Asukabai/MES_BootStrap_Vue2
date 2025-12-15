@@ -150,8 +150,7 @@
   </div>
 </template>
 
-<script>
-import { Toast } from 'vant';
+<script>import { Toast } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import { key_DingName, key_DingUserIndex, key_DingUserPhone } from '../../utils/Dingding.js';
 
@@ -166,6 +165,7 @@ export default {
       showEndDatePicker: false,
       projectList: [], // 项目列表
       weekList: [], // 周次列表
+      personList: [], // 人员列表
       minDate: new Date(2020, 0, 1),
       maxDate: new Date(2030, 11, 31),
       formData: {
@@ -196,11 +196,34 @@ export default {
     this.fetchProjectList(); // 加载项目列表
     this.fetchWeekList(); // 加载周次列表
     this.loadUserInfo(); // 加载用户信息
-    this.loading = false;
+    this.fetchPersonList(); // 加载人员列表
   },
   methods: {
     goBack() {
       this.$router.go(-1);
+    },
+
+    // 加载人员列表
+    fetchPersonList() {
+      SensorRequest.PersonGetFun(
+        '',
+        (respData) => {
+          try {
+            const data = JSON.parse(respData);
+            this.personList = Array.isArray(data) ? data : [data];
+            this.loading = false;
+          } catch (error) {
+            console.error('解析人员数据失败:', error);
+            Toast.fail('人员数据解析失败');
+            this.loading = false;
+          }
+        },
+        (error) => {
+          console.error('获取人员列表失败:', error);
+          Toast.fail('获取人员列表失败');
+          this.loading = false;
+        }
+      );
     },
 
     // 加载用户信息
@@ -368,7 +391,6 @@ export default {
     },
 
     // 周次选择确认
-// 周次选择确认
     onWeekConfirm(value) {
       this.formData.Week_Display = value;
       this.showWeekPicker = false;
@@ -421,6 +443,12 @@ export default {
       this.showEndDatePicker = false;
     },
 
+    // 根据姓名查找人员信息
+    findPersonByName(name) {
+      if (!name) return null;
+      return this.personList.find(person => person.Person_Name === name) || null;
+    },
+
     onSubmit() {
       // 验证必填字段
       if (!this.formData.Project_Name) {
@@ -448,7 +476,21 @@ export default {
         return;
       }
 
-      // 构建完整的提交数据，确保所有字段都不为空
+      // 查找汇报人详细信息
+      let reportPerson = this.findPersonByName(this.formData.Report_Person.Person_Name);
+      if (!reportPerson) {
+        Toast.fail('未找到汇报人信息');
+        return;
+      }
+
+      // 查找项目经理详细信息
+      let projectManager = this.findPersonByName(this.formData.Project_Manager.Person_Name);
+      if (!projectManager) {
+        Toast.fail('未找到项目经理信息');
+        return;
+      }
+
+      // 构建完整的提交数据
       const submitData = {
         Project_Uuid: this.formData.Project_Uuid || this.generateProjectUuid(),
         Project_Name: this.formData.Project_Name,
@@ -457,16 +499,16 @@ export default {
         Week_EndDate: this.formData.Week_EndDate,
         Report_Year: this.formData.Report_Year,
         Report_Person: {
-          Person_DingID: this.formData.Report_Person.Person_DingID || '0000000000',
-          Person_Phone: this.formData.Report_Person.Person_Phone || '0000000000',
-          Person_Name: this.formData.Report_Person.Person_Name || '未知用户',
-          Person_Department: this.formData.Report_Person.Person_Department || '未知部门'
+          Person_DingID: reportPerson.Person_DingID,
+          Person_Phone: reportPerson.Person_Phone,
+          Person_Name: reportPerson.Person_Name,
+          Person_Department: reportPerson.Person_Department
         },
         Project_Manager: {
-          Person_DingID: this.formData.Project_Manager.Person_DingID || '0000000000',
-          Person_Phone: this.formData.Project_Manager.Person_Phone || '0000000000',
-          Person_Name: this.formData.Project_Manager.Person_Name || '未知经理',
-          Person_Department: this.formData.Project_Manager.Person_Department || '未知部门'
+          Person_DingID: projectManager.Person_DingID,
+          Person_Phone: projectManager.Person_Phone,
+          Person_Name: projectManager.Person_Name,
+          Person_Department: projectManager.Person_Department
         },
         Project_Nodes: '',
         Required_Nodes: '',
@@ -514,8 +556,7 @@ export default {
 };
 </script>
 
-<style scoped>
-.weekly-report-add {
+<style scoped>.weekly-report-add {
   min-height: 100vh;
   background-color: #f5f5f5;
 }

@@ -210,6 +210,10 @@ export default {
             newData = Array.isArray(respData.data) ? respData.data : [respData.data];
           }
           console.log("获取周报数据 newData:",newData);
+
+          // 按时间排序，最新的在前面
+          this.sortDataByTime(newData);
+
           this.allData = newData;
           // 提取唯一的汇报人和周次
           this.extractUniqueFilters();
@@ -229,6 +233,25 @@ export default {
         Toast('获取周报信息失败');
         this.loading = false;
         this.refreshing = false;
+      });
+    },
+
+    // 按时间排序数据
+    sortDataByTime(data) {
+      data.sort((a, b) => {
+        // 使用可用的时间字段进行排序，优先级依次为:
+        // Ts_edit -> Ts_create -> Week_EndDate -> Week_StartDate
+        const getTimeValue = (item) => {
+          return new Date(
+            item.Ts_edit ||
+            item.Ts_create ||
+            item.Week_EndDate ||
+            item.Week_StartDate ||
+            new Date(0)
+          ).getTime();
+        };
+
+        return getTimeValue(b) - getTimeValue(a); // 降序排列，最新的在前
       });
     },
 
@@ -281,6 +304,9 @@ export default {
           item.Week_Display === this.filter.week
         );
       }
+
+      // 对筛选后的数据也进行排序
+      this.sortDataByTime(filteredData);
 
       this.list = filteredData;
     },

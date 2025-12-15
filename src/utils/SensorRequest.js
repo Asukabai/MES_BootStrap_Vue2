@@ -8,6 +8,12 @@ import * as ssDing from '../utils/Dingding.js';
           callSuccess(respData);
         }, callFail);
       },
+      // 获取人员信息（包含部门等信息）
+      PersonGetFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("PersonGetFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       // 获取用户聊天室列表
       Talk_GetUserRoom(param, callSuccess, callFail) {
         ssDing.PostDataUrl("Talk_GetUserRoom", param, true, respData => {
@@ -17,6 +23,12 @@ import * as ssDing from '../utils/Dingding.js';
       // 获取聊天用户列表
       Talk_GetUserList(param, callSuccess, callFail) {
         ssDing.PostDataUrl("Talk_GetUserList", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 获取房间聊天记录
+      Talk_GetRoomHistoryMsg(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("Talk_GetRoomHistoryMsg", param, true, respData => {
           callSuccess(respData);
         }, callFail);
       },
@@ -57,7 +69,7 @@ import * as ssDing from '../utils/Dingding.js';
         }, callFail);
       },
       // 库存信息添加
-    InventoryItemsAddFun(param, callSuccess, callFail) {
+      InventoryItemsAddFun(param, callSuccess, callFail) {
         ssDing.PostDataUrl("InventoryItemsAddFun", param, true, respData => {
           callSuccess(respData);
         }, callFail);

@@ -154,6 +154,7 @@ export default {
       showEndDatePicker: false,
       projectList: [], // 项目列表
       weekList: [], // 周次列表
+      personList: [], // 人员列表
       selectedProjectIndex: 0,
       selectedWeekIndex: 0,
       minDate: new Date(2020, 0, 1),
@@ -187,10 +188,37 @@ export default {
     this.loadReportDetail();
     this.fetchProjectList(); // 加载项目列表
     this.fetchWeekList(); // 加载周次列表
+    this.fetchPersonList(); // 加载人员列表
   },
   methods: {
     goBack() {
       this.$router.go(-1);
+    },
+
+    // 加载人员列表
+    fetchPersonList() {
+      SensorRequest.PersonGetFun(
+        '',
+        (respData) => {
+          try {
+            const data = JSON.parse(respData);
+            this.personList = Array.isArray(data) ? data : [data];
+          } catch (error) {
+            console.error('解析人员数据失败:', error);
+            Toast.fail('人员数据解析失败');
+          }
+        },
+        (error) => {
+          console.error('获取人员列表失败:', error);
+          Toast.fail('获取人员列表失败');
+        }
+      );
+    },
+
+    // 根据姓名查找人员信息
+    findPersonByName(name) {
+      if (!name) return null;
+      return this.personList.find(person => person.Person_Name === name) || null;
     },
 
     // 日期格式化函数
@@ -447,6 +475,63 @@ export default {
     },
 
     onSubmit() {
+      // 验证必填字段
+      if (!this.formData.Project_Name) {
+        Toast.fail('请选择项目名称');
+        return;
+      }
+
+      if (!this.formData.Week_Display) {
+        Toast.fail('请选择周次');
+        return;
+      }
+
+      if (!this.formData.Week_StartDate || !this.formData.Week_EndDate) {
+        Toast.fail('请选择开始日期和结束日期');
+        return;
+      }
+
+      if (!this.formData.Actual_Work) {
+        Toast.fail('请输入实际工作内容');
+        return;
+      }
+
+      if (!this.formData.Plan_Work) {
+        Toast.fail('请输入计划工作内容');
+        return;
+      }
+
+      // 查找汇报人详细信息
+      let reportPerson = this.findPersonByName(this.formData.Report_Person.Person_Name);
+      if (!reportPerson) {
+        Toast.fail('未找到汇报人信息');
+        return;
+      }
+
+      // 查找项目经理详细信息
+      let projectManager = this.findPersonByName(this.formData.Project_Manager.Person_Name);
+      if (!projectManager) {
+        Toast.fail('未找到项目经理信息');
+        return;
+      }
+
+      // 构建完整的提交数据
+      const submitData = {
+        ...this.formData,
+        Report_Person: {
+          Person_DingID: reportPerson.Person_DingID,
+          Person_Phone: reportPerson.Person_Phone,
+          Person_Name: reportPerson.Person_Name,
+          Person_Department: reportPerson.Person_Department
+        },
+        Project_Manager: {
+          Person_DingID: projectManager.Person_DingID,
+          Person_Phone: projectManager.Person_Phone,
+          Person_Name: projectManager.Person_Name,
+          Person_Department: projectManager.Person_Department
+        }
+      };
+
       // 显示确认弹窗
       this.$dialog.confirm({
         title: '确认保存',
@@ -455,11 +540,7 @@ export default {
         cancelButtonText: '取消'
       }).then(() => {
         // 调用更新周报接口
-        const param = {
-          ...this.formData
-        };
-
-        SensorRequest.WeeklyReportsInfoUpdateFun(JSON.stringify(param), (respData) => {
+        SensorRequest.WeeklyReportsInfoUpdateFun(JSON.stringify(submitData), (respData) => {
           try {
             const result = JSON.parse(respData);
             console.log('保存周报结果:', result);
