@@ -8,6 +8,12 @@ import * as ssDing from '../utils/Dingding.js';
           callSuccess(respData);
         }, callFail);
       },
+      // 发送用户消息_普通消息
+      Talk_SendMsg(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("Talk_SendMsg", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       // 获取人员信息（包含部门等信息）
       PersonGetFun(param, callSuccess, callFail) {
         ssDing.PostDataUrl("PersonGetFun", param, true, respData => {

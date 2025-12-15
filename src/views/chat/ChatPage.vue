@@ -166,12 +166,13 @@ export default {
             // 根据实际返回的数据结构调整映射逻辑
             if (Array.isArray(respData)) {
               this.contacts = respData.map(item => ({
-                id: item.roomIndex || Date.now() + Math.random(),
+                id: item.roomIndex ,
                 name: item.roomCaption || item.roomNickname || '未知聊天室',
                 avatar: item.roomPng || require('@/assets/群聊.png'),
                 lastMessage: item.lastMsgCaption || '暂无消息',
                 lastMessageType: 'text',
                 time: item.dtLastMsg || new Date().toISOString(),
+                roomIndex: item.roomIndex, // ✅ 显式添加 roomIndex 字段
                 unread: item.waitMsgCnt || 0
               }));
             } else {
@@ -220,7 +221,10 @@ export default {
     enterChat(contact) {
       // 进入聊天时清除未读
       contact.unread = 0;
-      this.$router.push(`/${this.$route.params.department}/chatDetail/${contact.id}`);
+      this.$router.push({
+        path: `/${this.$route.params.department}/chatDetail/${contact.id}`,
+        query: { contact: JSON.stringify(contact) } // 将 contact 对象作为 query 参数传递
+      });
     },
     goBack() {
       this.$router.go(-1);

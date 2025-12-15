@@ -1,5 +1,13 @@
 <template>
   <div class="create-group-page">
+    <!-- 群聊名称输入 -->
+    <van-field
+      v-model="groupName"
+      placeholder="请输入群聊名称"
+      label="群聊名称"
+      class="group-name-input"
+    />
+
     <van-search
       v-model="searchValue"
       placeholder="搜索联系人"
@@ -42,7 +50,7 @@
             />
             <div class="user-info">
               <div class="user-name">{{ user.name }}</div>
-              <div class="user-department">{{ user.department || '未知部门' }}</div>
+              <div class="user-phone">{{ user.phone || '未知联系方式' }}</div>
             </div>
           </div>
         </template>
@@ -57,7 +65,7 @@
         type="info"
         round
         block
-        :disabled="selectedUsers.length === 0"
+        :disabled="selectedUsers.length === 0 || !groupName.trim()"
         @click="createGroup"
       >
         创建群聊 ({{ selectedUsers.length }})
@@ -74,6 +82,7 @@ export default {
   name: 'CreateGroup',
   data() {
     return {
+      groupName: '', // 群聊名称
       searchValue: '',
       allUsers: [],
       selectedUserIds: [],
@@ -91,7 +100,7 @@ export default {
       const searchLower = this.searchValue.toLowerCase();
       return this.allUsers.filter(user =>
         user.name.toLowerCase().includes(searchLower) ||
-        (user.department && user.department.toLowerCase().includes(searchLower))
+        (user.phone && user.phone.toLowerCase().includes(searchLower))
       );
     }
   },
@@ -113,9 +122,10 @@ export default {
             if (Array.isArray(respData)) {
               this.allUsers = respData.map(user => ({
                 id: user.id || user.userId,
+                userIndex: user.userIndex,
                 name: user.name || user.userName || '未知用户',
                 avatar: user.avatar || user.png || null,
-                department: user.department || user.dept || null
+                phone: user.phone || null
               }));
             } else {
               console.warn('返回用户数据格式不符合预期:', respData);
@@ -152,8 +162,13 @@ export default {
       }
     },
     createGroup() {
-      if (this.selectedUsers.length === 0) {
-        Toast.fail('请选择至少一个成员');
+      if (!this.groupName.trim()) {
+        Toast.fail('请输入群聊名称');
+        return;
+      }
+
+      if (this.selectedUsers.length < 2) {
+        Toast.fail('请选择至少两个成员');
         return;
       }
 
@@ -163,13 +178,22 @@ export default {
         duration: 0
       });
 
-      // 准备创建房间的参数
-      const createUserIds = this.selectedUsers.map(user => user.id);
+      // 准备创建房间的参数，使用正确的结构体
+      const roomParams = {
+        roomID: "", // 待定
+        roomCaption: this.groupName, // 使用用户输入的群聊名称
+        roomUsers: this.selectedUsers.map(user => user.userIndex),
+        desc1: "",
+        desc2: "",
+        desc3: "",
+        announcement: "",
+        extra1: "",
+        extra2: "",
+        extra3: ""
+      };
 
       SensorRequest.Talk_CreateRoom(
-        JSON.stringify({
-          userIds: createUserIds
-        }),
+        JSON.stringify(roomParams),
         (response) => {
           loadingToast.clear();
           try {
@@ -207,6 +231,11 @@ export default {
   display: flex;
   flex-direction: column;
   background-color: #f7f8fa;
+}
+
+.group-name-input {
+  padding: 12px;
+  background-color: #fff;
 }
 
 .search-input {
@@ -260,7 +289,7 @@ export default {
   margin-bottom: 4px;
 }
 
-.user-department {
+.user-phone {
   font-size: 12px;
   color: #999;
 }

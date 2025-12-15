@@ -1,19 +1,21 @@
 <template>
   <div class="chat-detail">
-
     <!-- 消息区域 -->
     <div class="message-container" ref="messageContainer">
-      <!-- 日期分隔线 -->
-      <div class="date-divider" v-if="showDateDivider">
-        <span>今天</span>
-      </div>
-
       <!-- 消息列表 -->
       <div
-        v-for="(message, index) in messages"
+        v-for="(message, index) in sortedMessages"
         :key="message.id"
         :class="['message-item', message.isMe ? 'message-mine' : 'message-other']"
       >
+        <!-- 日期分隔线 -->
+        <div
+          v-if="index > 0 && shouldShowDateSeparator(message, index)"
+          class="date-divider"
+        >
+          <span>{{ formatDateForDisplay(message.timestamp) }}</span>
+        </div>
+
         <!-- 时间显示 -->
         <div
           v-if="shouldShowTime(message, index)"
@@ -122,7 +124,7 @@
               </div>
             </div>
             <van-image
-              src="https://img.yzcdn.cn/vant/cat.jpeg"
+              :src="userAvatar"
               round
               width="36px"
               height="36px"
@@ -220,13 +222,15 @@
 
 <script>
 import { Toast, ImagePreview } from 'vant';
+import SensorRequest from '../../utils/SensorRequest';
+import { key_DingName, key_DingUserIndex, key_DingUserPhone } from '../../utils/Dingding.js';
 
 export default {
   name: 'ChatDetail',
   props: {
-    contactId: {
-      type: [String, Number],
-      required: true
+    contact: {
+      type: Object,
+      default: null
     }
   },
   data() {
@@ -239,8 +243,14 @@ export default {
       previewImages: [],
       showDateDivider: true,
       currentContact: {
-        id: this.contactId,
+        id: null,
         name: '聊天对象',
+        avatar: 'https://img.yzcdn.cn/vant/cat.jpeg',
+        userId: null
+      },
+      currentUser: {
+        name: '',
+        userId: null,
         avatar: 'https://img.yzcdn.cn/vant/cat.jpeg'
       },
       actionActions: [
@@ -249,28 +259,56 @@ export default {
         { name: '举报', icon: 'warning-o' },
         { name: '取消', icon: 'close' }
       ],
-      messages: []
+      messages: [],
+      userList: [] // 新增：存储所有用户信息
     };
   },
   computed: {
-    currentContactName() {
-      return this.currentContact ? this.currentContact.name : '聊天';
+    sortedMessages() {
+      // 按照时间戳从小到大排序（旧的时间在前，新的时间在后）
+      return [...this.messages].sort((a, b) => {
+        const timeA = new Date(a.timestamp).getTime();
+        const timeB = new Date(b.timestamp).getTime();
+        return timeA - timeB;
+      });
     },
     contactAvatar() {
       return this.currentContact ? this.currentContact.avatar || 'https://img.yzcdn.cn/vant/cat.jpeg' : 'https://img.yzcdn.cn/vant/cat.jpeg';
+    },
+    userAvatar() {
+      return this.currentUser.avatar || 'https://img.yzcdn.cn/vant/cat.jpeg';
     },
     canSend() {
       return this.messageText.trim().length > 0;
     }
   },
   mounted() {
-    this.loadMessages();
+    const queryString = window.location.search;
+    const params = new URLSearchParams(queryString);
+    const contactStr = params.get('contact');
+    if (contactStr) {
+      try {
+        const parsedContact = JSON.parse(contactStr);
+        this.currentContact = {
+          ...parsedContact,
+          id: parsedContact.roomIndex || parsedContact.id,
+          userId: parsedContact.userId
+        };
+      } catch (e) {
+        console.error('解析 contact 失败:', e);
+      }
+    }
+
+    // 从缓存中获取当前用户信息
+    this.loadCurrentUser();
+
+    // 新增：先加载用户列表，再加载消息
+    this.loadUserList().then(() => {
+      this.loadMessages();
+    });
+
     this.scrollToBottom();
 
-    // 开始模拟接收消息
-    this.messageInterval = this.simulateNewMessage();
-
-    // 自动聚焦输入框
     setTimeout(() => {
       if (this.$refs.messageInput) {
         this.$refs.messageInput.focus();
@@ -286,80 +324,238 @@ export default {
     }
   },
   methods: {
-    loadMessages() {
-      const mockMessages = [
-        {
-          id: 1,
-          content: '你好，在吗？',
-          type: 'text',
-          isMe: false,
-          senderName: '张三',
-          timestamp: new Date(Date.now() - 3600000).toISOString(),
-          status: 'read'
-        },
-        {
-          id: 2,
-          content: '在的，有什么事吗？',
-          type: 'text',
-          isMe: true,
-          timestamp: new Date(Date.now() - 3500000).toISOString(),
-          status: 'read'
-        },
-        {
-          id: 3,
-          content: '想问一下项目的进度怎么样了？',
-          type: 'text',
-          isMe: false,
-          senderName: '张三',
-          timestamp: new Date(Date.now() - 3400000).toISOString(),
-          status: 'read'
-        },
-        {
-          id: 4,
-          content: '基本完成了，就等测试了。',
-          type: 'text',
-          isMe: true,
-          timestamp: new Date(Date.now() - 3300000).toISOString(),
-          status: 'read'
-        },
-        {
-          id: 5,
-          content: '太好了！这是设计稿的截图。',
-          type: 'text',
-          isMe: false,
-          senderName: '张三',
-          timestamp: new Date(Date.now() - 3200000).toISOString(),
-          status: 'read'
-        },
-        {
-          id: 6,
-          content: 'https://img.yzcdn.cn/vant/cat.jpeg',
-          type: 'image',
-          isMe: false,
-          senderName: '张三',
-          timestamp: new Date(Date.now() - 3100000).toISOString(),
-          status: 'read'
-        }
-      ];
+    // 从缓存中加载当前用户信息
+    loadCurrentUser() {
+      const name = localStorage.getItem(key_DingName);
+      const phone = localStorage.getItem(key_DingUserPhone);
+      const userId = localStorage.getItem(key_DingUserIndex);
 
-      this.messages = mockMessages;
+      this.currentUser = {
+        name: name || '未知用户',
+        userId: userId || null,
+        phone: phone || '',
+        avatar: 'https://img.yzcdn.cn/vant/cat.jpeg' // 可以替换为真实头像URL
+      };
+    },
+
+    // 生成UUID
+    generateUUID() {
+      return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
+        const r = Math.random() * 16 | 0;
+        const v = c == 'x' ? r : (r & 0x3 | 0x8);
+        return v.toString(16);
+      });
+    },
+
+    // 获取当前时间戳（秒）
+    getCurrentTimestampInSeconds() {
+      return Math.floor(Date.now() / 1000);
+    },
+
+    // 格式化当前时间为指定格式
+    getCurrentFormattedTime() {
+      const now = new Date();
+      const year = now.getFullYear();
+      const month = String(now.getMonth() + 1).padStart(2, '0');
+      const day = String(now.getDate()).padStart(2, '0');
+      const hours = String(now.getHours()).padStart(2, '0');
+      const minutes = String(now.getMinutes()).padStart(2, '0');
+      const seconds = String(now.getSeconds()).padStart(2, '0');
+      return `${year}/${month}/${day} ${hours}:${minutes}:${seconds}`;
+    },
+
+    // 新增：加载所有用户信息
+    loadUserList() {
+      return new Promise((resolve) => {
+        SensorRequest.Talk_GetUserList(
+          '', // 空参数获取所有用户
+          (response) => {
+            try {
+              const respData = JSON.parse(response);
+              console.log("📂 获取到的用户列表数据:", respData);
+
+              if (Array.isArray(respData)) {
+                this.userList = respData.map(user => ({
+                  userIndex: user.userIndex,
+                  name: user.name
+                }));
+                console.log("📊 用户列表数量:", this.userList.length);
+              } else {
+                console.warn('用户列表数据格式不符合预期:', respData);
+                this.userList = [];
+              }
+              resolve();
+            } catch (error) {
+              console.error('处理用户列表数据失败:', error);
+              Toast.fail('加载用户信息失败');
+              this.userList = [];
+              resolve();
+            }
+          },
+          (error) => {
+            console.error('获取用户列表失败:', error);
+            Toast.fail('获取用户列表失败');
+            this.userList = [];
+            resolve();
+          }
+        );
+      });
+    },
+
+    // 根据userIndex获取用户名
+    getUserNameByIndex(userIndex) {
+      const user = this.userList.find(u => u.userIndex === userIndex);
+      return user ? user.name : '未知用户';
+    },
+
+    // 根据用户名获取userIndex
+    getUserIndexByName(name) {
+      const user = this.userList.find(u => u.name === name);
+      return user ? user.userIndex : null;
+    },
+
+    loadMessages() {
+      console.log("📂 获取聊天历史数据参数的房间编号:", this.currentContact.roomIndex);
+      const param = {
+        roomIndex: this.currentContact.roomIndex,
+        lastMsgID: 0,
+        msgLimit: 50,
+        msgDir: 1 // 1 表示从新到旧
+      };
+
+      SensorRequest.Talk_GetRoomHistoryMsg(
+        JSON.stringify(param),
+        (response) => {
+          try {
+            const respData = JSON.parse(response);
+            console.log("📂 获取到的聊天历史数据:", respData);
+
+            if (Array.isArray(respData)) {
+              // 确保每个消息都有时间戳，并按时间顺序（旧到新）排列
+              this.messages = respData.map(item => {
+                // 确保 timestamp 字段存在，使用 dtSend 作为时间戳
+                const timestamp = item.dtSend || item.timestamp || new Date().toISOString();
+
+                // 使用真实用户名替换senderName
+                const senderName = this.getUserNameByIndex(item.userIndex);
+
+                // 判断消息是否为自己发送的
+                const isMe = item.userIndex === this.getUserIndexByName(this.currentUser.name);
+
+                // 从extra1字段获取消息内容
+                const content = item.extra1 || '暂无内容';
+
+                return {
+                  id: item.id || Date.now() + Math.random(),
+                  content: content,
+                  type: item.msgType === 10 ? 'text' : 'image',
+                  isMe: isMe,
+                  senderName: senderName,
+                  timestamp: timestamp, // 确保时间戳字段
+                  status: 'read'
+                };
+              });
+
+              // 移除之前的排序，让 computed 属性处理排序
+              console.log("📊 原始消息数量:", this.messages.length);
+            } else {
+              console.warn('返回数据格式不符合预期:', respData);
+              this.messages = [];
+            }
+          } catch (error) {
+            console.error('处理历史消息数据失败:', error);
+            Toast.fail('加载聊天记录失败');
+            this.messages = [];
+          }
+        },
+        (error) => {
+          console.error('获取聊天历史失败:', error);
+          Toast.fail('获取聊天记录失败');
+          this.messages = [];
+        }
+      );
     },
     formatMessageTime(timestamp) {
-      const date = new Date(timestamp);
-      return date.toLocaleTimeString('zh-CN', {
-        hour: '2-digit',
-        minute: '2-digit'
-      });
+      // 确保 timestamp 是有效的日期
+      let date;
+      if (timestamp instanceof Date) {
+        date = timestamp;
+      } else if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+        date = new Date(timestamp);
+      } else {
+        return '未知时间';
+      }
+
+      if (isNaN(date.getTime())) return '未知时间';
+
+      const now = new Date();
+      const diff = now - date;
+
+      if (diff < 3600000) { // 1小时内
+        const minutes = Math.floor(diff / 60000);
+        return minutes < 1 ? '刚刚' : `${minutes}分钟前`;
+      } else if (diff < 86400000) { // 24小时内
+        return date.toLocaleTimeString('zh-CN', {
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      } else if (diff < 604800000) { // 7天内
+        const days = Math.floor(diff / 86400000);
+        return `${days}天前`;
+      } else {
+        return date.toLocaleDateString('zh-CN', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      }
     },
     shouldShowTime(message, index) {
       if (index === 0) return true;
 
-      const prevMessage = this.messages[index - 1];
-      const currentTime = new Date(message.timestamp);
-      const prevTime = new Date(prevMessage.timestamp);
+      const prevMessage = this.sortedMessages[index - 1];
+      const currentTime = new Date(message.timestamp).getTime();
+      const prevTime = new Date(prevMessage.timestamp).getTime();
 
-      // 如果两条消息间隔超过5分钟，显示时间
-      return (currentTime - prevTime) > 300000;
+      // 确保时间比较使用有效的时间戳
+      if (isNaN(currentTime) || isNaN(prevTime)) {
+        return true;
+      }
+
+      return (currentTime - prevTime) > 300000; // 5分钟以上才显示时间
+    },
+    shouldShowDateSeparator(message, index) {
+      if (index === 0) return false;
+
+      const prevMessage = this.sortedMessages[index - 1];
+      const messageDate = new Date(message.timestamp);
+      const prevDate = new Date(prevMessage.timestamp);
+
+      if (isNaN(messageDate.getTime()) || isNaN(prevDate.getTime())) {
+        return false;
+      }
+
+      return messageDate.toDateString() !== prevDate.toDateString();
+    },
+    formatDateForDisplay(timestamp) {
+      const date = new Date(timestamp);
+      if (isNaN(date.getTime())) return '未知日期';
+
+      const today = new Date();
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+
+      if (date.toDateString() === today.toDateString()) {
+        return '今天';
+      } else if (date.toDateString() === yesterday.toDateString()) {
+        return '昨天';
+      } else {
+        return date.toLocaleDateString('zh-CN', {
+          year: 'numeric',
+          month: 'short',
+          day: 'numeric'
+        });
+      }
     },
     async sendMessage() {
       if (!this.canSend) return;
@@ -367,51 +563,86 @@ export default {
       const content = this.messageText.trim();
       const tempId = Date.now();
 
-      // 创建临时消息（显示发送中状态）
       const tempMessage = {
         id: tempId,
         content: content,
         type: 'text',
         isMe: true,
-        timestamp: new Date().toISOString(),
+        timestamp: new Date().toISOString(), // 添加时间戳
         status: 'sending'
       };
 
       this.messages.push(tempMessage);
       this.messageText = '';
 
-      // 滚动到底部
       this.$nextTick(() => {
         this.scrollToBottom();
       });
 
-      // 模拟发送到服务器
-      setTimeout(() => {
-        const messageIndex = this.messages.findIndex(msg => msg.id === tempId);
-        if (messageIndex !== -1) {
-          // 更新消息状态为已发送
-          this.messages.splice(messageIndex, 1, {
-            ...this.messages[messageIndex],
-            id: Date.now() + 1,
-            status: 'sent'
-          });
-        }
+      // 构造发送消息的参数
+      const sendMsgParam = {
+        msgId: this.generateUUID(), // 生成UUID
+        dingId: "",
+        msgCaption: `${this.currentUser.name}: ${content.substring(0, 10)}`, // 使用用户名和消息前10个字符
+        userIndex: 0, // 根据要求设置为0
+        toFromIndex: this.currentContact.id, // 房间Index
+        isRevoked: 0,
+        isDeleted: 0,
+        extra1: content, // 使用extra1字段传递消息内容
+        extra2: "",
+        extra3: "",
+        quote: "",
+        dtSend: this.getCurrentFormattedTime(), // 当前时间
+        dtCreate: "",
+        dtUpdate: "",
+        id: 0,
+        sequence: this.getCurrentTimestampInSeconds(), // 当前时间戳（秒）
+        msgType: 10 // 普通消息类型
+      };
 
-        // 模拟对方回复（仅测试用）
-        setTimeout(() => {
-          const replyMessage = {
-            id: Date.now(),
-            content: '收到消息了！',
-            type: 'text',
-            isMe: false,
-            senderName: this.currentContact.name,
-            timestamp: new Date().toISOString(),
-            status: 'read'
-          };
-          this.messages.push(replyMessage);
-          this.scrollToBottom();
-        }, 1000);
-      }, 500);
+      // 调用发送消息接口
+      SensorRequest.Talk_SendMsg(
+        JSON.stringify(sendMsgParam),
+        (response) => {
+          try {
+            const respData = JSON.parse(response);
+            console.log("消息发送成功:", respData);
+
+            // 更新消息状态为已发送
+            const messageIndex = this.messages.findIndex(msg => msg.id === tempId);
+            if (messageIndex !== -1) {
+              this.messages.splice(messageIndex, 1, {
+                ...this.messages[messageIndex],
+                id: respData.id || Date.now() + 1,
+                status: 'sent'
+              });
+            }
+          } catch (error) {
+            console.error('处理发送消息响应失败:', error);
+            // 更新消息状态为发送失败
+            const messageIndex = this.messages.findIndex(msg => msg.id === tempId);
+            if (messageIndex !== -1) {
+              this.messages.splice(messageIndex, 1, {
+                ...this.messages[messageIndex],
+                status: 'error'
+              });
+            }
+            Toast.fail('消息发送失败');
+          }
+        },
+        (error) => {
+          console.error('发送消息失败:', error);
+          // 更新消息状态为发送失败
+          const messageIndex = this.messages.findIndex(msg => msg.id === tempId);
+          if (messageIndex !== -1) {
+            this.messages.splice(messageIndex, 1, {
+              ...this.messages[messageIndex],
+              status: 'error'
+            });
+          }
+          Toast.fail('消息发送失败');
+        }
+      );
     },
     scrollToBottom() {
       this.$nextTick(() => {
@@ -424,37 +655,38 @@ export default {
     loadMoreMessages() {
       this.loadingMore = true;
 
+      // 模拟从服务器获取历史消息（实际项目中应调用接口）
       setTimeout(() => {
-        const newMessages = [
-          {
-            id: this.messages.length + 1,
-            content: '这是更早的消息1',
-            type: 'text',
-            isMe: false,
-            senderName: this.currentContact.name,
-            timestamp: new Date(Date.now() - 86400000).toISOString(),
-            status: 'read'
-          },
-          {
-            id: this.messages.length + 2,
-            content: '这是更早的消息2',
-            type: 'text',
-            isMe: true,
-            timestamp: new Date(Date.now() - 86400000).toISOString(),
-            status: 'read'
-          }
-        ];
+        // 假设后端返回空数组表示无更多消息
+        const respData = []; // 模拟返回空数据
 
-        this.messages = [...newMessages, ...this.messages];
+        if (Array.isArray(respData) && respData.length === 0) {
+          // 无更多消息，提示用户
+          Toast('已全部加载完成');
+          this.hasMoreMessages = false;
+        } else {
+          // 有新消息，插入到顶部
+          const newMessages = respData.map(item => ({
+            id: item.id || Date.now() + Math.random(),
+            content: item.extra1 || '暂无内容', // 从extra1字段获取内容
+            type: item.msgType === 10 ? 'text' : 'image',
+            isMe: item.userIndex === this.getUserIndexByName(this.currentUser.name),
+            senderName: this.getUserNameByIndex(item.userIndex), // 使用真实用户名
+            timestamp: item.dtSend,
+            status: 'read'
+          })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+
+          this.messages = [...newMessages, ...this.messages];
+        }
+
         this.loadingMore = false;
-        this.hasMoreMessages = false;
       }, 1000);
     },
     chooseImage() {
-      Toast('选择图片功能需要调用原生API');
+      Toast('选择图片功能暂未实现');
     },
     takePhoto() {
-      Toast('拍照功能需要调用原生API');
+      Toast('拍照功能暂未实现');
     },
     previewImage(imageUrl) {
       this.previewImages = [imageUrl];
@@ -485,24 +717,6 @@ export default {
     },
     showUserInfo(user) {
       Toast(`查看 ${user.name} 的信息`);
-    },
-    simulateNewMessage() {
-      // 每30秒接收一条模拟消息
-      return setInterval(() => {
-        if (Math.random() > 0.7) { // 30%概率接收消息
-          const newMessage = {
-            id: Date.now(),
-            content: '这是自动回复的消息',
-            type: 'text',
-            isMe: false,
-            senderName: this.currentContact.name,
-            timestamp: new Date().toISOString(),
-            status: 'read'
-          };
-          this.messages.push(newMessage);
-          this.scrollToBottom();
-        }
-      }, 30000);
     },
     goBack() {
       this.$router.go(-1);
@@ -699,7 +913,7 @@ export default {
 
 .text-count {
   font-size: 12px;
-  color: #999;
+  color: #996;
   white-space: nowrap;
 }
 
