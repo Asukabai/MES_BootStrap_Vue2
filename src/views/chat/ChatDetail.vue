@@ -441,6 +441,7 @@ export default {
     },
 
     // 处理接收到的 MQTT 消息
+// 处理接收到的 MQTT 消息
     handleIncomingMessage(message) {
       // 检查message是否为有效对象
       if (!message || typeof message !== 'object') {
@@ -463,16 +464,6 @@ export default {
       if (message.toFromIndex === this.currentContact.roomIndex) {
         console.log('✅ 消息属于当前聊天室，开始处理');
 
-        // 获取发送者名称
-        let senderName = '未知用户';
-        if (message.userIndex) {
-          senderName = this.getUserNameByIndex(message.userIndex);
-          console.log('👤 发送者信息:', {
-            userIndex: message.userIndex,
-            userName: senderName
-          });
-        }
-
         // 获取当前用户的ID
         const currentUserIndex = this.getUserIndexByName(this.currentUser.name);
         const isMe = message.userIndex === currentUserIndex;
@@ -482,6 +473,22 @@ export default {
           userIndex: currentUserIndex,
           是否为自己: isMe
         });
+
+        // 如果消息是自己发送的，直接跳过（因为发送时已经显示过了）
+        if (isMe) {
+          console.log('⏭️ 跳过自己发送的MQTT消息，避免重复显示');
+          return;
+        }
+
+        // 获取发送者名称
+        let senderName = '未知用户';
+        if (message.userIndex) {
+          senderName = this.getUserNameByIndex(message.userIndex);
+          console.log('👤 发送者信息:', {
+            userIndex: message.userIndex,
+            userName: senderName
+          });
+        }
 
         const newMessage = {
           id: message.id || Date.now(),
@@ -979,10 +986,19 @@ export default {
 }
 
 .message-content-wrapper {
-  max-width: 70%;
+  max-width: 85%;
   display: flex;
   flex-direction: column;
 }
+
+.message-other .message-content-wrapper {
+  max-width: 75%;
+}
+
+.message-mine .message-content-wrapper {
+  max-width: 75%;
+}
+
 
 .sender-name {
   font-size: 12px;
@@ -999,6 +1015,10 @@ export default {
   line-height: 1.5;
   font-size: 16px;
   animation: fadeIn 0.3s ease;
+  /* 添加以下属性以允许更长的文本行 */
+  white-space: normal;
+  word-wrap: break-word;
+  max-width: 100%; /* 确保内容不会超出容器 */
 }
 
 .message-other .message-content {
@@ -1129,7 +1149,16 @@ export default {
     font-size: 15px;
     padding: 10px 14px;
   }
+  .message-other .message-content-wrapper,
+  .message-mine .message-content-wrapper {
+    max-width: 80%;
+  }
 
+  .message-content {
+    max-width: 100%;
+    font-size: 15px;
+    padding: 10px 14px;
+  }
   .message-avatar {
     width: 32px;
     height: 32px;
