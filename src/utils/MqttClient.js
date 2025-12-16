@@ -63,6 +63,12 @@ class MqttClient {
       console.log('连接成功后状态:', this.connected)
 
       // 订阅个人消息主题
+      // 在聊天应用中，我们通常希望消息至少被接收一次，但不能丢失消息。QoS 1 提供了一个折中的方案：它保证了消息的传递，但可能会重复。不过，通过消息去重机制（例如，使用唯一消息ID）可以处理重复消息。
+      // QoS 1：至少一次（At least once）
+      // 特点：消息保证至少到达一次，可能重复
+      // 可靠性：中等，不会丢失但可能有重复
+      // 性能：中等，有确认机制
+      // 适用场景：聊天消息、通知、重要数据（你正在使用的）
       const topic = `SensorRTU/talk/msg1/${userId}`
       this.client.subscribe(topic, { qos: 1 }, (err) => {
         if (err) {

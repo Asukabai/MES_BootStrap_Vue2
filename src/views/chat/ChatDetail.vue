@@ -261,7 +261,9 @@ export default {
         { name: '取消', icon: 'close' }
       ],
       messages: [],
-      userList: [] // 新增：存储所有用户信息
+      userList: [], // 新增：存储所有用户信息
+      mqttConnected: false, // 添加MQTT连接状态
+      mqttInitialized: false // 标记MQTT是否已初始化
     };
   },
   computed: {
@@ -286,56 +288,8 @@ export default {
 
   mounted() {
     // 在聊天页面初始化 MQTT 连接
-    const department = this.$route.params.department
-    const userId = localStorage.getItem(key_DingUserIndex);
+    this.initializeMQTT();
 
-    if (userId) {
-      GetDingUserToken(department, (token) => {
-        if (token) {
-          // 添加连接状态检查
-          console.log('初始化前连接状态:', MqttClient.getConnectStatus());
-          console.log('🔗 准备连接MQTT...');
-          console.log('用户ID:', userId, 'Token:', token.substring(0, 20) + '...');
-
-          // 确保只建立一次连接
-          if (!MqttClient.connected) {
-            // 1. 先设置消息回调
-            console.log('📞 设置消息回调...');
-            MqttClient.onMessage((message) => {
-              console.log('📨 MQTT消息回调被调用，收到消息:', message);
-              this.handleIncomingMessage(message);
-            });
-
-            // 2. 建立连接
-            MqttClient.connect(userId, token);
-            Toast(' MQTT 连接成功 ');
-
-            this.mqttConnected = true;
-
-            // 3. 添加连接状态检查
-            const connectCheckInterval = setInterval(() => {
-              if (MqttClient.connected) {
-                clearInterval(connectCheckInterval);
-                console.log('✅ MQTT连接已确认建立');
-                // 测试MQTT功能
-                this.testMQTTFunctionality();
-              }
-            }, 100);
-
-            // 设置超时检查
-            setTimeout(() => {
-              clearInterval(connectCheckInterval);
-              if (!MqttClient.connected) {
-                console.warn('⚠️ MQTT连接超时');
-                Toast.fail('MQTT连接超时');
-              }
-            }, 5000);
-          }
-        }
-      }, (error) => {
-        console.error('聊天页面 [App] 获取token失败 :', error);
-      });
-    }
     const queryString = window.location.search;
     const params = new URLSearchParams(queryString);
     const contactStr = params.get('contact');
@@ -372,95 +326,169 @@ export default {
     if (this.messageInterval) {
       clearInterval(this.messageInterval);
     }
-    console.log('=== ChatDetail beforeDestroy 开始 ===');
-    console.log('当前mqttConnected状态:', this.mqttConnected);
-    console.log('MqttClient连接状态:', MqttClient.connected);
-    console.log('MqttClient客户端实例:', MqttClient.client);
-    console.log('销毁前连接状态:', MqttClient.getConnectStatus());
 
-    // 添加防抖：确保只断开一次
-    if (!this._disconnecting && MqttClient.connected) {
-      this._disconnecting = true;
+    console.log('=== ChatDetail beforeDestroy 开始 ===');
+    console.log('当前组件状态:', {
+      mqttConnected: this.mqttConnected,
+      mqttInitialized: this.mqttInitialized
+    });
+
+    const status = MqttClient.getConnectStatus();
+    console.log('MQTT连接状态:', status);
+
+    // 确保只断开一次，并添加更详细的日志
+    if (status.connected && !status.disconnecting) {
       console.log('正在断开MQTT连接...');
-      MqttClient.disconnect();
+
+      // 标记为已初始化，防止重复连接
+      this.mqttInitialized = false;
       this.mqttConnected = false;
-      console.log('断开连接后状态:', MqttClient.connected);
+
+      // 延迟一小段时间再断开，确保所有操作完成
+      setTimeout(() => {
+        MqttClient.disconnect();
+        console.log('已调用断开连接方法');
+
+        // 再次检查状态
+        setTimeout(() => {
+          const newStatus = MqttClient.getConnectStatus();
+          console.log('断开连接后状态:', newStatus);
+        }, 500);
+      }, 50);
     } else {
       console.log('连接已在断开过程中或已断开，跳过重复断开');
     }
+
     console.log('=== ChatDetail beforeDestroy 结束 ===');
-    Toast(' 离开房间，MQTT 连接断开 ');
+    Toast('离开房间，MQTT连接断开');
   },
   methods: {
-    // 测试MQTT功能
-    testMQTTFunctionality() {
-      console.log('🧪 开始测试MQTT功能...');
-
-      // 检查连接状态
-      const status = MqttClient.getConnectStatus();
-      console.log('📊 MQTT连接状态检查:', {
-        连接状态: status.connected ? '✅ 已连接' : '❌ 未连接',
-        客户端实例: status.client ? '✅ 存在' : '❌ 不存在',
-        当前时间: new Date().toISOString()
-      });
-
-      // 发送测试消息
-      const testMessage = {
-        type: 'test',
-        roomIndex: this.currentContact.roomIndex,
-        content: 'MQTT连接测试消息',
-        timestamp: new Date().toISOString(),
-        testId: 'test_' + Date.now(),
-        from: 'ChatDetail测试'
-      };
-
-
+    // 初始化MQTT连接
+    initializeMQTT() {
+      const department = this.$route.params.department;
       const userId = localStorage.getItem(key_DingUserIndex);
-      const testTopic = `SensorRTU/talk/msg1/${userId}`;
 
-      console.log('📤 发送测试消息到主题:', testTopic);
+      if (!userId) {
+        console.error('❌ 无法初始化MQTT：用户ID不存在');
+        return;
+      }
 
-      // 稍等一下再发送测试消息，确保连接稳定
-      setTimeout(() => {
-        if (MqttClient.connected) {
-          MqttClient.publish(testTopic, testMessage);
+      console.log('🔗 开始初始化MQTT连接...');
 
-          // 检查是否收到自己的测试消息
-          setTimeout(() => {
-            console.log('🔍 测试完成，MQTT功能状态:', {
-              发送测试消息: '✅ 完成',
-              等待接收: '⏳ 进行中',
-              连接保持: MqttClient.connected ? '✅ 保持' : '❌ 断开'
-            });
-          }, 2000);
+      GetDingUserToken(department, (token) => {
+        if (token) {
+          console.log('✅ 获取到token，准备连接MQTT');
+          console.log('用户ID:', userId);
+          console.log('Token长度:', token.length);
+
+          // 检查是否已经初始化过MQTT
+          if (this.mqttInitialized) {
+            console.log('ℹ️ MQTT已经初始化过，跳过重复初始化');
+            return;
+          }
+
+          // 1. 先设置消息回调
+          console.log('📞 设置MQTT消息回调...');
+          MqttClient.onMessage((message) => {
+            console.log('📨 MQTT消息回调被调用，收到消息');
+            this.handleIncomingMessage(message);
+          });
+
+          // 2. 建立连接
+          console.log('🔌 正在建立MQTT连接...');
+          MqttClient.connect(userId, token);
+
+          // 标记已初始化
+          this.mqttInitialized = true;
+
+          // 3. 监听连接状态变化
+          this.monitorMQTTConnection();
+
         } else {
-          console.error('❌ 连接已断开，无法发送测试消息');
+          console.error('❌ 获取token失败，无法连接MQTT');
+          Toast.fail('MQTT连接失败：无法获取token');
         }
-      }, 2000);
+      }, (error) => {
+        console.error('聊天页面获取token失败:', error);
+        Toast.fail('MQTT连接失败');
+      });
     },
 
-    // 处理接收到的 MQTT 消息（增加详细日志）
+    // 监控MQTT连接状态
+    monitorMQTTConnection() {
+      console.log('🔍 开始监控MQTT连接状态...');
+
+      let checkCount = 0;
+      const maxChecks = 30; // 最多检查30次（3秒）
+
+      const checkInterval = setInterval(() => {
+        checkCount++;
+
+        if (MqttClient.connected) {
+          clearInterval(checkInterval);
+          this.mqttConnected = true;
+          console.log('✅ MQTT连接已确认建立');
+          console.log('📊 当前MQTT状态:', MqttClient.getConnectStatus());
+          Toast('MQTT连接成功');
+        } else if (checkCount >= maxChecks) {
+          clearInterval(checkInterval);
+          console.warn('⚠️ MQTT连接超时');
+          Toast.fail('MQTT连接超时');
+        } else {
+          console.log(`⏳ 等待MQTT连接... (${checkCount}/${maxChecks})`);
+        }
+      }, 100);
+    },
+
+    // 处理接收到的 MQTT 消息
     handleIncomingMessage(message) {
-      console.log('🔄 handleIncomingMessage 被调用，消息详情:', {
-        消息ID: message.id || message.msgId,
-        房间号: message.roomIndex,
+      // 检查message是否为有效对象
+      if (!message || typeof message !== 'object') {
+        console.error('❌ 收到的消息不是有效对象:', message);
+        return;
+      }
+
+      console.log('🔄 handleIncomingMessage 被调用，收到MQTT消息:', {
+        消息ID: message.id || message.msgId || '无ID',
+        房间号: message.toFromIndex,
         当前房间: this.currentContact.roomIndex,
-        消息内容: message.extra1 || message.content,
+        消息内容: message.extra1 || message.content || '无内容',
         消息类型: message.msgType,
-        时间: message.dtSend || message.timestamp,
-        发送者: message.userIndex
+        时间: message.dtSend || message.timestamp || '无时间',
+        发送者: message.userIndex,
+        消息来源: 'MQTT实时推送'
       });
 
       // 检查消息是否属于当前聊天室
-      if (message.roomIndex === this.currentContact.roomIndex) {
+      if (message.toFromIndex === this.currentContact.roomIndex) {
         console.log('✅ 消息属于当前聊天室，开始处理');
+
+        // 获取发送者名称
+        let senderName = '未知用户';
+        if (message.userIndex) {
+          senderName = this.getUserNameByIndex(message.userIndex);
+          console.log('👤 发送者信息:', {
+            userIndex: message.userIndex,
+            userName: senderName
+          });
+        }
+
+        // 获取当前用户的ID
+        const currentUserIndex = this.getUserIndexByName(this.currentUser.name);
+        const isMe = message.userIndex === currentUserIndex;
+
+        console.log('👤 当前用户信息:', {
+          name: this.currentUser.name,
+          userIndex: currentUserIndex,
+          是否为自己: isMe
+        });
 
         const newMessage = {
           id: message.id || Date.now(),
-          content: message.extra1 || '暂无内容',
+          content: message.extra1,
           type: message.msgType === 10 ? 'text' : 'image',
-          isMe: message.userIndex === this.getUserIndexByName(this.currentUser.name),
-          senderName: this.getUserNameByIndex(message.userIndex),
+          isMe: isMe,
+          senderName: senderName,
           timestamp: message.dtSend || new Date().toISOString(),
           status: 'read'
         };
@@ -477,11 +505,12 @@ export default {
         console.log('✅ 消息处理完成，当前消息总数:', this.messages.length);
       } else {
         console.log('⏭️ 消息不属于当前聊天室，已忽略', {
-          消息房间: message.roomIndex,
+          消息房间: message.toFromIndex,
           当前房间: this.currentContact.roomIndex
         });
       }
     },
+
     // 从缓存中加载当前用户信息
     loadCurrentUser() {
       const name = localStorage.getItem(key_DingName);
@@ -825,8 +854,8 @@ export default {
         } else {
           // 有新消息，插入到顶部
           const newMessages = respData.map(item => ({
-            id: item.id || Date.now() + Math.random(),
-            content: item.extra1 || '暂无内容', // 从extra1字段获取内容
+            id: item.id ,
+            content: item.extra1 , // 从extra1字段获取内容
             type: item.msgType === 10 ? 'text' : 'image',
             isMe: item.userIndex === this.getUserIndexByName(this.currentUser.name),
             senderName: this.getUserNameByIndex(item.userIndex), // 使用真实用户名
