@@ -221,9 +221,10 @@
 </template>
 
 <script>
+import MqttClient from '../../utils/MqttClient'; // 在具体页面导入
 import { Toast, ImagePreview } from 'vant';
 import SensorRequest from '../../utils/SensorRequest';
-import { key_DingName, key_DingUserIndex, key_DingUserPhone } from '../../utils/Dingding.js';
+import {GetDingUserToken, key_DingName, key_DingUserIndex, key_DingUserPhone} from '../../utils/Dingding.js';
 
 export default {
   name: 'ChatDetail',
@@ -282,7 +283,59 @@ export default {
       return this.messageText.trim().length > 0;
     }
   },
+
   mounted() {
+    // 在聊天页面初始化 MQTT 连接
+    const department = this.$route.params.department
+    const userId = localStorage.getItem(key_DingUserIndex);
+
+    if (userId) {
+      GetDingUserToken(department, (token) => {
+        if (token) {
+          // 添加连接状态检查
+          console.log('初始化前连接状态:', MqttClient.getConnectStatus());
+          console.log('🔗 准备连接MQTT...');
+          console.log('用户ID:', userId, 'Token:', token.substring(0, 20) + '...');
+
+          // 确保只建立一次连接
+          if (!MqttClient.connected) {
+            // 1. 先设置消息回调
+            console.log('📞 设置消息回调...');
+            MqttClient.onMessage((message) => {
+              console.log('📨 MQTT消息回调被调用，收到消息:', message);
+              this.handleIncomingMessage(message);
+            });
+
+            // 2. 建立连接
+            MqttClient.connect(userId, token);
+            Toast(' MQTT 连接成功 ');
+
+            this.mqttConnected = true;
+
+            // 3. 添加连接状态检查
+            const connectCheckInterval = setInterval(() => {
+              if (MqttClient.connected) {
+                clearInterval(connectCheckInterval);
+                console.log('✅ MQTT连接已确认建立');
+                // 测试MQTT功能
+                this.testMQTTFunctionality();
+              }
+            }, 100);
+
+            // 设置超时检查
+            setTimeout(() => {
+              clearInterval(connectCheckInterval);
+              if (!MqttClient.connected) {
+                console.warn('⚠️ MQTT连接超时');
+                Toast.fail('MQTT连接超时');
+              }
+            }, 5000);
+          }
+        }
+      }, (error) => {
+        console.error('聊天页面 [App] 获取token失败 :', error);
+      });
+    }
     const queryString = window.location.search;
     const params = new URLSearchParams(queryString);
     const contactStr = params.get('contact');
@@ -301,14 +354,11 @@ export default {
 
     // 从缓存中获取当前用户信息
     this.loadCurrentUser();
-
     // 新增：先加载用户列表，再加载消息
     this.loadUserList().then(() => {
       this.loadMessages();
     });
-
     this.scrollToBottom();
-
     setTimeout(() => {
       if (this.$refs.messageInput) {
         this.$refs.messageInput.focus();
@@ -322,8 +372,116 @@ export default {
     if (this.messageInterval) {
       clearInterval(this.messageInterval);
     }
+    console.log('=== ChatDetail beforeDestroy 开始 ===');
+    console.log('当前mqttConnected状态:', this.mqttConnected);
+    console.log('MqttClient连接状态:', MqttClient.connected);
+    console.log('MqttClient客户端实例:', MqttClient.client);
+    console.log('销毁前连接状态:', MqttClient.getConnectStatus());
+
+    // 添加防抖：确保只断开一次
+    if (!this._disconnecting && MqttClient.connected) {
+      this._disconnecting = true;
+      console.log('正在断开MQTT连接...');
+      MqttClient.disconnect();
+      this.mqttConnected = false;
+      console.log('断开连接后状态:', MqttClient.connected);
+    } else {
+      console.log('连接已在断开过程中或已断开，跳过重复断开');
+    }
+    console.log('=== ChatDetail beforeDestroy 结束 ===');
+    Toast(' 离开房间，MQTT 连接断开 ');
   },
   methods: {
+    // 测试MQTT功能
+    testMQTTFunctionality() {
+      console.log('🧪 开始测试MQTT功能...');
+
+      // 检查连接状态
+      const status = MqttClient.getConnectStatus();
+      console.log('📊 MQTT连接状态检查:', {
+        连接状态: status.connected ? '✅ 已连接' : '❌ 未连接',
+        客户端实例: status.client ? '✅ 存在' : '❌ 不存在',
+        当前时间: new Date().toISOString()
+      });
+
+      // 发送测试消息
+      const testMessage = {
+        type: 'test',
+        roomIndex: this.currentContact.roomIndex,
+        content: 'MQTT连接测试消息',
+        timestamp: new Date().toISOString(),
+        testId: 'test_' + Date.now(),
+        from: 'ChatDetail测试'
+      };
+
+
+      const userId = localStorage.getItem(key_DingUserIndex);
+      const testTopic = `SensorRTU/talk/msg1/${userId}`;
+
+      console.log('📤 发送测试消息到主题:', testTopic);
+
+      // 稍等一下再发送测试消息，确保连接稳定
+      setTimeout(() => {
+        if (MqttClient.connected) {
+          MqttClient.publish(testTopic, testMessage);
+
+          // 检查是否收到自己的测试消息
+          setTimeout(() => {
+            console.log('🔍 测试完成，MQTT功能状态:', {
+              发送测试消息: '✅ 完成',
+              等待接收: '⏳ 进行中',
+              连接保持: MqttClient.connected ? '✅ 保持' : '❌ 断开'
+            });
+          }, 2000);
+        } else {
+          console.error('❌ 连接已断开，无法发送测试消息');
+        }
+      }, 2000);
+    },
+
+    // 处理接收到的 MQTT 消息（增加详细日志）
+    handleIncomingMessage(message) {
+      console.log('🔄 handleIncomingMessage 被调用，消息详情:', {
+        消息ID: message.id || message.msgId,
+        房间号: message.roomIndex,
+        当前房间: this.currentContact.roomIndex,
+        消息内容: message.extra1 || message.content,
+        消息类型: message.msgType,
+        时间: message.dtSend || message.timestamp,
+        发送者: message.userIndex
+      });
+
+      // 检查消息是否属于当前聊天室
+      if (message.roomIndex === this.currentContact.roomIndex) {
+        console.log('✅ 消息属于当前聊天室，开始处理');
+
+        const newMessage = {
+          id: message.id || Date.now(),
+          content: message.extra1 || '暂无内容',
+          type: message.msgType === 10 ? 'text' : 'image',
+          isMe: message.userIndex === this.getUserIndexByName(this.currentUser.name),
+          senderName: this.getUserNameByIndex(message.userIndex),
+          timestamp: message.dtSend || new Date().toISOString(),
+          status: 'read'
+        };
+
+        console.log('📝 创建新消息对象:', newMessage);
+
+        this.messages.push(newMessage);
+
+        // 滚动到底部
+        this.$nextTick(() => {
+          this.scrollToBottom();
+        });
+
+        console.log('✅ 消息处理完成，当前消息总数:', this.messages.length);
+      } else {
+        console.log('⏭️ 消息不属于当前聊天室，已忽略', {
+          消息房间: message.roomIndex,
+          当前房间: this.currentContact.roomIndex
+        });
+      }
+    },
     // 从缓存中加载当前用户信息
     loadCurrentUser() {
       const name = localStorage.getItem(key_DingName);
