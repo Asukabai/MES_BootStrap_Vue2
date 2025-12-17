@@ -221,10 +221,11 @@
 </template>
 
 <script>
-import MqttClient from '../../utils/MqttClient'; // 在具体页面导入
-import { Toast, ImagePreview } from 'vant';
-import SensorRequest from '../../utils/SensorRequest';
-import {GetDingUserToken, key_DingName, key_DingUserIndex, key_DingUserPhone} from '../../utils/Dingding.js';
+// 移除原来的MqttClient导入
+import MqttService from '../../services/MqttService'
+import { Toast, ImagePreview } from 'vant'
+import SensorRequest from '../../utils/SensorRequest'
+import { GetDingUserToken, key_DingName, key_DingUserIndex, key_DingUserPhone } from '../../utils/Dingding.js'
 
 export default {
   name: 'ChatDetail',
@@ -247,7 +248,8 @@ export default {
         id: null,
         name: '聊天对象',
         avatar: 'https://img.yzcdn.cn/vant/cat.jpeg',
-        userId: null
+        userId: null,
+        roomIndex: null
       },
       currentUser: {
         name: '',
@@ -262,8 +264,8 @@ export default {
       ],
       messages: [],
       userList: [], // 新增：存储所有用户信息
-      mqttConnected: false, // 添加MQTT连接状态
-      mqttInitialized: false // 标记MQTT是否已初始化
+      unregisterCallback: null, // 用于注销回调的函数
+      mqttStatus: 'disconnected' // MQTT连接状态
     };
   },
   computed: {
@@ -287,9 +289,7 @@ export default {
   },
 
   mounted() {
-    // 在聊天页面初始化 MQTT 连接
-    this.initializeMQTT();
-
+    // 解析URL参数获取联系人信息
     const queryString = window.location.search;
     const params = new URLSearchParams(queryString);
     const contactStr = params.get('contact');
@@ -299,8 +299,13 @@ export default {
         this.currentContact = {
           ...parsedContact,
           id: parsedContact.roomIndex || parsedContact.id,
-          userId: parsedContact.userId
+          userId: parsedContact.userId,
+          roomIndex: parsedContact.roomIndex || parsedContact.id
         };
+
+        // 注册当前聊天室的消息回调
+        this.registerMQTTCallback();
+
       } catch (e) {
         console.error('解析 contact 失败:', e);
       }
@@ -318,130 +323,99 @@ export default {
         this.$refs.messageInput.focus();
       }
     }, 300);
+
+    // 监听MQTT连接状态
+    this.setupMQTTStatusListener();
   },
+
   updated() {
     this.scrollToBottom();
   },
+
   beforeDestroy() {
     if (this.messageInterval) {
       clearInterval(this.messageInterval);
     }
 
     console.log('=== ChatDetail beforeDestroy 开始 ===');
-    console.log('当前组件状态:', {
-      mqttConnected: this.mqttConnected,
-      mqttInitialized: this.mqttInitialized
-    });
 
-    const status = MqttClient.getConnectStatus();
-    console.log('MQTT连接状态:', status);
-
-    // 确保只断开一次，并添加更详细的日志
-    if (status.connected && !status.disconnecting) {
-      console.log('正在断开MQTT连接...');
-
-      // 标记为已初始化，防止重复连接
-      this.mqttInitialized = false;
-      this.mqttConnected = false;
-
-      // 延迟一小段时间再断开，确保所有操作完成
-      setTimeout(() => {
-        MqttClient.disconnect();
-        console.log('已调用断开连接方法');
-
-        // 再次检查状态
-        setTimeout(() => {
-          const newStatus = MqttClient.getConnectStatus();
-          console.log('断开连接后状态:', newStatus);
-        }, 500);
-      }, 50);
-    } else {
-      console.log('连接已在断开过程中或已断开，跳过重复断开');
+    // 注销当前聊天室的消息回调
+    if (this.unregisterCallback) {
+      this.unregisterCallback();
+      console.log('✅ 已注销MQTT回调');
     }
 
-    console.log('=== ChatDetail beforeDestroy 结束 ===');
-    Toast('离开房间，MQTT连接断开');
-  },
-  methods: {
-    // 初始化MQTT连接
-    initializeMQTT() {
-      const department = this.$route.params.department;
-      const userId = localStorage.getItem(key_DingUserIndex);
+    // 获取MQTT状态
+    const status = MqttService.getStatus();
+    console.log('离开聊天室时MQTT状态:', status);
 
-      if (!userId) {
-        console.error('❌ 无法初始化MQTT：用户ID不存在');
+    console.log('=== ChatDetail beforeDestroy 结束 ===');
+  },
+
+  watch: {
+    // 监听当前联系人变化，重新注册回调
+    'currentContact.roomIndex'(newRoomIndex, oldRoomIndex) {
+      if (newRoomIndex && newRoomIndex !== oldRoomIndex) {
+        // 注销旧的，注册新的
+        if (this.unregisterCallback) {
+          this.unregisterCallback();
+        }
+        this.registerMQTTCallback();
+      }
+    }
+  },
+
+  methods: {
+    /**
+     * 注册MQTT回调
+     */
+    registerMQTTCallback() {
+      if (!this.currentContact.roomIndex) {
+        console.error('❌ 无法注册MQTT回调：缺少房间ID');
         return;
       }
 
-      console.log('🔗 开始初始化MQTT连接...');
+      console.log(`📞 注册房间 ${this.currentContact.roomIndex} 的MQTT回调`);
 
-      GetDingUserToken(department, (token) => {
-        if (token) {
-          console.log('✅ 获取到token，准备连接MQTT');
-          console.log('用户ID:', userId);
-          console.log('Token长度:', token.length);
+      // 注册回调，并保存注销函数
+      MqttService.registerCallback(
+        this.currentContact.roomIndex,
+        this.handleIncomingMessage
+      );
 
-          // 检查是否已经初始化过MQTT
-          if (this.mqttInitialized) {
-            console.log('ℹ️ MQTT已经初始化过，跳过重复初始化');
-            return;
-          }
+      // 设置注销函数
+      this.unregisterCallback = () => {
+        MqttService.unregisterCallback(this.currentContact.roomIndex);
+      };
 
-          // 1. 先设置消息回调
-          console.log('📞 设置MQTT消息回调...');
-          MqttClient.onMessage((message) => {
-            console.log('📨 MQTT消息回调被调用，收到消息');
-            this.handleIncomingMessage(message);
-          });
+      // 检查MQTT连接状态
+      const status = MqttService.getStatus();
+      this.mqttStatus = status.connected ? 'connected' : 'disconnected';
 
-          // 2. 建立连接
-          console.log('🔌 正在建立MQTT连接...');
-          MqttClient.connect(userId, token);
+      if (!status.connected) {
+        console.warn('⚠️ MQTT未连接，消息可能无法实时接收');
+      }
+    },
 
-          // 标记已初始化
-          this.mqttInitialized = true;
-
-          // 3. 监听连接状态变化
-          this.monitorMQTTConnection();
-
-        } else {
-          console.error('❌ 获取token失败，无法连接MQTT');
-          Toast.fail('MQTT连接失败：无法获取token');
+    /**
+     * 设置MQTT状态监听
+     */
+    setupMQTTStatusListener() {
+      // 监听全局MQTT状态变化
+      this.unregisterGlobalCallback = MqttService.registerGlobalCallback((data) => {
+        if (data.type === 'connected') {
+          this.mqttStatus = 'connected';
+          console.log('✅ MQTT已连接');
+        } else if (data.type === 'disconnected' || data.type === 'error') {
+          this.mqttStatus = 'disconnected';
+          console.warn('⚠️ MQTT连接已断开');
         }
-      }, (error) => {
-        console.error('聊天页面获取token失败:', error);
-        Toast.fail('MQTT连接失败');
       });
     },
 
-    // 监控MQTT连接状态
-    monitorMQTTConnection() {
-      console.log('🔍 开始监控MQTT连接状态...');
-
-      let checkCount = 0;
-      const maxChecks = 30; // 最多检查30次（3秒）
-
-      const checkInterval = setInterval(() => {
-        checkCount++;
-
-        if (MqttClient.connected) {
-          clearInterval(checkInterval);
-          this.mqttConnected = true;
-          console.log('✅ MQTT连接已确认建立');
-          console.log('📊 当前MQTT状态:', MqttClient.getConnectStatus());
-          Toast('MQTT连接成功');
-        } else if (checkCount >= maxChecks) {
-          clearInterval(checkInterval);
-          console.warn('⚠️ MQTT连接超时');
-          Toast.fail('MQTT连接超时');
-        } else {
-          console.log(`⏳ 等待MQTT连接... (${checkCount}/${maxChecks})`);
-        }
-      }, 100);
-    },
-
-    // 处理接收到的 MQTT 消息
-// 处理接收到的 MQTT 消息
+    /**
+     * 处理接收到的 MQTT 消息
+     */
     handleIncomingMessage(message) {
       // 检查message是否为有效对象
       if (!message || typeof message !== 'object') {
@@ -457,7 +431,7 @@ export default {
         消息类型: message.msgType,
         时间: message.dtSend || message.timestamp || '无时间',
         发送者: message.userIndex,
-        消息来源: 'MQTT实时推送'
+        消息来源: 'MQTT全局服务'
       });
 
       // 检查消息是否属于当前聊天室
@@ -466,11 +440,13 @@ export default {
 
         // 获取当前用户的ID
         const currentUserIndex = this.getUserIndexByName(this.currentUser.name);
-        const isMe = message.userIndex === currentUserIndex;
+        const currentUserId = localStorage.getItem(key_DingUserIndex);
+        const isMe = message.userIndex == currentUserIndex || message.userIndex == currentUserId;
 
         console.log('👤 当前用户信息:', {
           name: this.currentUser.name,
           userIndex: currentUserIndex,
+          userId: currentUserId,
           是否为自己: isMe
         });
 
@@ -494,7 +470,7 @@ export default {
           id: message.id || Date.now(),
           content: message.extra1,
           type: message.msgType === 10 ? 'text' : 'image',
-          isMe: isMe,
+          isMe: false, // 这是别人发的消息
           senderName: senderName,
           timestamp: message.dtSend || new Date().toISOString(),
           status: 'read'
@@ -510,11 +486,44 @@ export default {
         });
 
         console.log('✅ 消息处理完成，当前消息总数:', this.messages.length);
+
+        // 播放消息提示音（可选）
+        this.playMessageSound();
       } else {
         console.log('⏭️ 消息不属于当前聊天室，已忽略', {
           消息房间: message.toFromIndex,
           当前房间: this.currentContact.roomIndex
         });
+      }
+    },
+
+    /**
+     * 播放消息提示音
+     */
+    playMessageSound() {
+      // 检查是否允许播放声音
+      const allowSound = localStorage.getItem('chat_sound_notification') !== 'false';
+      if (!allowSound) return;
+
+      try {
+        // 创建一个简短的提示音
+        const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        const oscillator = audioContext.createOscillator();
+        const gainNode = audioContext.createGain();
+
+        oscillator.connect(gainNode);
+        gainNode.connect(audioContext.destination);
+
+        oscillator.frequency.value = 800;
+        oscillator.type = 'sine';
+
+        gainNode.gain.setValueAtTime(0.3, audioContext.currentTime);
+        gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.1);
+
+        oscillator.start(audioContext.currentTime);
+        oscillator.stop(audioContext.currentTime + 0.1);
+      } catch (error) {
+        console.log('播放提示音失败:', error);
       }
     },
 
@@ -528,7 +537,7 @@ export default {
         name: name || '未知用户',
         userId: userId || null,
         phone: phone || '',
-        avatar: 'https://img.yzcdn.cn/vant/cat.jpeg' // 可以替换为真实头像URL
+        avatar: 'https://img.yzcdn.cn/vant/cat.jpeg'
       };
     },
 
@@ -574,6 +583,9 @@ export default {
                   name: user.name
                 }));
                 console.log("📊 用户列表数量:", this.userList.length);
+
+                // 保存到localStorage，供全局使用
+                localStorage.setItem('user_list', JSON.stringify(this.userList));
               } else {
                 console.warn('用户列表数据格式不符合预期:', respData);
                 this.userList = [];
@@ -609,6 +621,11 @@ export default {
     },
 
     loadMessages() {
+      if (!this.currentContact.roomIndex) {
+        console.error('无法加载消息：缺少房间编号');
+        return;
+      }
+
       console.log("📂 获取聊天历史数据参数的房间编号:", this.currentContact.roomIndex);
       const param = {
         roomIndex: this.currentContact.roomIndex,
@@ -634,7 +651,9 @@ export default {
                 const senderName = this.getUserNameByIndex(item.userIndex);
 
                 // 判断消息是否为自己发送的
-                const isMe = item.userIndex === this.getUserIndexByName(this.currentUser.name);
+                const currentUserIndex = this.getUserIndexByName(this.currentUser.name);
+                const currentUserId = localStorage.getItem(key_DingUserIndex);
+                const isMe = item.userIndex == currentUserIndex || item.userIndex == currentUserId;
 
                 // 从extra1字段获取消息内容
                 const content = item.extra1 || '暂无内容';
@@ -645,13 +664,17 @@ export default {
                   type: item.msgType === 10 ? 'text' : 'image',
                   isMe: isMe,
                   senderName: senderName,
-                  timestamp: timestamp, // 确保时间戳字段
+                  timestamp: timestamp,
                   status: 'read'
                 };
               });
 
-              // 移除之前的排序，让 computed 属性处理排序
-              console.log("📊 原始消息数量:", this.messages.length);
+              console.log("📊 加载历史消息数量:", this.messages.length);
+
+              // 滚动到底部
+              this.$nextTick(() => {
+                this.scrollToBottom();
+              });
             } else {
               console.warn('返回数据格式不符合预期:', respData);
               this.messages = [];
@@ -669,6 +692,7 @@ export default {
         }
       );
     },
+
     formatMessageTime(timestamp) {
       // 确保 timestamp 是有效的日期
       let date;
@@ -704,6 +728,7 @@ export default {
         });
       }
     },
+
     shouldShowTime(message, index) {
       if (index === 0) return true;
 
@@ -718,6 +743,7 @@ export default {
 
       return (currentTime - prevTime) > 300000; // 5分钟以上才显示时间
     },
+
     shouldShowDateSeparator(message, index) {
       if (index === 0) return false;
 
@@ -731,6 +757,7 @@ export default {
 
       return messageDate.toDateString() !== prevDate.toDateString();
     },
+
     formatDateForDisplay(timestamp) {
       const date = new Date(timestamp);
       if (isNaN(date.getTime())) return '未知日期';
@@ -751,6 +778,7 @@ export default {
         });
       }
     },
+
     async sendMessage() {
       if (!this.canSend) return;
 
@@ -762,7 +790,7 @@ export default {
         content: content,
         type: 'text',
         isMe: true,
-        timestamp: new Date().toISOString(), // 添加时间戳
+        timestamp: new Date().toISOString(),
         status: 'sending'
       };
 
@@ -775,23 +803,23 @@ export default {
 
       // 构造发送消息的参数
       const sendMsgParam = {
-        msgId: this.generateUUID(), // 生成UUID
+        msgId: this.generateUUID(),
         dingId: "",
-        msgCaption: `${this.currentUser.name}: ${content.substring(0, 10)}`, // 使用用户名和消息前10个字符
-        userIndex: 0, // 根据要求设置为0
-        toFromIndex: this.currentContact.id, // 房间Index
+        msgCaption: `${this.currentUser.name}: ${content.substring(0, 10)}`,
+        userIndex: 0,
+        toFromIndex: this.currentContact.id,
         isRevoked: 0,
         isDeleted: 0,
-        extra1: content, // 使用extra1字段传递消息内容
+        extra1: content,
         extra2: "",
         extra3: "",
         quote: "",
-        dtSend: this.getCurrentFormattedTime(), // 当前时间
+        dtSend: this.getCurrentFormattedTime(),
         dtCreate: "",
         dtUpdate: "",
         id: 0,
-        sequence: this.getCurrentTimestampInSeconds(), // 当前时间戳（秒）
-        msgType: 10 // 普通消息类型
+        sequence: this.getCurrentTimestampInSeconds(),
+        msgType: 10
       };
 
       // 调用发送消息接口
@@ -838,6 +866,7 @@ export default {
         }
       );
     },
+
     scrollToBottom() {
       this.$nextTick(() => {
         const container = this.$refs.messageContainer;
@@ -846,6 +875,7 @@ export default {
         }
       });
     },
+
     loadMoreMessages() {
       this.loadingMore = true;
 
@@ -862,10 +892,10 @@ export default {
           // 有新消息，插入到顶部
           const newMessages = respData.map(item => ({
             id: item.id ,
-            content: item.extra1 , // 从extra1字段获取内容
+            content: item.extra1 ,
             type: item.msgType === 10 ? 'text' : 'image',
             isMe: item.userIndex === this.getUserIndexByName(this.currentUser.name),
-            senderName: this.getUserNameByIndex(item.userIndex), // 使用真实用户名
+            senderName: this.getUserNameByIndex(item.userIndex),
             timestamp: item.dtSend,
             status: 'read'
           })).sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
@@ -876,22 +906,28 @@ export default {
         this.loadingMore = false;
       }, 1000);
     },
+
     chooseImage() {
       Toast('选择图片功能暂未实现');
     },
+
     takePhoto() {
       Toast('拍照功能暂未实现');
     },
+
     previewImage(imageUrl) {
       this.previewImages = [imageUrl];
       this.showImagePreview = true;
     },
+
     toggleEmoji() {
       Toast('表情功能暂未实现');
     },
+
     showMoreTools() {
       Toast('更多工具暂未实现');
     },
+
     onActionSelect(action) {
       switch (action.name) {
         case '用户信息':
@@ -909,9 +945,11 @@ export default {
       }
       this.showActionSheet = false;
     },
+
     showUserInfo(user) {
       Toast(`查看 ${user.name} 的信息`);
     },
+
     goBack() {
       this.$router.go(-1);
     }
@@ -999,7 +1037,6 @@ export default {
   max-width: 75%;
 }
 
-
 .sender-name {
   font-size: 12px;
   color: #666;
@@ -1015,10 +1052,9 @@ export default {
   line-height: 1.5;
   font-size: 16px;
   animation: fadeIn 0.3s ease;
-  /* 添加以下属性以允许更长的文本行 */
   white-space: normal;
   word-wrap: break-word;
-  max-width: 100%; /* 确保内容不会超出容器 */
+  max-width: 100%;
 }
 
 .message-other .message-content {
@@ -1184,5 +1220,26 @@ export default {
     background-color: #2d2d2d;
     color: #fff;
   }
+}
+
+/* MQTT连接状态指示器 */
+.mqtt-status-indicator {
+  position: fixed;
+  top: 10px;
+  right: 10px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  z-index: 1000;
+}
+
+.mqtt-status-connected {
+  background-color: #07c160;
+  box-shadow: 0 0 10px #07c160;
+}
+
+.mqtt-status-disconnected {
+  background-color: #ff4444;
+  box-shadow: 0 0 10px #ff4444;
 }
 </style>
