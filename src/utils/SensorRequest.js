@@ -8,7 +8,7 @@ import * as ssDing from '../utils/Dingding.js';
           callSuccess(respData);
         }, callFail);
       },
-      // 发送用户消息_普通消息
+      // 发送用户消息_普通/图片消息
       Talk_SendMsg(param, callSuccess, callFail) {
         ssDing.PostDataUrl("Talk_SendMsg", param, true, respData => {
           callSuccess(respData);

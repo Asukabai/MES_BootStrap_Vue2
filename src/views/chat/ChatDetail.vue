@@ -272,7 +272,8 @@ export default {
       messages: [],
       userList: [], // 新增：存储所有用户信息
       unregisterCallback: null, // 用于注销回调的函数
-      mqttStatus: 'disconnected' // MQTT连接状态
+      mqttStatus: 'disconnected', // MQTT连接状态
+      isSendingImage: false // 防止重复发送图片
     };
   },
   computed: {
@@ -291,7 +292,7 @@ export default {
       return this.currentUser.avatar || 'https://img.yzcdn.cn/vant/cat.jpeg';
     },
     canSend() {
-      return this.messageText.trim().length > 0;
+      return this.messageText.trim().length > 0 && !this.isSendingImage;
     }
   },
 
@@ -879,6 +880,268 @@ export default {
       );
     },
 
+    /**
+     * 提取Base64编码数据，去除data:image/xxx;base64,前缀
+     */
+    extractBase64Data(base64String) {
+      if (!base64String) return '';
+
+      // 使用正则表达式匹配并移除前缀
+      const match = base64String.match(/^data:[^;]+;base64,(.+)$/);
+      if (match && match[1]) {
+        return match[1];
+      }
+
+      // 如果没有前缀，直接返回原字符串
+      return base64String;
+    },
+
+    // 生成缩略图的方法
+    generateThumbnail(base64Image) {
+      return new Promise((resolve) => {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+
+          // 设置缩略图尺寸（例如最大边长为300px）
+          const maxSize = 300;
+          let { width, height } = img;
+
+          if (width > height) {
+            if (width > maxSize) {
+              height = (height * maxSize) / width;
+              width = maxSize;
+            }
+          } else {
+            if (height > maxSize) {
+              width = (width * maxSize) / height;
+              height = maxSize;
+            }
+          }
+
+          canvas.width = width;
+          canvas.height = height;
+
+          ctx.drawImage(img, 0, 0, width, height);
+
+          // 导出为较低质量的JPEG以减小文件大小
+          const thumbnail = canvas.toDataURL('image/png', 0.7);
+          resolve(thumbnail);
+        };
+        img.src = base64Image;
+      });
+    },
+
+    // 发送图片消息
+    async sendImageMessage(base64Image, fileName, fileType, fileSize) {
+      // 防止重复发送
+      if (this.isSendingImage) {
+        return;
+      }
+
+      this.isSendingImage = true;
+      const tempId = Date.now() + Math.floor(Math.random() * 1000);
+
+      // 添加临时图片消息到聊天界面
+      const tempMessage = {
+        id: tempId,
+        content: base64Image,
+        type: 'image',
+        isMe: true,
+        timestamp: new Date().toISOString(),
+        status: 'sending'
+      };
+      this.messages.push(tempMessage);
+      this.$nextTick(() => {
+        this.scrollToBottom();
+      });
+
+      try {
+        // 生成缩略图
+        const thumbnail = await this.generateThumbnail(base64Image);
+        // 构造发送图片消息的参数
+        const sendMsgParam = {
+          msgId: this.generateUUID(),
+          dingId: "",
+          msgCaption: `${this.currentUser.name}发了一个图片`,
+          userIndex: 0,
+          toFromIndex: this.currentContact.id,
+          isRevoked: 0,
+          isDeleted: 0,
+          extra1: fileName, // 实际文件名称
+          extra2: "image/png", // 实际文件类型
+          extra3: thumbnail, // 缩略图base64
+          extra4: "",
+          extra5: this.extractBase64Data(base64Image), // 只保留Base64编码部分
+          extra6: fileSize.toString(), // 实际文件大小
+          extra7: "",
+          extra8: "",
+          quote: "",
+          dtSend: this.getCurrentFormattedTime(),
+          dtCreate: "",
+          dtUpdate: "",
+          id: 0,
+          sequence: this.getCurrentTimestampInSeconds(),
+          msgType: 30 // 图片消息类型
+        };
+        // 调用发送消息接口
+        SensorRequest.Talk_SendMsg(
+          JSON.stringify(sendMsgParam),
+          (response) => {
+            try {
+              const respData = JSON.parse(response);
+              console.log("图片消息发送成功:", respData);
+
+              // 更新消息状态为已发送
+              const messageIndex = this.messages.findIndex(msg => msg.id === tempId);
+              if (messageIndex !== -1) {
+                this.messages.splice(messageIndex, 1, {
+                  ...this.messages[messageIndex],
+                  id: respData.id || Date.now() + 1,
+                  status: 'sent'
+                });
+              }
+            } catch (error) {
+              console.error('处理发送图片消息响应失败:', error);
+              // 更新消息状态为发送失败
+              const messageIndex = this.messages.findIndex(msg => msg.id === tempId);
+              if (messageIndex !== -1) {
+                this.messages.splice(messageIndex, 1, {
+                  ...this.messages[messageIndex],
+                  status: 'error'
+                });
+              }
+              Toast.fail('图片发送失败');
+            } finally {
+              this.isSendingImage = false;
+            }
+          },
+          (error) => {
+            console.error('发送图片消息失败:', error);
+            // 更新消息状态为发送失败
+            const messageIndex = this.messages.findIndex(msg => msg.id === tempId);
+            if (messageIndex !== -1) {
+              this.messages.splice(messageIndex, 1, {
+                ...this.messages[messageIndex],
+                status: 'error'
+              });
+            }
+            Toast.fail('图片发送失败');
+            this.isSendingImage = false;
+          }
+        );
+      } catch (error) {
+        console.error('生成缩略图失败:', error);
+        Toast.fail('图片处理失败');
+        this.isSendingImage = false;
+
+        // 更新消息状态为发送失败
+        const messageIndex = this.messages.findIndex(msg => msg.id === tempId);
+        if (messageIndex !== -1) {
+          this.messages.splice(messageIndex, 1, {
+            ...this.messages[messageIndex],
+            status: 'error'
+          });
+        }
+      }
+    },
+
+    // 选择图片
+    chooseImage() {
+      // 创建文件选择器
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+
+      // 移动端优化
+      if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+        fileInput.capture = 'environment'; // 移动端优先使用摄像头
+      }
+
+      fileInput.style.display = 'none';
+
+      fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          // 检查文件大小（限制为20MB）
+          if (file.size > 20 * 1024 * 1024) {
+            Toast.fail('图片大小不能超过20MB');
+            return;
+          }
+
+          // 显示加载提示
+          Toast.loading({
+            message: '正在处理图片...',
+            forbidClick: true,
+            duration: 0
+          });
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64Image = event.target.result;
+            Toast.clear();
+            // 传递文件信息给 sendImageMessage 方法
+            this.sendImageMessage(base64Image, file.name, file.type, file.size);
+          };
+          reader.onerror = () => {
+            Toast.clear();
+            Toast.fail('图片读取失败');
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      document.body.appendChild(fileInput);
+      fileInput.click();
+      document.body.removeChild(fileInput);
+    },
+
+    // 拍照
+    takePhoto() {
+      // 创建文件选择器
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.capture = 'environment'; // 使用摄像头
+      fileInput.style.display = 'none';
+
+      fileInput.onchange = (e) => {
+        const file = e.target.files[0];
+        if (file) {
+          // 检查文件大小（限制为20MB）
+          if (file.size > 20 * 1024 * 1024) {
+            Toast.fail('图片大小不能超过20MB');
+            return;
+          }
+
+          // 显示加载提示
+          Toast.loading({
+            message: '正在处理图片...',
+            forbidClick: true,
+            duration: 0
+          });
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64Image = event.target.result;
+            Toast.clear();
+            // 传递文件信息给 sendImageMessage 方法
+            this.sendImageMessage(base64Image, file.name, file.type, file.size);
+          };
+          reader.onerror = () => {
+            Toast.clear();
+            Toast.fail('图片读取失败');
+          };
+          reader.readAsDataURL(file);
+        }
+      };
+
+      document.body.appendChild(fileInput);
+      fileInput.click();
+      document.body.removeChild(fileInput);
+    },
+
     scrollToBottom() {
       this.$nextTick(() => {
         const container = this.$refs.messageContainer;
@@ -917,14 +1180,6 @@ export default {
 
         this.loadingMore = false;
       }, 1000);
-    },
-
-    chooseImage() {
-      Toast('选择图片功能暂未实现');
-    },
-
-    takePhoto() {
-      Toast('拍照功能暂未实现');
     },
 
     previewImage(imageUrl) {
@@ -1237,6 +1492,14 @@ export default {
   .message-avatar {
     width: 32px;
     height: 32px;
+  }
+
+  .input-tools {
+    gap: 12px;
+  }
+
+  .input-tools .van-icon {
+    font-size: 20px;
   }
 }
 
