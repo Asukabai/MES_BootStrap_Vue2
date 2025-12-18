@@ -216,6 +216,12 @@
     <van-image-preview
       v-model="showImagePreview"
       :images="previewImages"
+      :closeable="true"
+      close-icon="close"
+      close-icon-position="top-right"
+      :zoom.sync="zoom"
+      @scale="onScale"
+      @close="onPreviewClose"
     />
   </div>
 </template>
@@ -243,6 +249,7 @@ export default {
       showActionSheet: false,
       showImagePreview: false,
       previewImages: [],
+      zoom: 1,
       showDateDivider: true,
       currentContact: {
         id: null,
@@ -416,8 +423,8 @@ export default {
     /**
      * 处理接收到的 MQTT 消息
      */
+// 在 methods 中修改 handleIncomingMessage 方法
     handleIncomingMessage(message) {
-      // 检查message是否为有效对象
       if (!message || typeof message !== 'object') {
         console.error('❌ 收到的消息不是有效对象:', message);
         return;
@@ -438,39 +445,43 @@ export default {
       if (message.toFromIndex === this.currentContact.roomIndex) {
         console.log('✅ 消息属于当前聊天室，开始处理');
 
-        // 获取当前用户的ID
         const currentUserIndex = this.getUserIndexByName(this.currentUser.name);
         const currentUserId = localStorage.getItem(key_DingUserIndex);
         const isMe = message.userIndex == currentUserIndex || message.userIndex == currentUserId;
 
-        console.log('👤 当前用户信息:', {
-          name: this.currentUser.name,
-          userIndex: currentUserIndex,
-          userId: currentUserId,
-          是否为自己: isMe
-        });
-
-        // 如果消息是自己发送的，直接跳过（因为发送时已经显示过了）
         if (isMe) {
           console.log('⏭️ 跳过自己发送的MQTT消息，避免重复显示');
           return;
         }
 
-        // 获取发送者名称
         let senderName = '未知用户';
         if (message.userIndex) {
           senderName = this.getUserNameByIndex(message.userIndex);
-          console.log('👤 发送者信息:', {
-            userIndex: message.userIndex,
-            userName: senderName
-          });
+        }
+
+        let content = '';
+        let type = 'text';
+
+        // 根据 msgType 判断消息类型
+        if (message.msgType === 10) {
+          // 文本消息
+          content = message.extra1 || '暂无内容';
+          type = 'text';
+        } else if (message.msgType === 30) {
+          // 图片消息：使用 extra3 中的 Base64 数据
+          content = message.extra3; // data:image/png;base64,...
+          type = 'image';
+        } else {
+          console.warn(`⚠️ 不支持的消息类型: ${message.msgType}`);
+          content = message.extra1 || '未知消息';
+          type = 'text';
         }
 
         const newMessage = {
           id: message.id || Date.now(),
-          content: message.extra1,
-          type: message.msgType === 10 ? 'text' : 'image',
-          isMe: false, // 这是别人发的消息
+          content: content,
+          type: type,
+          isMe: false,
           senderName: senderName,
           timestamp: message.dtSend || new Date().toISOString(),
           status: 'read'
@@ -480,14 +491,10 @@ export default {
 
         this.messages.push(newMessage);
 
-        // 滚动到底部
         this.$nextTick(() => {
           this.scrollToBottom();
         });
 
-        console.log('✅ 消息处理完成，当前消息总数:', this.messages.length);
-
-        // 播放消息提示音（可选）
         this.playMessageSound();
       } else {
         console.log('⏭️ 消息不属于当前聊天室，已忽略', {
@@ -620,18 +627,18 @@ export default {
       return user ? user.userIndex : null;
     },
 
+    // 修改 loadMessages 方法，处理历史消息中的图片消息
     loadMessages() {
       if (!this.currentContact.roomIndex) {
         console.error('无法加载消息：缺少房间编号');
         return;
       }
 
-      console.log("📂 获取聊天历史数据参数的房间编号:", this.currentContact.roomIndex);
       const param = {
         roomIndex: this.currentContact.roomIndex,
         lastMsgID: 0,
-        msgLimit: 50,
-        msgDir: 1 // 1 表示从新到旧
+        msgLimit: 100,
+        msgDir: 1
       };
 
       SensorRequest.Talk_GetRoomHistoryMsg(
@@ -642,26 +649,33 @@ export default {
             console.log("📂 获取到的聊天历史数据:", respData);
 
             if (Array.isArray(respData)) {
-              // 确保每个消息都有时间戳，并按时间顺序（旧到新）排列
               this.messages = respData.map(item => {
-                // 确保 timestamp 字段存在，使用 dtSend 作为时间戳
                 const timestamp = item.dtSend || item.timestamp || new Date().toISOString();
 
-                // 使用真实用户名替换senderName
                 const senderName = this.getUserNameByIndex(item.userIndex);
 
-                // 判断消息是否为自己发送的
                 const currentUserIndex = this.getUserIndexByName(this.currentUser.name);
                 const currentUserId = localStorage.getItem(key_DingUserIndex);
                 const isMe = item.userIndex == currentUserIndex || item.userIndex == currentUserId;
 
-                // 从extra1字段获取消息内容
-                const content = item.extra1 || '暂无内容';
+                let content = '';
+                let type = 'text';
+
+                if (item.msgType === 10) {
+                  content = item.extra1 || '暂无内容';
+                  type = 'text';
+                } else if (item.msgType === 30) {
+                  content = item.extra3; // Base64 图片数据
+                  type = 'image';
+                } else {
+                  content = item.extra1 || '未知消息';
+                  type = 'text';
+                }
 
                 return {
                   id: item.id || Date.now() + Math.random(),
                   content: content,
-                  type: item.msgType === 10 ? 'text' : 'image',
+                  type: type,
                   isMe: isMe,
                   senderName: senderName,
                   timestamp: timestamp,
@@ -670,8 +684,6 @@ export default {
               });
 
               console.log("📊 加载历史消息数量:", this.messages.length);
-
-              // 滚动到底部
               this.$nextTick(() => {
                 this.scrollToBottom();
               });
@@ -918,6 +930,33 @@ export default {
     previewImage(imageUrl) {
       this.previewImages = [imageUrl];
       this.showImagePreview = true;
+      this.zoom = 1; // 重置缩放比例
+
+      // 添加键盘事件监听，支持ESC键关闭
+      const handleEsc = (event) => {
+        if (event.key === 'Escape') {
+          this.showImagePreview = false;
+          document.removeEventListener('keydown', handleEsc);
+        }
+      };
+      document.addEventListener('keydown', handleEsc);
+    },
+
+    /**
+     * 处理图片缩放事件
+     */
+    onScale({ scale }) {
+      console.log('当前缩放比例:', scale);
+      this.zoom = scale;
+    },
+
+    /**
+     * 处理预览关闭事件
+     */
+    onPreviewClose() {
+      this.showImagePreview = false;
+      this.previewImages = [];
+      this.zoom = 1;
     },
 
     toggleEmoji() {
@@ -1241,5 +1280,28 @@ export default {
 .mqtt-status-disconnected {
   background-color: #ff4444;
   box-shadow: 0 0 10px #ff4444;
+}
+
+/* 图片预览增强样式 */
+.van-image-preview {
+  z-index: 2000;
+}
+
+.van-image-preview__image {
+  cursor: zoom-in;
+}
+
+.van-image-preview__image--zooming {
+  cursor: grab;
+}
+
+.van-image-preview__close-icon {
+  top: 10px;
+  right: 10px;
+  width: 30px;
+  height: 30px;
+  background-color: rgba(0, 0, 0, 0.5);
+  border-radius: 50%;
+  color: white;
 }
 </style>
