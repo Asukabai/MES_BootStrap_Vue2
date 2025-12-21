@@ -3,7 +3,6 @@ import Vue from 'vue'
 import App from './App'
 import router from './router'
 import store from './store'
-
 /* swiper */
 import 'swiper/dist/css/swiper.min.css'
 /* 重置样式 */
@@ -14,13 +13,11 @@ import './assets/css/bootstrap.min.css'
 import './assets/js/bootstrap.min'
 /* animate.css */
 import 'animate.css'
-
 // 引入 Vant 及其样式
 import Vant from 'vant'
 import 'vant/lib/index.css'
 
 // 引入 MQTT 服务
-import MqttService from './services/MqttService'
 Vue.config.productionTip = false
 
 // 引入 VueMeta
@@ -47,57 +44,23 @@ Vue.use(Vant, {
 })
 
 // 将 MQTT 服务和 store 挂载到 Vue 原型上
-Vue.prototype.$mqtt = MqttService
 Vue.prototype.$store = store
-
 // 创建 Vue 实例
 const app = new Vue({
   router,
   store,
   render: h => h(App),
-
   // 应用级别的生命周期钩子
   created() {
     console.log('🚀 应用启动，初始化全局组件...')
-
     // 初始化用户数据
     this.$store.dispatch('chat/initUserData')
-
-    // 监听页面可见性变化
-    document.addEventListener('visibilitychange', this.handleVisibilityChange)
-
     // 添加全局错误处理
     window.addEventListener('error', (event) => {
       console.error('全局错误:', event.error)
     })
-
     window.addEventListener('unhandledrejection', (event) => {
       console.error('未处理的Promise拒绝:', event.reason)
     })
-  },
-
-  beforeDestroy() {
-    // 清理事件监听器
-    document.removeEventListener('visibilitychange', this.handleVisibilityChange)
-  },
-
-  methods: {
-    // 处理页面可见性变化
-    handleVisibilityChange() {
-      if (document.visibilityState === 'hidden') {
-        console.log('📱 页面隐藏')
-      } else if (document.visibilityState === 'visible') {
-        console.log('📱 页面显示')
-
-        // 检查 MQTT 连接状态
-        if (!MqttService.isConnected()) {
-          console.log('🔄 页面恢复，检查 MQTT 连接...')
-          // 可以在这里添加重连逻辑
-        }
-      }
-    }
   }
 }).$mount('#app')
-
-// 导出 app 实例
-export default app

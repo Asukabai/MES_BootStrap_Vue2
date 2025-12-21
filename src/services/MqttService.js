@@ -38,6 +38,8 @@ class MqttService {
           clearTimeout(timeout)
           this.connected = true
           console.log('✅ MQTT连接成功')
+          // 同步连接状态到Vuex
+          store.dispatch('chat/setMqttStatus', 'connected')
 
           // 订阅主题
           const topic = `SensorRTU/talk/msg1/${userId}`
@@ -62,6 +64,9 @@ class MqttService {
 
         this.client.once('error', (error) => {
           clearTimeout(timeout)
+          this.connected = false
+          // 同步错误状态到Vuex
+          store.dispatch('chat/setMqttStatus', 'error')
           reject(error)
         })
       })

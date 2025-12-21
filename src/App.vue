@@ -115,6 +115,58 @@ export default {
 </script>
 
 <style>
+/* 全局样式 */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body, #app {
+  height: 100%;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+}
+
+.app-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch; /* iOS平滑滚动 */
+}
+
+/* 底部导航栏固定定位 */
+.tabbar-content {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background-color: #fff;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+
+  /* 适配iOS安全区域 */
+  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: constant(safe-area-inset-bottom); /* 兼容旧版本iOS */
+}
+
+/* 安卓和鸿蒙系统适配 */
+@supports not (padding-bottom: env(safe-area-inset-bottom)) {
+  .tabbar-content {
+    padding-bottom: 0;
+  }
+}
+
+/* 简单通知 */
 .simple-notification {
   position: fixed;
   top: 10px;
@@ -168,5 +220,10 @@ export default {
 
 .notification-close:hover {
   color: #ff4444;
+}
+
+/* 隐藏底部导航栏时调整内容区域 */
+.app-content:has(.tabbar-content) .main-content {
+  padding-bottom: 60px; /* 预留底部导航栏高度 */
 }
 </style>
