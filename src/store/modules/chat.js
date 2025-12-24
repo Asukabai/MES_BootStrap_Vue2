@@ -166,7 +166,30 @@ const chat = {
       if (state.paginationState[roomIdNum]) {
         state.paginationState[roomIdNum] = { lastMsgID: 0, hasMore: true } // 初始化分页参数
       }
+    },
+
+    // 在 mutations 中添加新的更新消息ID的方法
+    UPDATE_MESSAGE_ID(state, { roomId, tempId, realId }) {
+      console.log(`[Vuex Mutation] UPDATE_MESSAGE_ID: roomId=${roomId}, tempId=${tempId}, realId=${realId}`);
+      const roomIdNum = Number(roomId);
+
+      if (state.messagesByRoom[roomIdNum]) {
+        const messageIndex = state.messagesByRoom[roomIdNum].findIndex(msg => msg.id === tempId);
+        if (messageIndex !== -1) {
+          // 替换临时ID为真实ID
+          const updatedMessage = {
+            ...state.messagesByRoom[roomIdNum][messageIndex],
+            id: realId,
+            originalId: realId
+          };
+          Vue.set(state.messagesByRoom[roomIdNum], messageIndex, updatedMessage);
+          console.log(`[Vuex Mutation] 更新消息ID成功`);
+        } else {
+          console.warn(`[Vuex Mutation] 未找到临时消息ID: ${tempId}`);
+        }
+      }
     }
+
   },
 
   // 定义异步操作方法（actions）
@@ -198,22 +221,26 @@ const chat = {
 
     // 加载用户列表
     loadUserList({ commit }) {
-      console.log('[Vuex Action] loadUserList 开始')
+      console.log('[Vuex Action] 加载用户列表 loadUserList 开始')
       return new Promise((resolve) => {
         const cachedList = localStorage.getItem('user_list') // 先尝试从缓存读取用户列表
         if (cachedList) {
           try {
             const userList = JSON.parse(cachedList) // 解析缓存数据
             console.log(`[Vuex Action] 从缓存加载用户列表: ${userList.length} 个用户`)
-            commit('SET_USER_LIST', userList) // 提交更新用户列表
-            resolve(userList) // 返回结果
-            return
+            // 如果缓存中的用户列表不为空，使用缓存数据
+            if (userList && userList.length > 0) {
+              commit('SET_USER_LIST', userList) // 提交更新用户列表
+              resolve(userList) // 返回结果
+              return
+            } else {
+              console.log('[Vuex Action] 缓存用户列表为空，跳过缓存，发起网络请求')
+            }
           } catch (e) {
             console.warn('读取缓存用户列表失败:', e) // 解析失败警告
           }
         }
-
-        // 如果缓存无效，发起网络请求获取最新用户列表
+        // 如果缓存无效或为空，发起网络请求获取最新用户列表
         SensorRequest.Talk_GetUserList(
           '',
           (response) => {
@@ -322,7 +349,8 @@ const chat = {
         throw new Error('用户信息或消息内容为空') // 参数校验失败抛出异常
       }
 
-      const tempId = Date.now() // 临时 ID 用于标识正在发送的消息
+      // 使用更独特的临时ID格式
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const tempMessage = {
         id: tempId,
         content: content.trim(), // 去除前后空白字符
@@ -378,7 +406,31 @@ const chat = {
             try {
               const respData = JSON.parse(response) // 解析响应
               console.log("消息发送成功:", respData)
-              commit('UPDATE_MESSAGE_STATUS', { roomId, messageId: tempId, status: 'sent' }) // 更新状态为已发送
+
+              // 关键修改：使用服务器返回的真实ID更新消息
+              if (respData && respData.id) {
+                // 先更新临时消息为真实ID
+                commit('UPDATE_MESSAGE_ID', {
+                  roomId,
+                  tempId,
+                  realId: respData.id
+                });
+
+                // 再更新状态
+                commit('UPDATE_MESSAGE_STATUS', {
+                  roomId,
+                  messageId: respData.id,
+                  status: 'sent'
+                });
+              } else {
+                // 如果没有返回ID，仍然使用临时ID更新状态
+                commit('UPDATE_MESSAGE_STATUS', {
+                  roomId,
+                  messageId: tempId,
+                  status: 'sent'
+                });
+              }
+
               resolve(respData) // 成功返回解析后的数据
             } catch (error) {
               console.error('处理发送消息响应失败:', error)
@@ -402,7 +454,8 @@ const chat = {
         throw new Error('用户信息为空') // 参数校验失败抛出异常
       }
 
-      const tempId = Date.now() + Math.random() // 临时 ID 用于标识正在发送的消息
+      // 使用更独特的临时ID格式
+      const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       const tempMessage = {
         id: tempId,
         content: base64Image, // 图片 base64 数据
@@ -470,7 +523,31 @@ const chat = {
             try {
               const respData = JSON.parse(response) // 解析响应
               console.log("图片消息发送成功:", respData)
-              commit('UPDATE_MESSAGE_STATUS', { roomId, messageId: tempId, status: 'sent' }) // 更新状态为已发送
+
+              // 关键修改：使用服务器返回的真实ID更新消息
+              if (respData && respData.id) {
+                // 先更新临时消息为真实ID
+                commit('UPDATE_MESSAGE_ID', {
+                  roomId,
+                  tempId,
+                  realId: respData.id
+                });
+
+                // 再更新状态
+                commit('UPDATE_MESSAGE_STATUS', {
+                  roomId,
+                  messageId: respData.id,
+                  status: 'sent'
+                });
+              } else {
+                // 如果没有返回ID，仍然使用临时ID更新状态
+                commit('UPDATE_MESSAGE_STATUS', {
+                  roomId,
+                  messageId: tempId,
+                  status: 'sent'
+                });
+              }
+
               resolve(respData) // 成功返回解析后的数据
             } catch (error) {
               console.error('处理发送图片消息响应失败:', error)
@@ -525,37 +602,61 @@ const chat = {
                 // 如果当前用户ID存在
                 if (currentUserName) {
                   // 在用户列表中查找当前用户信息
-                  console.log("state.userList:",state.userList)
-                  const currentUserInList = state.userList.find(u =>
-                    String(u.name) === String(currentUserName)
-                  )
-                  console.log("在用户列表中查找当前用户信息 currentUserInList",currentUserInList)
+                  console.log("state.userList:", state.userList)
 
-                  // 如果找到了当前用户信息
-                  if (currentUserInList) {
-                    // 设置当前用户索引
-                    currentUserIndex = currentUserInList.userIndex
-                    // 输出当前用户索引的日志
-                    console.log("currentUserIndex22222222222222:",currentUserIndex)
-                  } else {
-                    // 如果未找到当前用户，尝试重新加载用户列表
+                  // 检查用户列表是否为空，如果为空则重新加载
+                  if (!state.userList || state.userList.length === 0) {
+                    console.log("用户列表为空，重新加载用户列表");
                     try {
-                      await dispatch('loadUserList') // 异步调用加载用户列表action
-                      // 重新在更新后的用户列表中查找当前用户
+                      // 等待用户列表加载完成
+                      await dispatch('loadUserList');
+                      // 确保用户列表已更新后再查找当前用户
                       const updatedUser = state.userList.find(u =>
-                        String(u.userId) === String(currentUserId) || // 匹配userId
-                        String(u.userIndex) === String(currentUserId)  // 或匹配userIndex
-                      )
-                      // 如果找到了更新后的用户信息
+                        String(u.name) === String(currentUserName)
+                      );
                       if (updatedUser) {
-                        // 设置当前用户索引
-                        currentUserIndex = updatedUser.userIndex
-                        // 输出当前用户索引的日志
-                        console.log("currentUserIndex44444444444444:",currentUserIndex)
+                        currentUserIndex = updatedUser.userIndex;
+                        console.log("currentUserIndex33333333333333:", currentUserIndex);
+                      } else {
+                        console.log("重新加载后仍未找到当前用户:", currentUserName);
                       }
                     } catch (e) {
-                      // 处理重新加载用户列表失败的情况
-                      console.warn('重新加载用户列表失败:', e)
+                      console.warn('重新加载用户列表失败:', e);
+                    }
+                  } else {
+                    // 用户列表不为空，直接查找当前用户
+                    const currentUserInList = state.userList.find(u =>
+                      String(u.name) === String(currentUserName)
+                    );
+                    console.log("在用户列表中查找当前用户信息 currentUserInList", currentUserInList);
+
+                    // 如果找到了当前用户信息
+                    if (currentUserInList) {
+                      // 设置当前用户索引
+                      currentUserIndex = currentUserInList.userIndex;
+                      // 输出当前用户索引的日志
+                      console.log("currentUserIndex22222222222222:", currentUserIndex);
+                    } else {
+                      // 如果未找到当前用户，尝试重新加载用户列表
+                      try {
+                        await dispatch('loadUserList'); // 异步调用加载用户列表action
+                        // 重新在更新后的用户列表中查找当前用户
+                        const updatedUser = state.userList.find(u =>
+                          String(u.name) === String(currentUserName)
+                        );
+                        // 如果找到了更新后的用户信息
+                        if (updatedUser) {
+                          // 设置当前用户索引
+                          currentUserIndex = updatedUser.userIndex;
+                          // 输出当前用户索引的日志
+                          console.log("currentUserIndex44444444444444:", currentUserIndex);
+                        } else {
+                          console.log("重新加载后仍未找到当前用户:", currentUserName);
+                        }
+                      } catch (e) {
+                        // 处理重新加载用户列表失败的情况
+                        console.warn('重新加载用户列表失败:', e);
+                      }
                     }
                   }
                 }

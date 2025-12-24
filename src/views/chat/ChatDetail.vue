@@ -59,7 +59,6 @@
           <span v-if="hasMoreMessages"> | 还有更多消息</span>
         </div>
 
-        <!-- 修改这里：使用统一的message-item类，但根据isMe动态添加子类 -->
         <div
           v-for="(message, index) in roomMessages"
           :key="message.id"
@@ -69,24 +68,24 @@
           <!-- 消息内容 -->
           <div class="message-bubble-wrapper">
             <!-- 对方消息 -->
-            <div v-if="!message.isMe" class="message-content-wrapper">
+            <div v-if="!message.isMe" class="message-row other-row">
               <van-image
                 :src="contactAvatar"
                 round
                 width="36px"
                 height="36px"
-                class="message-avatar"
+                class="message-avatar other-avatar"
               />
               <div class="message-content-container">
                 <div v-if="message.senderName" class="sender-name">
                   {{ message.senderName }}
                 </div>
                 <div
-                  class="message-content"
+                  class="message-content other-content"
                   :class="{
-                    'message-loading': message.status === 'sending',
-                    'image-message-content': message.type === 'image'
-                  }"
+                  'message-loading': message.status === 'sending',
+                  'image-message-content': message.type === 'image'
+                }"
                   @click="message.type === 'image' ? previewImage(message) : null"
                 >
                   <template v-if="message.type === 'text'">
@@ -100,9 +99,9 @@
                       @load="handleImageLoad"
                     />
                     <div class="image-meta">
-                      <span class="image-size" v-if="message.fileSize">
-                        {{ formatFileSize(message.fileSize) }}
-                      </span>
+                    <span class="image-size" v-if="message.fileSize">
+                      {{ formatFileSize(message.fileSize) }}
+                    </span>
                       <van-button
                         v-if="message.content && message.type === 'image'"
                         size="mini"
@@ -119,21 +118,21 @@
                   </div>
                 </div>
                 <!-- 消息时间 -->
-                <div class="message-time">
+                <div class="message-time other-time">
                   {{ formatMessageTime(message) }}
                 </div>
               </div>
             </div>
 
             <!-- 我的消息 -->
-            <div v-else class="message-content-wrapper mine-wrapper">
+            <div v-else class="message-row mine-row">
               <div class="message-content-container">
                 <div
                   class="message-content mine-content"
                   :class="{
-                    'message-loading': message.status === 'sending',
-                    'image-message-content': message.type === 'image'
-                  }"
+                  'message-loading': message.status === 'sending',
+                  'image-message-content': message.type === 'image'
+                }"
                   @click="message.type === 'image' ? previewImage(message) : null"
                 >
                   <template v-if="message.type === 'text'">
@@ -147,9 +146,9 @@
                       @load="handleImageLoad"
                     />
                     <div class="image-meta">
-                      <span class="image-size" v-if="message.fileSize">
-                        {{ formatFileSize(message.fileSize) }}
-                      </span>
+                    <span class="image-size" v-if="message.fileSize">
+                      {{ formatFileSize(message.fileSize) }}
+                    </span>
                       <van-button
                         v-if="message.content && message.type === 'image'"
                         size="mini"
@@ -169,11 +168,11 @@
                 <div class="message-time mine-time">
                   {{ formatMessageTime(message) }}
                   <span v-if="message.status === 'sending'" class="sending-indicator">
-                    · 发送中
-                  </span>
+                  · 发送中
+                </span>
                   <span v-else-if="message.status === 'failed'" class="failed-indicator">
-                    · 发送失败
-                  </span>
+                  · 发送失败
+                </span>
                 </div>
               </div>
               <van-image
@@ -945,16 +944,21 @@ export default {
   flex-direction: column;
 }
 
-/* 消息内容包装器 */
-.message-content-wrapper {
+/* 消息行布局 */
+.message-row {
   display: flex;
   align-items: flex-start;
   max-width: 100%;
 }
 
-/* 我的消息的包装器 - 确保头像在右侧 */
-.mine-wrapper {
-  flex-direction: row-reverse;
+/* 对方消息行 - 左对齐 */
+.other-row {
+  justify-content: flex-start;
+}
+
+/* 我的消息行 - 右对齐 */
+.mine-row {
+  justify-content: flex-end;
 }
 
 /* 消息内容容器 */
@@ -965,14 +969,8 @@ export default {
   flex-direction: column;
 }
 
-/* 对方消息 */
-.is-other .message-content-container {
-  margin-left: 8px;
-}
-
-/* 我的消息 */
-.is-mine .message-content-container {
-  margin-right: 8px;
+/* 我的消息内容容器右对齐 */
+.mine-row .message-content-container {
   align-items: flex-end;
 }
 
@@ -1008,32 +1006,35 @@ export default {
 }
 
 /* 对方消息气泡 */
-.is-other .message-content {
+.other-content {
   background-color: #fff;
   border-bottom-left-radius: 4px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
 /* 我的消息气泡 */
-.is-mine .mine-content {
+.mine-content {
   background: linear-gradient(135deg, #95ec69 0%, #6dd400 100%);
   color: #fff;
   border-bottom-right-radius: 4px;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
+/* 头像样式 */
 .message-avatar {
   flex-shrink: 0;
 }
 
-/* 对方头像 */
-.is-other .message-avatar {
-  margin-right: 0;
+/* 对方头像 - 在左侧 */
+.other-avatar {
+  margin-right: 8px;
+  margin-left: 0;
 }
 
-/* 我的头像 */
-.is-mine .mine-avatar {
-  margin-left: 0;
+/* 我的头像 - 在右侧 */
+.mine-avatar {
+  margin-left: 8px;
+  margin-right: 0;
 }
 
 .message-time {
@@ -1044,12 +1045,12 @@ export default {
 }
 
 /* 对方消息时间左对齐 */
-.is-other .message-time {
+.other-time {
   text-align: left;
 }
 
 /* 我的消息时间右对齐 */
-.is-mine .mine-time {
+.mine-time {
   text-align: right;
 }
 
@@ -1087,12 +1088,12 @@ export default {
 }
 
 /* 对方图片圆角 */
-.is-other .chat-image {
+.other-content .chat-image {
   border-radius: 18px 18px 18px 4px;
 }
 
 /* 我的图片圆角 */
-.is-mine .chat-image {
+.mine-content .chat-image {
   border-radius: 18px 18px 4px 18px;
 }
 
@@ -1106,11 +1107,11 @@ export default {
 }
 
 /* 确保我的消息中图片元数据文字颜色正确 */
-.is-mine .image-meta {
+.mine-content .image-meta {
   color: #fff;
 }
 
-.is-mine .image-size {
+.mine-content .image-size {
   color: rgba(255, 255, 255, 0.8);
 }
 
@@ -1123,7 +1124,7 @@ export default {
 }
 
 /* 对于我的消息中的查看原图按钮 */
-.is-mine .view-original-btn {
+.mine-content .view-original-btn {
   background-color: rgba(255, 255, 255, 0.2);
   border-color: rgba(255, 255, 255, 0.3);
 }

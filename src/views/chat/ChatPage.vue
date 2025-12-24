@@ -1,6 +1,6 @@
 <template>
   <div class="chat-page">
-    <!-- 联系人列表 -->
+    <!-- 使用独立的滚动容器包装下拉刷新 -->
     <div class="contact-list-container">
       <van-pull-refresh
         v-model="refreshing"
@@ -79,6 +79,7 @@
       description="暂无群聊，请点击 + 创建群聊"
     >
     </van-empty>
+
     <!-- 添加悬浮按钮 -->
     <FloatingActionButton
       @click="navigateToCreateGroup"
@@ -131,6 +132,11 @@ export default {
     this.loadAllUsers();
   },
   methods: {
+    // 截断消息文本
+    truncateMessage(message, maxLength) {
+      if (!message) return '暂无消息';
+      return message.length > maxLength ? message.substring(0, maxLength) + '...' : message;
+    },
     navigateToCreateGroup() {
       this.$router.push(`/${this.$route.params.department}/chat/createGroup`);
     },
@@ -162,19 +168,22 @@ export default {
           try {
             const respData = JSON.parse(response) || {}
             console.log("📂 解析出的聊天页面返回数据 respData:", respData)
-
             // 根据实际返回的数据结构调整映射逻辑
             if (Array.isArray(respData)) {
-              this.contacts = respData.map(item => ({
-                id: item.roomIndex ,
-                name: item.roomCaption || item.roomNickname || '未知聊天室',
-                avatar: item.roomPng || require('@/assets/群聊.png'),
-                lastMessage: item.lastMsgCaption || '暂无消息',
-                lastMessageType: 'text',
-                time: item.dtLastMsg || new Date().toISOString(),
-                roomIndex: item.roomIndex, // ✅ 显式添加 roomIndex 字段
-                unread: item.waitMsgCnt || 0
-              }));
+              this.contacts = respData.map(item => {
+                // 判断是否为新建群聊
+                const isGroupCreatedMessage = item.lastMsgCaption === '我们成为好友了，可以开始聊天了！';
+                return {
+                  id: item.roomIndex,
+                  name: item.roomCaption || item.roomNickname || '未知聊天室',
+                  avatar: item.roomPng || require('@/assets/群聊.png'),
+                  lastMessage: this.truncateMessage(item.lastMsgCaption || '暂无消息', 15),
+                  lastMessageType: 'text',
+                  time: isGroupCreatedMessage ? (item.dtCreate || new Date().toISOString()) : (item.dtLastMsg || new Date().toISOString()),
+                  roomIndex: item.roomIndex, // ✅ 显式添加 roomIndex 字段
+                  unread: item.waitMsgCnt || 0
+                };
+              });
             } else {
               console.warn('返回数据格式不符合预期:', respData);
               this.contacts = [];
@@ -235,31 +244,42 @@ export default {
 
 <style scoped>
 .chat-page {
-  height: 100vh;
+  height: 100%;
   display: flex;
   flex-direction: column;
   background-color: #f7f8fa;
-}
-
-.search-container {
-  padding: 8px 12px;
-  background-color: #fff;
-  border-bottom: 1px solid #f0f0f0;
+  overflow: hidden; /* 防止组件内部出现双重滚动 */
 }
 
 .contact-list-container {
   flex: 1;
-  overflow: hidden;
+  overflow-y: auto; /* 明确指定滚动方向 */
+  -webkit-overflow-scrolling: touch; /* 启用iOS平滑滚动 */
+  height: 0; /* 确保flex子项正确计算高度 */
 }
 
 .contact-list {
   min-height: 100%;
+  padding-bottom: 20px; /* 为最后的项目添加底部边距 */
 }
 
-.unread-item {
-  background-color: #f9f9f9;
+/* 重置 Vant 组件的可能冲突样式 */
+:deep(.van-pull-refresh) {
+  height: 100%;
 }
 
+:deep(.van-list) {
+  height: auto;
+  flex: 1;
+}
+
+:deep(.van-cell) {
+  background-color: transparent;
+  border-radius: 8px;
+  margin: 4px 12px;
+}
+
+/* 联系人项目样式 */
 .contact-item {
   display: flex;
   align-items: center;
@@ -320,6 +340,11 @@ export default {
 .contact-last-message .van-icon {
   vertical-align: middle;
   margin-right: 4px;
+}
+
+/* 其他样式保持不变 */
+.unread-item {
+  background-color: #f9f9f9;
 }
 
 .empty-button {
