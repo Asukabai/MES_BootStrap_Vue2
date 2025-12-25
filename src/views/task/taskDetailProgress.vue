@@ -20,12 +20,12 @@
         <template #default>
           <div class="slider-wrapper">
             <van-slider
-                v-model="taskProgress"
-                :min="-10"
-                :max="90"
-                :step="10"
-                @change="onProgressChange"
-                style="transition: all 0.3s ease;"
+              v-model="taskProgress"
+              :min="-10"
+              :max="90"
+              :step="10"
+              @change="onProgressChange"
+              style="transition: all 0.3s ease;"
             />
             <div class="slider-ticks">
               <span v-for="tick in 10" :key="tick" :style="{ left: `${(tick - 1) * 10}%` }"></span>
@@ -40,13 +40,13 @@
       <van-cell title="任务备注">
         <template #default>
           <van-field
-              v-model="taskRemark"
-              rows="2"
-              autosize
-              type="textarea"
-              maxlength="50"
-              placeholder="请输入备注信息（最多50字，若无异常可仅上传凭证）"
-              show-word-limit
+            v-model="taskRemark"
+            rows="2"
+            autosize
+            type="textarea"
+            maxlength="50"
+            placeholder="请输入备注信息（最多50字，若无异常可仅上传凭证）"
+            show-word-limit
           />
         </template>
       </van-cell>
@@ -57,12 +57,12 @@
         </template>
       </van-cell>
       <van-uploader
-          v-model="fileList"
-          :after-read="onAfterRead"
-          multiple
-          :max-count="5"
-          upload-text="上传文件"
-          accept="*"
+        v-model="fileList"
+        :after-read="onAfterRead"
+        multiple
+        :max-count="5"
+        upload-text="上传文件"
+        accept="*"
       >
         <!-- 自定义上传区域内容 -->
         <div class="custom-upload-area">
@@ -75,19 +75,19 @@
     <!-- 提交按钮组 -->
     <div style="padding: 15px; display: flex; gap: 25px; justify-content: center; margin-top: 5px;">
       <van-button
-          type="info"
-          style="width: 40%; font-size: 14px; padding: 8px 20px; margin-right: 5px;"
-          @click="submitEvidence"
-          :disabled="isSubmitting"
+        type="info"
+        style="width: 40%; font-size: 14px; padding: 8px 20px; margin-right: 5px;"
+        @click="submitEvidence"
+        :disabled="isSubmitting"
       >
         {{ isSubmitting ? '处理中...' : '提交' }}
       </van-button>
 
       <van-button
-          type="default"
-          style="width: 40%; font-size: 14px; padding: 8px 20px; margin-left: 5px;"
-          @click="cancelAndGoBack"
-          :disabled="isSubmitting"
+        type="default"
+        style="width: 40%; font-size: 14px; padding: 8px 20px; margin-left: 5px;"
+        @click="cancelAndGoBack"
+        :disabled="isSubmitting"
       >
         取消并返回
       </van-button>
@@ -101,13 +101,13 @@
 </template>
 
 <script>
-import SensorRequest from "@/utils/SensorRequest";
+import SensorRequest from "../../utils/SensorRequest";
 import {
   key_DingName,
-  key_DingUserIndex,
-  key_DingUserPhone
-} from "@/utils/Dingding";
-import uploadUtils from "@/utils/uploadUtils";
+  key_DingUserPhone,
+  key_DingUserIndex
+} from "../../utils/Dingding";
+import uploadUtils from "../../utils/uploadUtils";
 import {GetDingUserToken} from "../../utils/Dingding"; // 引入上传工具
 
 function getLocalUserInfo() {
@@ -157,15 +157,15 @@ export default {
 
     onAfterRead(files) {
       console.log('【onAfterRead】开始处理文件:', files);
-      // 修改为使用二进制方式处理文件
-      uploadUtils.processFilesBinary(files, 20 * 1024 * 1024)
-          .then(list => {
-            this.evidenceList = list;
-            console.log('✅ 文件处理完成:', list);
-          })
-          .catch(error => {
-            this.$toast.fail(error.message);
-          });
+      // 修改为使用Base64方式处理文件
+      uploadUtils.processFiles(files, 10 * 1024 * 1024) // 限制10MB
+        .then(list => {
+          this.evidenceList = list;
+          console.log('✅ 文件处理完成:', list);
+        })
+        .catch(error => {
+          this.$toast.fail(error.message);
+        });
     },
 
     async submitEvidence() {
@@ -218,9 +218,7 @@ export default {
             TaskStage_Files: this.evidenceList.map(e => ({
               File_Name: e.File_Name,
               File_Md5: "",
-              File_Base64: e.File_Base64 || "multipart/form-data", // 支持Base64和二进制
-              // 添加二进制文件数据（如果存在）
-              File_Blob: e.File_Blob || null,
+              File_Base64: e.File_Base64 , // 支持Base64
               Upload_Time: e.Upload_Time
             })),
             StageFile_Creator: creatorFromCache
@@ -231,9 +229,9 @@ export default {
       try {
         await new Promise((resolve, reject) => {
           SensorRequest.TaskInfoStageFileAddFun(
-              JSON.stringify(payload),
-              resolve,
-              (error) => reject(new Error(error.message))
+            JSON.stringify(payload),
+            resolve,
+            (error) => reject(new Error(error.message))
           );
         });
         this.$toast.success('提交成功');
