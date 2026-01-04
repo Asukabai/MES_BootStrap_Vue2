@@ -385,6 +385,11 @@ export default {
 
     // 根据操作类型筛选库存列表
     filterInventoryListByType(type) {
+      // 安全检查：确保 originalInventoryList 是数组
+      if (!Array.isArray(this.originalInventoryList)) {
+        this.inventoryList = [];
+        return;
+      }
       if (type === 'inbound') {
         // 筛选包含"入库"的操作类型
         this.inventoryList = this.originalInventoryList.filter(item =>
@@ -401,6 +406,11 @@ export default {
 
     // 根据操作类型筛选个人列表
     filterPersonListByType(type) {
+      // 安全检查：确保 originalPersonList 是数组
+      if (!Array.isArray(this.originalPersonList)) {
+        this.personList = [];
+        return;
+      }
       if (type === 'inbound') {
         // 筛选包含"入库"的操作类型
         this.personList = this.originalPersonList.filter(item =>

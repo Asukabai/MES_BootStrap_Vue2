@@ -4,34 +4,34 @@
       <van-loading v-if="loading" size="24px" vertical>加载中...</van-loading>
       <div v-else>
         <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
-        <!-- 展示详细信息的卡片 -->
-        <van-card
-          v-if="currentItem "
-          class="detail-card"
-        >
-          <div slot="desc" class="detail-content">
-            <van-cell-group>
-              <van-cell title="物品名称">
-                <span class="item-name" slot="default">{{ currentItem.Item_Name }}</span>
-              </van-cell>
-              <van-cell title="货架位置" :value="currentItem.Shelf_Location" />
-              <van-cell title="物品型号" :value="currentItem.Item_Model" />
-              <van-cell title="当前库存">
-                <span :class="stockStatusClass" slot="default">{{ currentItem.Current_Stock }}</span>
-              </van-cell>
-              <van-cell title="物品品牌" :value="currentItem.Item_Brand" />
-              <van-cell title="类别类型" :value="currentItem.Category_Type" />
-<!--              <van-cell title="项目编码" :value="currentItem.Project_Code || '无'" />-->
-              <van-cell title="预警阈值" :value="currentItem.Warning_Threshold" />
-              <van-cell title="库存状态">
-                <span :class="stockStatusClass" slot="default">{{ stockStatusText }}</span>
-              </van-cell>
-              <van-cell title="备注" :value="currentItem.Remark" />
-              <van-cell title="公司" :value="currentItem.Company" />
-            </van-cell-group>
-          </div>
-        </van-card>
-        <van-empty v-else-if="!currentItem" description="暂无库存信息" />
+          <!-- 展示详细信息的卡片 -->
+          <van-card
+            v-if="currentItem "
+            class="detail-card"
+          >
+            <div slot="desc" class="detail-content">
+              <van-cell-group>
+                <van-cell title="物品名称">
+                  <span class="item-name" slot="default">{{ currentItem.Item_Name }}</span>
+                </van-cell>
+                <van-cell title="货架位置" :value="currentItem.Shelf_Location" />
+                <van-cell title="物品型号" :value="currentItem.Item_Model" />
+                <van-cell title="当前库存">
+                  <span :class="stockStatusClass" slot="default">{{ currentItem.Current_Stock }}</span>
+                </van-cell>
+                <van-cell title="物品品牌" :value="currentItem.Item_Brand" />
+                <van-cell title="类别类型" :value="currentItem.Category_Type" />
+                <!--              <van-cell title="项目编码" :value="currentItem.Project_Code || '无'" />-->
+                <van-cell title="预警阈值" :value="currentItem.Warning_Threshold" />
+                <van-cell title="库存状态">
+                  <span :class="stockStatusClass" slot="default">{{ stockStatusText }}</span>
+                </van-cell>
+                <van-cell title="备注" :value="currentItem.Remark" />
+                <van-cell title="公司" :value="currentItem.Company" />
+              </van-cell-group>
+            </div>
+          </van-card>
+          <van-empty v-else-if="!currentItem" description="暂无库存信息录入，请点击“+”按钮进行信息新增，或请确认扫描二维码是否正确" />
         </van-pull-refresh>
         <div class="button-group-container">
           <div class="button-row">
@@ -39,7 +39,19 @@
             <van-button size="small" class="action-button" @click="goToInbound">快速入库</van-button>
             <van-button size="small" class="action-button" @click="goToLog">操作日志</van-button>
           </div>
+          <div class="button-row">
+            <van-button size="small" class="action-button" @click="goToExtendInfoView">查看扩展信息</van-button>
+            <van-button size="small" class="action-button" @click="goToExtendInfoEdit">修改扩展信息</van-button>
+            <van-button size="small" class="action-button" @click="goToExtendInfoAdd">新增扩展信息</van-button>
+          </div>
         </div>
+        <!-- 添加悬浮按钮 -->
+        <template v-if="!currentItem">
+          <FloatingActionButton
+            @click="onFloatingButtonClick"
+            :initial-position="{ bottom: 80, right: 20 }"
+          />
+        </template>
       </div>
     </div>
   </div>
@@ -48,9 +60,11 @@
 <script>
 import SensorRequest from '../../utils/SensorRequest';
 import {key_DingScannedInventoryQRCodeResult} from '../../utils/Dingding';
+import FloatingActionButton from "../../components/FloatingActionButton.vue";
 
 export default {
   name: 'InventoryDetail',
+  components: {FloatingActionButton},
   data() {
     return {
       loading: true,
@@ -84,6 +98,77 @@ export default {
     }
   },
   methods: {
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
+    onFloatingButtonClick() {
+      // 防止重复点击
+      if (this.isNavigating) return;
+      this.isNavigating = true;
+      // alert('点击了悬浮按钮')
+      this.navigateTo('/inventory/add');
+      // 延迟重置导航状态
+      setTimeout(() => {
+        this.isNavigating = false;
+      }, 10);
+    },
+    goToExtendInfoView() {
+      // 跳转到查看扩展信息页面
+      if (this.currentItem) {
+        this.$router.push({
+          name: 'InventoryExtendInfoView',
+          params: {
+            department: this.$route.params.department
+          },
+          query: {
+            item: JSON.stringify(this.currentItem)
+          }
+        });
+      } else {
+        this.$toast.fail('未查询到物品信息');
+      }
+    },
+
+    goToExtendInfoEdit() {
+      // 跳转到编辑扩展信息页面
+      if (this.currentItem) {
+        this.$router.push({
+          name: 'InventoryExtendInfoEdit',
+          params: {
+            department: this.$route.params.department
+          },
+          query: {
+            item: JSON.stringify(this.currentItem)
+          }
+        });
+      } else {
+        this.$toast.fail('未查询到物品信息');
+      }
+    },
+
+    goToExtendInfoAdd() {
+      // 跳转到新增扩展信息页面
+      if (this.currentItem) {
+        this.$router.push({
+          name: 'InventoryExtendInfoAdd',
+          params: {
+            department: this.$route.params.department
+          },
+          query: {
+            item: JSON.stringify(this.currentItem)
+          }
+        });
+      } else {
+        this.$toast.fail('未查询到物品信息');
+      }
+    },
+
     // 添加下拉刷新处理方法
     onRefresh() {
       this.loadInventoryData();
@@ -114,9 +199,11 @@ export default {
           // 自动选择第一个物品
           if (this.inventoryItems.length > 0) {
             this.currentItem = this.inventoryItems[0];
+            this.$toast.success('数据加载成功');
+          } else {
+            this.currentItem = null;
+            this.$toast.fail('暂未查询到数据');
           }
-          // 添加刷新成功的提示
-          this.$toast.success('数据加载成功');
         },
         (error) => {
           console.error('获取库存信息失败:', error);
@@ -221,8 +308,8 @@ export default {
   flex: 1;
   max-width: 100px;
   box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  border-radius: 8px;
-  font-size: 14px;
+  border-radius: 10px;
+  font-size: 12px;
   height: 40px;
 }
 

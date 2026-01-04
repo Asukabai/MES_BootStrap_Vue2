@@ -11,22 +11,6 @@
             placeholder="请输入物品名称"
             :rules="[{ required: true, message: '请填写物品名称' }]"
           />
-
-<!--          <van-field-->
-<!--            v-model="itemForm.Shelf_Location"-->
-<!--            name="Shelf_Location"-->
-<!--            label="货架位置"-->
-<!--            placeholder="请输入货架位置或直接扫码获取"-->
-<!--            :rules="[{ required: true, message: '请填写货架位置' }]"-->
-<!--            readonly-->
-<!--            :right-icon="scanIcon"-->
-<!--            @click-right-icon="handleScanClick"-->
-<!--          >-->
-<!--            <template #label>-->
-<!--              <span>货架位置</span>-->
-<!--            </template>-->
-<!--          </van-field>-->
-
           <van-field
             v-model="itemForm.Shelf_Location"
             name="Shelf_Location"

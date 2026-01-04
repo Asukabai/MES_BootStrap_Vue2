@@ -338,6 +338,7 @@ export default {
     },
 
     viewDetail(item) {
+      // 将当前物品信息保存到sessionStorage中(模拟扫码情况)
       sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, item);
       // 跳转到库存详情页面
       const department = this.$route.params.department;
