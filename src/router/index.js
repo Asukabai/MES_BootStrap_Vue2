@@ -75,6 +75,12 @@ const router = new Router({
       meta: { title: '文件下载' }
     },
     {
+      path: '/:department/DingtalkFilePreview',
+      name: 'DingtalkFilePreview',
+      component: () => import('../views/share/DingtalkFilePreview.vue'),
+      meta: { title: '钉钉文件预览' }
+    },
+    {
       path: '/:department/profile',
       name: 'Profile',
       component: () => import('@/views/user/Profile.vue'),
@@ -271,7 +277,7 @@ const router = new Router({
       path: '/:department/inventoryDetail',
       name: 'InventoryDetail',
       component: () => import('@/views/inventory/InventoryDetail.vue'),
-      meta: { title: '库存扫码' }
+      meta: { title: '库存详情' }
     },
     // 在 router/index.js 中添加路由
     {
@@ -297,6 +303,24 @@ const router = new Router({
       name: 'InventoryAdd',
       component: () => import('../views/inventory/InventoryAdd.vue'),
       meta: { title: '新增物品' }
+    },
+    {
+      path: '/:department/inventoryExtendInfoAdd',
+      name: 'InventoryExtendInfoAdd',
+      component: () => import('../views/inventory/InventoryExtendInfoAdd.vue'),
+      meta: { title: '物品扩展信息新增表单' }
+    },
+    {
+      path: '/:department/InventoryExtendInfoView',
+      name: 'InventoryExtendInfoView',
+      component: () => import('../views/inventory/InventoryExtendInfoView.vue'),
+      meta: { title: '物品扩展信息表单' }
+    },
+    {
+      path: '/:department/InventoryExtendInfoEdit',
+      name: 'InventoryExtendInfoEdit',
+      component: () => import('../views/inventory/InventoryExtendInfoEdit.vue'),
+      meta: { title: '物品扩展信息编辑表单' }
     },
     {
       path: '/:department/project-detail/:id',

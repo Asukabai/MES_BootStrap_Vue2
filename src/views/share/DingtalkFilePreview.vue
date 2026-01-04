@@ -1,12 +1,5 @@
 <template>
   <div class="preview-container">
-    <!--    <van-nav-bar-->
-    <!--        :title="fileName"-->
-    <!--        left-text="返回"-->
-    <!--        left-arrow-->
-    <!--        @click-left="goBack"-->
-    <!--    />-->
-
     <div class="preview-content">
       <div v-if="loading" class="loading-container">
         <van-loading size="24px" vertical>文件加载中...</van-loading>

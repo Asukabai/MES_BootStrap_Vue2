@@ -74,6 +74,24 @@ import * as ssDing from '../utils/Dingding.js';
           callSuccess(respData);
         }, callFail);
       },
+      // 库存扩展信息添加
+      InventoryItemExtensionsAddFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("InventoryItemExtensionsAddFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 库存扩展信息修改
+      InventoryItemExtensionsUpdateFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("InventoryItemExtensionsUpdateFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 获取库存扩展信息表格数据
+      InventoryItemExtensionsGetFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("InventoryItemExtensionsGetFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       // 库存信息添加
       InventoryItemsAddFun(param, callSuccess, callFail) {
         ssDing.PostDataUrl("InventoryItemsAddFun", param, true, respData => {
@@ -274,8 +292,7 @@ import * as ssDing from '../utils/Dingding.js';
                   reject(error); // 失败时 reject
               });
           });
-      }
-
+      },
   };
 
   export default SensorRequest;

@@ -16,7 +16,7 @@ module.exports = {
         // target:'https://api-v2.sensor-smart.cn:22027/ss-proxy/p22027',
         // target:'http://192.168.2.139:29027/ss-proxy/p29021',
         target:'https://api-v2.sensor-smart.cn:22027/ss-proxy/p35001',
-        // target:'http://192.168.2.107:22027/',
+        // target:'http://192.168.67.75:35001/',
         changeOrigin:true, // 在本地会创建一个虚拟服务端，然后发送请求的数据，并同时接收请求的数据，这样服务端和服务端进行数据的交互就不会有跨域问题
         pathRewrite:{  // 路径重写，
           '^/': ''  // 替换target中的请求地址，也就是说以后你在请求http://api.douban.com/v2/XXXXX这个地址的时候直接写成/api即可。
@@ -47,12 +47,12 @@ module.exports = {
     },
     // Various Dev Server settings
     // host: 'localhost', // can be overwritten by process.env.HOST
-    host: '192.168.0.100', // can be overwritten by process.env.HOST    host: '192.168.65.76', // can be overwritten by process.env.HOST
-    port: 8888, // can be overwritten by process.env.PORT, if port is in use, a free one will be determined
+    host: '192.168.67.74', // can be overwritten by process.env.HOST    host: '192.168.65.76', // can be overwritten by process.env.HOST
+    port: 8888,
     autoOpenBrowser: true,
     errorOverlay: true,
     notifyOnErrors: true,
-    poll: false, // https://webpack.js.org/configuration/dev-server/#devserver-watchoptions-
+    poll: false,
 
     /**
      * Source Maps

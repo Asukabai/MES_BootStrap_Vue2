@@ -112,8 +112,8 @@ export function PostData(method, data, callSuccess, callFail) {
     token: userToken,
     reqData: data
   }
-  // axios.post(systemConfigure.serverrUrl, JSON.stringify(postPack), {
-  axios.post(baseURL, JSON.stringify(postPack), {
+  axios.post(systemConfigure.serverrUrl, JSON.stringify(postPack), {
+  // axios.post(baseURL, JSON.stringify(postPack), {
     headers: {
       "content-type": "application/json"
     }
@@ -161,8 +161,8 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
   }
   let postJson = JSON.stringify(postPack)
 
-  // axios.post(systemConfigure.serverrUrl, postJson, {
-  axios.post(baseURL, postJson, {
+  axios.post(systemConfigure.serverrUrl, postJson, {
+  // axios.post(baseURL, postJson, {
     headers: {
       "content-type": dataType
     }
@@ -171,7 +171,6 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
       if (systemConfigure.isDebugMode) {
         alert('responseJson: ' + JSON.stringify(response.data));
       }
-
       // 定义错误码映射表
       const errorCodeMap = {
         0: "空响应",
@@ -215,8 +214,6 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
       }
     });
 }
-
-
 
 // 用于获取钉钉授权码
 // 在 GetDingCode 的成功回调中，info.code 被作为参数传递给 GetDingCode 的第一个回调函数参数

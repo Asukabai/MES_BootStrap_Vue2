@@ -48,7 +48,8 @@ export default {
   },
   computed: {
     showTabBar() {
-      const hiddenPaths = ['login', 'inventory', 'weeklyReport', 'chatDetail', 'chat_category', 'post-detail', 'createGroup']
+      const hiddenPaths = ['login', 'inventory', 'weeklyReport', 'chatDetail', 'chat_category',
+        'post-detail', 'createGroup', 'DingtalkFilePreview','inventoryExtendInfoAdd','InventoryExtendInfoView','InventoryExtendInfoEdit']
       return !hiddenPaths.some(path => this.$route.path.includes(path))
     },
 
@@ -78,9 +79,10 @@ export default {
           try {
             await MqttService.init(userId, token)
             console.log('MQTT连接成功')
+            Toast.fail('MQTT消息服务连接成功')
           } catch (error) {
             console.error('MQTT连接失败:', error)
-            Toast.fail('消息服务连接失败')
+            Toast.fail('MQTT消息服务连接失败')
           }
         }
       })
@@ -122,51 +124,50 @@ export default {
   box-sizing: border-box;
 }
 
-html, body, #app {
+html, body {
   height: 100%;
+  overflow: hidden; /* 防止全局滚动 */
 }
 
 #app {
+  height: 100vh;
   display: flex;
   flex-direction: column;
+  position: relative;
 }
-
 .app-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   position: relative;
+  overflow: hidden; /* 防止内容溢出 */
 }
 
 .main-content {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch; /* iOS平滑滚动 */
+  height: 100%; /* 明确设置高度 */
 }
 
-/* 底部导航栏固定定位 */
+/* 底部导航栏 - 修改为相对定位当需要时 */
 .tabbar-content {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: relative; /* 改为相对定位，避免影响滚动 */
   z-index: 1000;
   background-color: #fff;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
+  flex-shrink: 0; /* 防止被压缩 */
 
   /* 适配iOS安全区域 */
   padding-bottom: env(safe-area-inset-bottom);
-  padding-bottom: constant(safe-area-inset-bottom); /* 兼容旧版本iOS */
 }
 
-/* 安卓和鸿蒙系统适配 */
-@supports not (padding-bottom: env(safe-area-inset-bottom)) {
-  .tabbar-content {
-    padding-bottom: 0;
-  }
+/* 当页面需要固定底部导航时的特殊处理 */
+#app:has(.tabbar-content:not([style*="display: none"])) .main-content {
+  padding-bottom: 0; /* 移除额外的padding，因为tabbar不再是fixed */
 }
 
-/* 简单通知 */
+/* 简单通知 - 保持原有样式 */
 .simple-notification {
   position: fixed;
   top: 10px;
@@ -175,6 +176,7 @@ html, body, #app {
   z-index: 9999;
 }
 
+/* 其他通知相关样式保持不变 */
 .notification-item {
   background: white;
   border-radius: 8px;
