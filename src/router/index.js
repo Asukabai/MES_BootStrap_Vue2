@@ -274,6 +274,12 @@ const router = new Router({
       meta: { title: '库存管理' }
     },
     {
+      path: '/:department/inventoryV1',
+      name: 'InventoryManagement',
+      component: () => import('../views/inventory/InventoryManagement.vue'),
+      meta: { title: '库存管理V1.0' }
+    },
+    {
       path: '/:department/inventoryDetail',
       name: 'InventoryDetail',
       component: () => import('@/views/inventory/InventoryDetail.vue'),

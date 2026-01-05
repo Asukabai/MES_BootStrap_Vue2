@@ -62,11 +62,11 @@ export default {
           title: '知识库',
           path: '',
         },
-        {
-          icon: progressTrackIcon,
-          title: '进度跟踪',
-          path: '',
-        },
+        // {
+        //   icon: progressTrackIcon,
+        //   title: '进度跟踪',
+        //   path: '',
+        // },
         {
           icon: inventoryIcon,
           title: '库存管理',
@@ -75,6 +75,11 @@ export default {
         {
           icon: scanConfigIcon,
           title: '库存扫码',
+          path: '',
+        },
+        {
+          icon: inventoryIcon,
+          title: '库存管理V1.0',
           path: '',
         },
         // {
@@ -168,6 +173,10 @@ export default {
       }
       if (item.title === '库存管理') {
         this.navigateTo('/inventory');
+        // this.$toast.success('正在开发中 ！');
+      }
+      if (item.title === '库存管理V1.0') {
+        this.navigateTo('/inventoryV1');
         // this.$toast.success('正在开发中 ！');
       }
       if (item.title === '库存扫码') {
