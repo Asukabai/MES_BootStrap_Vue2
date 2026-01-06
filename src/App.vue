@@ -14,14 +14,11 @@
         <span class="notification-close" @click.stop="removeNote(note.id)">×</span>
       </div>
     </div>
-
-    <div class="app-content">
       <div class="main-content">
         <router-view />
       </div>
       <!-- 底部导航 -->
       <MainTabBar v-if="showTabBar" />
-    </div>
   </div>
 </template>
 
@@ -102,35 +99,42 @@ export default {
   }
 }
 </script>
+<!--
 
-<style>
-/* 全局样式 */
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  /* 修复iOS滚动性能 */
+.main-content {
+  flex: 1;
+  overflow-y: auto;
   -webkit-overflow-scrolling: touch;
 }
 
-html, body {
-  height: 100%;
-  overflow: hidden;
-}
+这段CSS代码定义了.main-content元素的样式，具体含义如下：
+1. flex: 1
+将元素设置为弹性布局的可伸缩项目
+占据容器中剩余的所有可用空间
+确保内容区域能够自动填充页面高度
+2. overflow-y: auto
+当内容超出容器高度时，自动显示垂直滚动条
+只在需要时显示滚动条，避免不必要的滚动条出现
+保证内容可滚动访问
+3. -webkit-overflow-scrolling: touch
+启用原生滚动性能优化
+在iOS设备上提供流畅的触摸滚动体验
+使滚动更加平滑自然
+
+这个样式设置创建了一个可滚动的内容区域，它会自动占据页面剩余空间，并在内容超出时提供流畅的滚动体验，配合底部的MainTabBar组件实现完整的页面布局。
+
+TabBar 为什么不能固定在页面底部？（特别重要！！！）
+
+不同业务项目中的布局逻辑是不一样的，TabBar 本身是不含定位和外层布局相关的逻辑的，需要业务项目中配合 Popup 实现，或者自行用 CSS 实现。
+
+-->
+<style>
+
 
 #app {
+  height: 100vh;
   display: flex;
   flex-direction: column;
-  position: relative;
-  /* 使用现代视口单位解决iOS问题 */
-  min-height: 100vh;
-}
-
-.app-content {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  position: relative;
   overflow: hidden;
 }
 
@@ -138,11 +142,11 @@ html, body {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  height: 100%;
-  /* 防止iOS弹性滚动导致的空白 */
-  overscroll-behavior: contain;
-  /* 为TabBar预留空间，但让Vant的placeholder处理 */
 }
+
+/* 底部标签栏使用固定定位 */
+/* MainTabBar 组件会自动处理固定定位 */
+
 
 /* 简单通知 */
 .simple-notification {
@@ -152,7 +156,6 @@ html, body {
   max-width: 300px;
   z-index: 9999;
 }
-
 .notification-item {
   background: white;
   border-radius: 8px;
@@ -200,58 +203,4 @@ html, body {
   color: #ff4444;
 }
 
-/* 深色模式适配 */
-@media (prefers-color-scheme: dark) {
-  .notification-item {
-    background: rgba(30, 30, 30, 0.95);
-  }
-
-  .notification-title {
-    color: #fff;
-  }
-
-  .notification-message {
-    color: #ccc;
-  }
-}
-
-/* ============= iOS特殊修复 ============= */
-@supports (-webkit-touch-callout: none) {
-  /* iOS设备 */
-  #app {
-    /* 修复iOS 100vh问题 - 使用现代方法 */
-    min-height: 100vh;
-  }
-
-  .main-content {
-    /* 修复iOS滚动回弹 */
-    -webkit-overflow-scrolling: touch;
-  }
-
-  /* 确保Tabbar正确显示 - 简化样式 */
-  .van-tabbar {
-    /* 强制覆盖任何可能影响安全区域的样式 */
-    padding-bottom: env(safe-area-inset-bottom) !important;
-  }
-}
-
-/* 支持现代视口单位 */
-@supports (height: 100dvh) {
-  #app {
-    height: 100dvh;
-  }
-}
-
-/* 修复Android/HarmonyOS可能的兼容性问题 */
-@supports not (-webkit-touch-callout: none) {
-  .van-tabbar {
-    /* 非iOS设备不需要额外padding */
-    padding-bottom: 0 !important;
-  }
-}
-
-/* 添加这个样式确保内容不会被TabBar遮挡 */
-.van-tabbar--placeholder {
-  height: auto !important;
-}
 </style>

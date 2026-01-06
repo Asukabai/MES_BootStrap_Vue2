@@ -235,9 +235,4 @@ export default {
   margin: 8px 0;
   text-align: left;
 }
-
-/* 确保最后的内容不会被底部导航栏遮挡 */
-.van-cell-group:last-child {
-  margin-bottom: 20px;
-}
 </style>

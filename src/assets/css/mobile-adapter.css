@@ -15,8 +15,6 @@ html {
   -moz-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
   text-size-adjust: 100%;
-  /* 修复iOS滚动弹性问题 */
-  overscroll-behavior: none;
 }
 
 body {
@@ -24,10 +22,7 @@ body {
   -moz-user-select: none;
   -ms-user-select: none;
   user-select: none;
-  -webkit-overflow-scrolling: touch;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  /* 防止iOS下拉刷新 */
-  overflow: hidden;
 }
 
 /* 移除默认点击高亮 */
@@ -44,29 +39,9 @@ img {
 
 /* 针对iOS设备的特殊样式 */
 @supports (-webkit-touch-callout: none) {
-  /* iOS设备 */
-  body {
-    /* 修复iOS 100vh问题 - 使用 stretch 替代 fill-available */
-    min-height: 100vh;
-  }
-
   /* 修复iOS输入框缩放问题 */
   input, textarea {
     font-size: 16px !important;
-    transform: translateZ(0);
-  }
-
-  /* 修复iOS按钮点击延迟 */
-  button, a {
-    cursor: pointer;
-  }
-}
-
-/* 针对iOS全面屏的特殊处理 */
-@supports (padding: max(0px)) {
-  /* 确保安全区域适配 */
-  .safe-area-bottom {
-    padding-bottom: max(env(safe-area-inset-bottom), 0px);
   }
 }
 
@@ -76,19 +51,4 @@ img {
     background-color: #121212;
     color: #f5f5f5;
   }
-}
-
-/* 修复iOS键盘弹出时的布局问题 */
-.van-field--error .van-field__control,
-.van-field--error .van-field__control::placeholder {
-  /* 防止iOS键盘弹出时布局错乱 */
-  -webkit-user-select: text;
-  user-select: text;
-}
-
-/* 确保所有fixed元素正确处理安全区域 */
-.van-tabbar,
-.van-submit-bar,
-.van-goods-action {
-  padding-bottom: env(safe-area-inset-bottom) !important;
 }
