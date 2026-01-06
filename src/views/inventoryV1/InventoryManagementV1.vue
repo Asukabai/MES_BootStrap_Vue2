@@ -107,7 +107,7 @@ import SensorRequest from '../../utils/SensorRequest.js';
 import FloatingActionButton from '../../components/FloatingActionButton.vue';
 import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding"; // 引入组件
 export default {
-  name: 'InventoryManagement',
+  name: 'InventoryManagementV1',
   components: {
     FloatingActionButton // 注册组件
   },
@@ -343,7 +343,7 @@ export default {
       // 跳转到库存详情页面
       const department = this.$route.params.department;
       if (department) {
-        this.$router.push(`/${department}/inventoryDetail`);
+        this.$router.push(`/${department}/inventoryDetailV1`);
       } else {
         console.error('未找到 department 参数');
         this.$toast.fail('路由参数缺失');

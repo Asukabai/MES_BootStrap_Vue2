@@ -20,12 +20,7 @@
         <router-view />
       </div>
       <!-- 底部导航 -->
-      <div
-        v-if="showTabBar"
-        class="tabbar-content"
-      >
-        <MainTabBar/>
-      </div>
+      <MainTabBar v-if="showTabBar" />
     </div>
   </div>
 </template>
@@ -52,8 +47,6 @@ export default {
         'post-detail', 'createGroup', 'DingtalkFilePreview','inventoryExtendInfoAdd','InventoryExtendInfoView','InventoryExtendInfoEdit']
       return !hiddenPaths.some(path => this.$route.path.includes(path))
     },
-
-    // 直接从Vuex获取通知
     notifications() {
       return this.$store.state.chat.notifications
     }
@@ -87,8 +80,6 @@ export default {
         }
       })
     },
-
-    // 跳转到聊天
     goToChat(roomId) {
       this.$router.push({
         name: 'ChatDetail',
@@ -97,13 +88,9 @@ export default {
         }
       })
     },
-
-    // 移除通知
     removeNote(id) {
       this.$store.commit('chat/REMOVE_NOTIFICATION', id)
     },
-
-    // 格式化时间
     formatTime(timestamp) {
       const diff = Date.now() - timestamp
       if (diff < 60000) return '刚刚'
@@ -122,61 +109,50 @@ export default {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
+  /* 修复iOS滚动性能 */
+  -webkit-overflow-scrolling: touch;
 }
 
 html, body {
   height: 100%;
-  overflow: hidden; /* 防止全局滚动 */
+  overflow: hidden;
 }
 
 #app {
-  height: 100vh;
   display: flex;
   flex-direction: column;
   position: relative;
+  /* 使用现代视口单位解决iOS问题 */
+  min-height: 100vh;
 }
+
 .app-content {
   flex: 1;
   display: flex;
   flex-direction: column;
   position: relative;
-  overflow: hidden; /* 防止内容溢出 */
+  overflow: hidden;
 }
 
 .main-content {
   flex: 1;
   overflow-y: auto;
-  -webkit-overflow-scrolling: touch; /* iOS平滑滚动 */
-  height: 100%; /* 明确设置高度 */
+  -webkit-overflow-scrolling: touch;
+  height: 100%;
+  /* 防止iOS弹性滚动导致的空白 */
+  overscroll-behavior: contain;
+  /* 为TabBar预留空间，但让Vant的placeholder处理 */
 }
 
-/* 底部导航栏 - 修改为相对定位当需要时 */
-.tabbar-content {
-  position: relative; /* 改为相对定位，避免影响滚动 */
-  z-index: 1000;
-  background-color: #fff;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  flex-shrink: 0; /* 防止被压缩 */
-
-  /* 适配iOS安全区域 */
-  padding-bottom: env(safe-area-inset-bottom);
-}
-
-/* 当页面需要固定底部导航时的特殊处理 */
-#app:has(.tabbar-content:not([style*="display: none"])) .main-content {
-  padding-bottom: 0; /* 移除额外的padding，因为tabbar不再是fixed */
-}
-
-/* 简单通知 - 保持原有样式 */
+/* 简单通知 */
 .simple-notification {
   position: fixed;
-  top: 10px;
-  right: 10px;
+  top: max(10px, env(safe-area-inset-top, 10px));
+  right: max(10px, env(safe-area-inset-right, 10px));
   max-width: 300px;
   z-index: 9999;
 }
 
-/* 其他通知相关样式保持不变 */
 .notification-item {
   background: white;
   border-radius: 8px;
@@ -224,8 +200,58 @@ html, body {
   color: #ff4444;
 }
 
-/* 隐藏底部导航栏时调整内容区域 */
-.app-content:has(.tabbar-content) .main-content {
-  padding-bottom: 60px; /* 预留底部导航栏高度 */
+/* 深色模式适配 */
+@media (prefers-color-scheme: dark) {
+  .notification-item {
+    background: rgba(30, 30, 30, 0.95);
+  }
+
+  .notification-title {
+    color: #fff;
+  }
+
+  .notification-message {
+    color: #ccc;
+  }
+}
+
+/* ============= iOS特殊修复 ============= */
+@supports (-webkit-touch-callout: none) {
+  /* iOS设备 */
+  #app {
+    /* 修复iOS 100vh问题 - 使用现代方法 */
+    min-height: 100vh;
+  }
+
+  .main-content {
+    /* 修复iOS滚动回弹 */
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* 确保Tabbar正确显示 - 简化样式 */
+  .van-tabbar {
+    /* 强制覆盖任何可能影响安全区域的样式 */
+    padding-bottom: env(safe-area-inset-bottom) !important;
+  }
+}
+
+/* 支持现代视口单位 */
+@supports (height: 100dvh) {
+  #app {
+    height: 100dvh;
+  }
+}
+
+/* 修复Android/HarmonyOS可能的兼容性问题 */
+@supports not (-webkit-touch-callout: none) {
+  .van-tabbar {
+    /* 非iOS设备不需要额外padding */
+    padding-bottom: 0 !important;
+  }
+}
+
+/* 添加这个样式确保内容不会被TabBar遮挡 */
+.van-tabbar--placeholder {
+  height: auto !important;
 }
 </style>

@@ -83,7 +83,7 @@
     <!-- 添加悬浮按钮 -->
     <FloatingActionButton
       @click="navigateToCreateGroup"
-      :initial-position="{ bottom: 80, right: 20 }"
+      :initial-position="{ bottom: 100, right: 20 }"
     />
   </div>
 </template>

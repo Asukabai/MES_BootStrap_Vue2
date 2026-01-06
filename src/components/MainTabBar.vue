@@ -1,44 +1,36 @@
 <template>
   <van-tabbar
     v-model="active"
-    class="fixed-tabbar"
     :safe-area-inset-bottom="true"
+    :fixed="true"
+    :placeholder="true"
     @change="onTabChange"
+    class="main-tabbar"
   >
     <van-tabbar-item
       v-for="(item, index) in tabbars"
       :key="index"
+      :name="item.path"
       :badge="item.badge"
     >
-      <!-- 自定义图标 -->
-      <template #icon>
+      <template #icon="props">
         <img
-          :src="active === index ? item.iconActive : item.iconInactive"
+          :src="props.active ? item.iconActive : item.iconInactive"
           :alt="item.title"
-          style="width: 20px; height: 20px;"
+          class="tabbar-icon"
         />
       </template>
-
-      <!-- 文字标题 -->
-      <span>{{ item.title }}</span>
+      <span class="tabbar-text">{{ item.title }}</span>
     </van-tabbar-item>
   </van-tabbar>
 </template>
 
 <script>
 export default {
-  props: {
-    showRouterView: {
-      type: Boolean,
-      default: true
-    }
-  },
+  name: 'MainTabBar',
   data() {
     return {
       active: 0,
-      isIOS: false,
-
-      // 图标资源路径（可以统一管理或按需加载）
       icons: {
         message: {
           active: require('@/assets/icons/message-active.png'),
@@ -61,23 +53,25 @@ export default {
           inactive: require('@/assets/icons/user-inactive.png')
         }
       }
-    };
+    }
   },
   computed: {
     tabbars() {
-      const base = this.$route.params.department || 'default';
+      const base = this.$route.params.department || ''
       return [
         {
           title: '消息',
           path: `/${base}/chat`,
           iconActive: this.icons.message.active,
-          iconInactive: this.icons.message.inactive
+          iconInactive: this.icons.message.inactive,
+          badge: this.getUnreadCount('chat')
         },
         {
           title: '任务',
           path: `/${base}/taskList`,
           iconActive: this.icons.task.active,
-          iconInactive: this.icons.task.inactive
+          iconInactive: this.icons.task.inactive,
+          badge: this.getUnreadCount('task')
         },
         {
           title: '工作台',
@@ -97,97 +91,129 @@ export default {
           iconActive: this.icons.user.active,
           iconInactive: this.icons.user.inactive
         }
-      ];
+      ]
     }
   },
   watch: {
     '$route': {
       handler(newRoute) {
-        this.updateActiveTab(newRoute);
+        this.updateActiveTab(newRoute)
       },
       immediate: true
     }
   },
-
+  mounted() {
+    this.$nextTick(() => {
+      this.updateActiveTab(this.$route)
+    })
+  },
   methods: {
-    onTabChange(index) {
-      const targetPath = this.tabbars[index].path;
-      if (this.$route.path !== targetPath) {
-        this.$router.push(targetPath);
+    onTabChange(name) {
+      if (this.$route.path !== name) {
+        this.$router.push(name)
       }
     },
 
     updateActiveTab(route) {
-      const fullPath = route.path;
-      const department = route.params.department;
-
-      // 精确匹配路径
-      for (let i = 0; i < this.tabbars.length; i++) {
-        const tabPath = this.tabbars[i].path;
-        if (fullPath === tabPath) {
-          this.active = i;
-          return;
-        }
-      }
-
-      // 模糊匹配（处理带参数的情况）
-      if (department) {
-        if (fullPath.includes(`/${department}/chat_category`)) {
-          this.active = 0;
-        } else if (fullPath.includes(`/${department}/taskList`)) {
-          this.active = 1;
-        } else if (fullPath.includes(`/${department}/index`)) {
-          this.active = 2;
-        } else if (fullPath.includes(`/${department}/cartList`)) {
-          this.active = 3;
-        } else if (fullPath.includes(`/${department}/user`)) {
-          this.active = 4;
+      const fullPath = route.path
+      const tab = this.tabbars.find(tab => tab.path === fullPath)
+      if (tab) {
+        const index = this.tabbars.indexOf(tab)
+        this.active = index
+      } else {
+        const base = this.$route.params.department || ''
+        if (fullPath.includes(`/${base}/chat`) || fullPath.includes('chat_category')) {
+          this.active = 0
+        } else if (fullPath.includes(`/${base}/taskList`)) {
+          this.active = 1
+        } else if (fullPath.includes(`/${base}/index`)) {
+          this.active = 2
+        } else if (fullPath.includes(`/${base}/cartList`)) {
+          this.active = 3
+        } else if (fullPath.includes(`/${base}/user`)) {
+          this.active = 4
         }
       }
     },
 
-    detectIOS() {
-      // 检测是否为iOS设备
-      const userAgent = navigator.userAgent || navigator.vendor || window.opera;
-      this.isIOS = /iPad|iPhone|iPod/.test(userAgent) && !window.MSStream;
+    getUnreadCount(type) {
+      // 使用逻辑运算符替代可选链操作符
+      const count = (this.$store.state.chat.unreadCounts &&
+        this.$store.state.chat.unreadCounts[type]) || 0
+      return count > 0 ? count : ''
     }
-  },
-
-  mounted() {
-    this.detectIOS();
   }
-};
+}
 </script>
 
 <style scoped>
-.fixed-tabbar {
-  position: relative;
-  height: 50px;
-  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-  border-top: 1px solid #f0f0f0;
-  padding-bottom: env(safe-area-inset-bottom);
+/* 覆盖Vant Tabbar的默认样式，确保安全区域适配 */
+.main-tabbar {
+  z-index: 1000;
 }
 
-/* 可选：添加图标过渡效果 */
-.van-tabbar-item__icon img {
-  transition: all 0.2s ease-in-out;
+/* 重要：确保Tabbar在iOS上正确处理安全区域 */
+::v-deep .van-tabbar {
+  padding-bottom: env(safe-area-inset-bottom) !important;
 }
 
-/* 调整标签栏项的内边距 */
 ::v-deep .van-tabbar-item {
   padding: 4px 0;
-  font-size: 12px;
 }
 
-/* 调整图标大小 */
-::v-deep .van-tabbar-item__icon img {
-  width: 20px;
-  height: 20px;
+.tabbar-icon {
+  width: 22px;
+  height: 22px;
+  margin-bottom: 4px;
 }
 
-/* 调整文字样式 */
-::v-deep .van-tabbar-item__text {
-  font-size: 12px;
+.tabbar-text {
+  font-size: 11px;
   line-height: 1.2;
+}
+
+/* 激活状态样式 */
+::v-deep .van-tabbar-item--active {
+  color: #1989fa;
+}
+
+::v-deep .van-tabbar-item--active .tabbar-text {
+  color: #1989fa;
+  font-weight: 500;
+}
+
+/* 适配不同屏幕尺寸 */
+@media (min-width: 375px) {
+  .tabbar-icon {
+    width: 24px;
+    height: 24px;
+  }
+
+  .tabbar-text {
+    font-size: 12px;
+  }
+}
+
+@media (min-width: 414px) {
+  .tabbar-icon {
+    width: 26px;
+    height: 26px;
+  }
+}
+
+/* 深色模式适配 */
+@media (prefers-color-scheme: dark) {
+  ::v-deep .van-tabbar {
+    background-color: #1a1a1a;
+    border-top: 1px solid #333;
+  }
+
+  ::v-deep .van-tabbar-item {
+    color: #999;
+  }
+
+  ::v-deep .van-tabbar-item--active {
+    color: #1989fa;
+  }
 }
 </style>

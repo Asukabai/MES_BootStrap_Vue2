@@ -275,15 +275,21 @@ const router = new Router({
     },
     {
       path: '/:department/inventoryV1',
-      name: 'InventoryManagement',
-      component: () => import('../views/inventory/InventoryManagement.vue'),
+      name: 'InventoryManagementV1',
+      component: () => import('../views/inventoryV1/InventoryManagementV1.vue'),
       meta: { title: '库存管理V1.0' }
     },
     {
       path: '/:department/inventoryDetail',
       name: 'InventoryDetail',
-      component: () => import('@/views/inventory/InventoryDetail.vue'),
+      component: () => import('../views/inventory/InventoryDetail.vue'),
       meta: { title: '库存详情' }
+    },
+    {
+      path: '/:department/inventoryDetailV1',
+      name: 'InventoryDetailV1',
+      component: () => import('../views/inventoryV1/InventoryDetailV1.vue'),
+      meta: { title: '库存详情V1.0' }
     },
     // 在 router/index.js 中添加路由
     {

@@ -37,7 +37,7 @@ export default {
     initialPosition: {
       type: Object,
       default: () => ({
-        bottom: 80,
+        bottom: 100,
         right: 20
       })
     }
