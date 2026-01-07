@@ -107,6 +107,7 @@
 
 <script>import SensorRequest from '../../utils/SensorRequest.js';
 import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
+import SensorRequestPage from "../../utils/SensorRequestPage";
 function getLocalUserInfo() {
   const name = localStorage.getItem(key_DingName);
   const phone = localStorage.getItem(key_DingUserPhone);
@@ -190,7 +191,7 @@ export default {
           Remark: this.remark || this.itemData.Remark || ''
         };
         // 调用出库接口
-        SensorRequest.InventoryTransactionsAddFun(
+        SensorRequestPage.InventoryTransactionAddFun(
           JSON.stringify(requestData),
           (respData) => {
             console.log('出库成功:', respData);

@@ -189,7 +189,7 @@ export default {
       if (this.isNavigating) return;
       this.isNavigating = true;
       // alert('点击了悬浮按钮')
-      this.navigateTo('/inventory/add');
+      this.navigateTo('/inventory/addV1');
       // 延迟重置导航状态
       setTimeout(() => {
         this.isNavigating = false;

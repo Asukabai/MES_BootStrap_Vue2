@@ -1,27 +1,104 @@
 <template>
   <div>
-    <div class="info-display">
-      <van-cell-group>
-        <van-cell title="物品名称" :value="itemName" />
-        <van-cell title="货架位置" :value="shelfLocation" />
-        <van-cell title="物品型号" :value="itemModel" />
-      </van-cell-group>
-    </div>
-
     <!-- 所有表单内容的卡片 -->
     <div class="card-container" style="margin-top: 0px; padding-bottom: 20px;">
       <van-loading v-if="loading" size="24px" vertical>加载中...</van-loading>
       <div v-else-if="!recordExists">
         <div class="no-record-message">
           <van-icon name="warning-o" size="40" color="#ff976a" />
-          <p class="message-text">该物品暂无扩展信息，请先新增扩展信息</p>
+          <p class="message-text">该物品暂无信息，请先新增物品信息</p>
         </div>
       </div>
       <div v-else>
+        <!-- 基本信息编辑 -->
+        <van-cell title="物品名称">
+          <template #default>
+            <van-field
+              v-model="itemForm.Item_Name"
+              type="text"
+              placeholder="请输入物品名称"
+            />
+          </template>
+        </van-cell>
+
+        <van-cell title="货架位置">
+          <template #default>
+            <van-field
+              v-model="itemForm.Shelf_Location"
+              type="text"
+              placeholder="请输入货架位置"
+            />
+          </template>
+        </van-cell>
+
+        <van-cell title="物品型号">
+          <template #default>
+            <van-field
+              v-model="itemForm.Item_Model"
+              type="text"
+              placeholder="请输入物品型号"
+            />
+          </template>
+        </van-cell>
+
+        <van-cell title="物品品牌">
+          <template #default>
+            <van-field
+              v-model="itemForm.Item_Brand"
+              type="text"
+              placeholder="请输入物品品牌"
+            />
+          </template>
+        </van-cell>
+
+        <van-cell title="库存分类">
+          <template #default>
+            <van-radio-group v-model="itemForm.Category_Type" direction="horizontal">
+              <van-radio name="耗材">耗材</van-radio>
+              <van-radio name="公用">公用</van-radio>
+              <van-radio name="项目">项目</van-radio>
+              <van-radio name="其他">其他</van-radio>
+            </van-radio-group>
+          </template>
+        </van-cell>
+
+        <van-cell v-if="itemForm.Category_Type === '耗材'" title="预警阈值">
+          <template #default>
+            <van-field
+              v-model="itemForm.Warning_Threshold"
+              type="number"
+              placeholder="请输入预警阈值"
+            />
+          </template>
+        </van-cell>
+
+        <van-cell title="所属公司">
+          <template #default>
+            <van-radio-group v-model="itemForm.Company" direction="horizontal">
+              <van-radio name="晟思">晟思</van-radio>
+              <van-radio name="大钧">大钧</van-radio>
+              <van-radio name="星移">星移</van-radio>
+            </van-radio-group>
+          </template>
+        </van-cell>
+
+        <van-cell title="备注">
+          <template #default>
+            <van-field
+              v-model="itemForm.Remark"
+              type="textarea"
+              rows="2"
+              autosize
+              placeholder="请输入备注"
+            />
+          </template>
+        </van-cell>
+
+        <!-- 扩展信息编辑 -->
         <van-cell title="物品颜色">
           <template #default>
             <van-field
-              v-model="itemColor"
+              v-model="itemForm.Item_Color"
               type="text"
               placeholder="请输入物品颜色"
             />
@@ -31,7 +108,7 @@
         <van-cell title="物品尺寸">
           <template #default>
             <van-field
-              v-model="itemSize"
+              v-model="itemForm.Item_Size"
               type="text"
               placeholder="请输入物品尺寸"
             />
@@ -41,7 +118,7 @@
         <van-cell title="物品单位">
           <template #default>
             <van-field
-              v-model="itemUnit"
+              v-model="itemForm.Item_Unit"
               type="text"
               placeholder="请输入物品单位"
             />
@@ -51,7 +128,7 @@
         <van-cell title="物品材质">
           <template #default>
             <van-field
-              v-model="itemMaterial"
+              v-model="itemForm.Item_Material"
               rows="2"
               autosize
               type="textarea"
@@ -61,6 +138,46 @@
             />
           </template>
         </van-cell>
+
+        <!-- 更多信息编辑 -->
+        <van-cell :border="false">
+          <template #title>
+            <span>更多信息</span>
+          </template>
+        </van-cell>
+        <div class="more-fields-container">
+          <div v-for="(field, index) in moreFields" :key="index" class="more-field-row">
+            <van-field
+              v-model="field.key"
+              placeholder="名称"
+              class="more-field-input"
+            />
+            <van-field
+              v-model="field.value"
+              placeholder="内容（不能为空）"
+              class="more-field-input"
+            />
+            <van-button
+              type="danger"
+              size="small"
+              class="remove-field-btn"
+              @click="removeMoreField(index)"
+            >
+              删除
+            </van-button>
+          </div>
+          <van-button
+            plain
+            hairline
+            type="primary"
+            size="small"
+            native-type="button"
+            @click="addMoreField"
+          >
+            + 自定义添加更多信息字段
+          </van-button>
+        </div>
+
 
         <van-cell title="上传图片(正视图、左视图、俯视图)">
           <template #label>
@@ -170,17 +287,35 @@
 
 <script>
 import SensorRequest from "../../utils/SensorRequest";
+import SensorRequestPage from "../../utils/SensorRequestPage";
 
 export default {
   name: 'InventoryExtendInfoEdit',
   data() {
     return {
-      ID: '', // 初始化为空字符串，将在加载数据时设置
+      ID: '', // 记录ID
       inventoryId: this.getInventoryId(),
-      itemColor: '',
-      itemSize: '',
-      itemUnit: '',
-      itemMaterial: '',
+      // 物品信息表单
+      itemForm: {
+        Item_Name: '',
+        Shelf_Location: '',
+        Item_Model: '',
+        Current_Stock: 0,
+        Item_Brand: '',
+        Category_Type: '',
+        Project_Code: '',
+        Warning_Threshold: 0,
+        Is_Low_Stock: '',
+        Remark: '',
+        Company: '',
+        // 扩展信息字段
+        Item_Color: '',
+        Item_Size: '',
+        Item_Unit: '',
+        Item_Material: '',
+        Item_Images: [],
+        Item_Mores: ''
+      },
       // 添加用于显示的字段
       itemName: this.getItemName(),
       shelfLocation: this.getShelfLocation(),
@@ -192,6 +327,8 @@ export default {
       isSubmitting: false,
       recordExists: false, // 记录是否存在
       loading: true, // 加载状态
+      // 更多字段
+      moreFields: [],
       // 新增图片预览相关数据
       showImagePreview: false,
       currentImage: null,
@@ -285,50 +422,94 @@ export default {
       return '';
     },
 
-    // 加载扩展信息
+    // 加载物品信息
     loadExtendInfo() {
       // 构造请求体
       const payload = {
-        Inventory_ID: this.inventoryId
+        Shelf_Location: this.getShelfLocation() // 使用货架位置查询完整信息
       };
 
-      SensorRequest.InventoryItemExtensionsGetFun(
+      SensorRequestPage.InventoryItemGetFun(
         JSON.stringify(payload),
         (respData) => {
           try {
-            const result = JSON.parse(respData);
-            if (result && result.length > 0) {
+            const responseJson = JSON.parse(respData);
+            if (responseJson.Data && Array.isArray(responseJson.Data) && responseJson.Data.length > 0) {
               // 记录存在，加载数据
               this.recordExists = true;
-              const extendInfo = result[0];
-              // 从后端响应中获取扩展信息记录的ID
-              this.ID = extendInfo.Id || extendInfo.id || '';
-              this.itemColor = extendInfo.Item_Color || '';
-              this.itemSize = extendInfo.Item_Size || '';
-              this.itemUnit = extendInfo.Item_Unit || '';
-              this.itemMaterial = extendInfo.Item_Material || '';
-              this.existingImages = extendInfo.Item_Images || [];
-              // 初始化保留的原有图片列表
+              const itemData = responseJson.Data[0];
+
+              // 从后端响应中获取完整信息
+              this.ID = itemData.Id || itemData.id || '';
+              this.itemForm = {
+                ...this.itemForm,
+                Item_Name: itemData.Item_Name || '',
+                Shelf_Location: itemData.Shelf_Location || '',
+                Item_Model: itemData.Item_Model || '',
+                Current_Stock: itemData.Current_Stock || 0,
+                Item_Brand: itemData.Item_Brand || '',
+                Category_Type: itemData.Category_Type || '',
+                Project_Code: itemData.Project_Code || '',
+                Warning_Threshold: itemData.Warning_Threshold || 0,
+                Is_Low_Stock: itemData.Is_Low_Stock || '',
+                Remark: itemData.Remark || '',
+                Company: itemData.Company || '',
+                Item_Color: itemData.Item_Color || '',
+                Item_Size: itemData.Item_Size || '',
+                Item_Unit: itemData.Item_Unit || '',
+                Item_Material: itemData.Item_Material || '',
+                Item_Images: itemData.Item_Images || [],
+                Item_Mores: itemData.Item_Mores || ''
+              };
+
+              // 解析更多信息
+              if (itemData.Item_Mores) {
+                try {
+                  const moreInfo = JSON.parse(itemData.Item_Mores);
+                  this.moreFields = Object.keys(moreInfo).map(key => ({
+                    key: key,
+                    value: moreInfo[key]
+                  }));
+                } catch (e) {
+                  console.error('解析更多信息失败:', e);
+                  this.moreFields = [];
+                }
+              } else {
+                this.moreFields = [];
+              }
+
+              // 初始化图片相关
+              this.existingImages = itemData.Item_Images || [];
               this.existingImagesToKeep = [...this.existingImages];
             } else {
               // 记录不存在
               this.recordExists = false;
-              this.$toast.info('该物品暂无扩展信息，请先新增扩展信息');
+              this.$toast.info('该物品暂无信息，请先新增物品信息');
             }
           } catch (e) {
-            console.error('加载扩展信息失败:', e);
+            console.error('加载物品信息失败:', e);
             this.recordExists = false;
-            this.$toast.fail('加载扩展信息失败');
+            this.$toast.fail('加载物品信息失败');
           }
           this.loading = false;
         },
         (error) => {
-          console.error('获取扩展信息失败:', error);
+          console.error('获取物品信息失败:', error);
           this.recordExists = false;
-          this.$toast.fail('获取扩展信息失败');
+          this.$toast.fail('获取物品信息失败');
           this.loading = false;
         }
       );
+    },
+
+    // 添加更多字段
+    addMoreField() {
+      this.moreFields.push({ key: '', value: '' });
+    },
+
+    // 移除更多字段
+    removeMoreField(index) {
+      this.moreFields.splice(index, 1);
     },
 
     // 将文件转换为base64的方法
@@ -574,61 +755,59 @@ export default {
       }
 
       if (!this.recordExists) {
-        this.$toast.fail('该物品暂无扩展信息，请先新增扩展信息');
+        this.$toast.fail('该物品暂无信息，请先新增物品信息');
         return;
       }
 
       // 验证ID存在且有效
-      if (!this.inventoryId || this.inventoryId === '' || this.inventoryId === 'undefined' || this.inventoryId === null) {
+      if (!this.ID || this.ID === '' || this.ID === 'undefined' || this.ID === null) {
         this.$toast.fail('物品ID不能为空，请从物品详情页面进入');
-        return;
-      }
-
-      // 验证用户是否填写了所有扩展信息字段
-      const hasFilledAllData = this.itemColor.trim() !== '' &&
-        this.itemSize.trim() !== '' &&
-        this.itemUnit.trim() !== '' &&
-        this.itemMaterial.trim() !== '' &&
-        (this.imageList.length > 0 || this.existingImagesToKeep.length > 0); // 至少有一张图片（新上传的或保留的）
-
-      if (!hasFilledAllData) {
-        this.$toast.fail('请填写所有扩展信息字段并上传至少一张图片');
-        return;
-      }
-
-      // 验证图片信息至少有一个字段不为空
-      const allImages = [...this.existingImagesToKeep, ...this.imageList];
-      const hasValidImageInfo = allImages.some(img =>
-        (img.File_Md5 && img.File_Md5.trim() !== '') ||
-        (img.File_Base64 && img.File_Base64.trim() !== '')
-      );
-
-      if (!hasValidImageInfo) {
-        this.$toast.fail('编辑图片不能为空');
         return;
       }
 
       this.isSubmitting = true;
 
       // 准备提交的数据（合并保留的原有图片和新上传的图片）
+      const allImages = [...this.existingImagesToKeep, ...this.imageList];
+
+      // 构造更多信息JSON字符串
+      const moreInfoObj = {};
+      this.moreFields.forEach(field => {
+        if (field.key && field.value) {
+          moreInfoObj[field.key] = field.value;
+        }
+      });
+      const itemMores = Object.keys(moreInfoObj).length > 0 ? JSON.stringify(moreInfoObj) : '';
+
       const payload = {
         Id: this.ID,
-        Inventory_ID: this.inventoryId,
-        Item_Color: this.itemColor || '',
-        Item_Size: this.itemSize || '',
-        Item_Unit: this.itemUnit || '',
-        Item_Material: this.itemMaterial || '',
+        Item_Name: this.itemForm.Item_Name,
+        Shelf_Location: this.itemForm.Shelf_Location,
+        Item_Model: this.itemForm.Item_Model,
+        Current_Stock: this.itemForm.Current_Stock || 0,
+        Item_Brand: this.itemForm.Item_Brand,
+        Category_Type: this.itemForm.Category_Type,
+        Project_Code: this.itemForm.Project_Code || '',
+        Warning_Threshold: this.itemForm.Warning_Threshold || 0,
+        Is_Low_Stock: this.itemForm.Is_Low_Stock || '',
+        Remark: this.itemForm.Remark,
+        Company: this.itemForm.Company,
+        Item_Color: this.itemForm.Item_Color,
+        Item_Size: this.itemForm.Item_Size,
+        Item_Unit: this.itemForm.Item_Unit,
+        Item_Material: this.itemForm.Item_Material,
         Item_Images: allImages.map(img => ({
           File_Name: img.File_Name,
-          File_Md5: img.File_Md5 || "", // 保留原有的MD5
+          File_Md5: img.File_Md5 || "",
           File_Base64: img.File_Base64 || "",
           Upload_Time: img.Upload_Time || new Date().toISOString()
-        }))
+        })),
+        Item_Mores: itemMores
       };
 
       try {
         await new Promise((resolve, reject) => {
-          SensorRequest.InventoryItemExtensionsUpdateFun( // 使用更新接口
+          SensorRequestPage.InventoryItemUpdateFun( // 使用更新接口
             JSON.stringify(payload),
             (respData) => {
               resolve(respData); // 成功时调用 resolve
@@ -640,14 +819,7 @@ export default {
         });
         this.$toast.success('修改成功');
         // 清空表单
-        this.itemColor = '';
-        this.itemSize = '';
-        this.itemUnit = '';
-        this.itemMaterial = '';
-        this.imageList = [];
-        this.fileList = [];
-        this.existingImages = [];
-        this.existingImagesToKeep = [];
+        this.resetForm();
         setTimeout(() => {
           this.$router.go(-1);
         }, 1000);
@@ -658,20 +830,41 @@ export default {
       }
     },
 
+    // 重置表单
+    resetForm() {
+      this.itemForm = {
+        Item_Name: '',
+        Shelf_Location: '',
+        Item_Model: '',
+        Current_Stock: 0,
+        Item_Brand: '',
+        Category_Type: '',
+        Project_Code: '',
+        Warning_Threshold: 0,
+        Is_Low_Stock: '',
+        Remark: '',
+        Company: '',
+        Item_Color: '',
+        Item_Size: '',
+        Item_Unit: '',
+        Item_Material: '',
+        Item_Images: [],
+        Item_Mores: ''
+      };
+      this.imageList = [];
+      this.fileList = [];
+      this.existingImages = [];
+      this.existingImagesToKeep = [];
+      this.moreFields = [];
+    },
+
     cancelAndGoBack() {
       if (this.isSubmitting) {
         this.$toast('请勿操作，当前正在提交中');
         return;
       }
       // 清空表单
-      this.itemColor = '';
-      this.itemSize = '';
-      this.itemUnit = '';
-      this.itemMaterial = '';
-      this.imageList = [];
-      this.fileList = [];
-      this.existingImages = [];
-      this.existingImagesToKeep = [];
+      this.resetForm();
       this.$router.go(-1);
     }
   }
@@ -779,6 +972,31 @@ export default {
 .delete-button {
   flex-shrink: 0;
   margin-left: 5px;
+}
+
+/* 更多字段样式 */
+.more-fields-container {
+  width: 100%;
+}
+
+.more-field-row {
+  display: flex;
+  flex-direction: column; /* 改为垂直布局 */
+  gap: 8px;
+  margin-bottom: 12px;
+  padding: 10px;
+  border: 1px solid #ebedf0;
+  border-radius: 4px;
+  background-color: #fafafa;
+}
+
+.more-field-input {
+  margin-bottom: 8px; /* 为每个输入框添加底部间距 */
+}
+
+.remove-field-btn {
+  align-self: flex-end; /* 将删除按钮对齐到右侧 */
+  margin-top: 5px;
 }
 
 /* 图片预览弹窗样式 */

@@ -202,7 +202,7 @@ export default {
               sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, result);
               // 更新全局变量
               updateCachedInventoryProductId(result);
-              this.navigateTo('/inventoryDetail');
+              this.navigateTo('/inventoryDetailV1');
             } else {
               alert("扫描的二维码不符合要求，请重新扫描！");
             }

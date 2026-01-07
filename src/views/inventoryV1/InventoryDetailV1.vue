@@ -4,18 +4,27 @@
       <van-loading v-if="loading" size="24px" vertical>加载中...</van-loading>
       <div v-else>
         <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
-          <!-- 展示基础信息的卡片 -->
+          <!-- 展示所有信息的卡片 -->
           <van-card
             v-if="currentItem "
             class="detail-card"
           >
             <div slot="desc" class="detail-content">
               <van-cell-group>
+                <!-- 基本信息 -->
                 <van-cell title="物品名称">
                   <span class="item-name" slot="default">{{ currentItem.Item_Name }}</span>
                 </van-cell>
                 <van-cell title="货架位置" :value="currentItem.Shelf_Location" />
                 <van-cell title="物品型号" :value="currentItem.Item_Model" />
+                <van-cell title="物品颜色" :value="currentItem.Item_Color || '未填写'" />
+                <van-cell title="物品尺寸" :value="currentItem.Item_Size || '未填写'" />
+                <van-cell title="物品单位" :value="currentItem.Item_Unit || '未填写'" />
+                <van-cell title="物品材质">
+                  <template #default>
+                    <div class="material-content">{{ currentItem.Item_Material || '未填写' }}</div>
+                  </template>
+                </van-cell>
                 <van-cell title="当前库存">
                   <span :class="stockStatusClass" slot="default">{{ currentItem.Current_Stock }}</span>
                 </van-cell>
@@ -27,67 +36,54 @@
                 </van-cell>
                 <van-cell title="备注" :value="currentItem.Remark" />
                 <van-cell title="公司" :value="currentItem.Company" />
+
+                <!-- 更多信息 -->
+                <van-cell title="更多信息" v-if="currentItem.Item_Mores && currentItem.Item_Mores !== ''">
+                  <template #default>
+                    <div class="more-info-content">
+                      <div v-for="(value, key, index) in parsedMoreInfo" :key="index" class="more-info-item">
+                        <span class="more-info-key">{{ key }}:</span>
+                        <span class="more-info-value">{{ value }}</span>
+                      </div>
+                    </div>
+                  </template>
+                </van-cell>
+
+                <!-- 图片展示区域 -->
+                <van-cell title="物品图片" v-if="currentItem.Item_Images && currentItem.Item_Images.length > 0" />
+                <div class="image-container" v-if="currentItem.Item_Images && currentItem.Item_Images.length > 0">
+                  <div
+                    v-for="(img, index) in currentItem.Item_Images"
+                    :key="index"
+                    class="image-item-container"
+                  >
+                    <div class="image-info">
+                      <span class="file-name">{{ img.File_Name }}</span>
+                      <span class="upload-time">{{ formatTime(img.Upload_Time) }}</span>
+                    </div>
+                    <van-button
+                      type="primary"
+                      size="small"
+                      class="preview-button"
+                      @click="previewImage(img)"
+                    >
+                      预览
+                    </van-button>
+                  </div>
+                </div>
+                <van-cell v-else title="扩展图片" value="暂无图片" />
               </van-cell-group>
             </div>
           </van-card>
           <van-empty v-else-if="!currentItem" description="暂无库存信息录入，请点击 + 按钮进行信息新增，或请确认扫描二维码是否正确" />
         </van-pull-refresh>
 
-        <!-- 扩展信息展示卡片 -->
-        <div class="card-container" style="margin-top: 0px; padding-bottom: 20px;">
-          <van-loading v-if="extendLoading" size="24px" vertical>加载中...</van-loading>
-          <div v-else-if="Object.keys(extendInfo).length === 0">
-            <div class="no-record-message">
-              <van-icon name="warning-o" size="40" color="#ff976a" />
-              <p class="message-text">该物品暂无扩展信息，请先新增扩展信息</p>
-            </div>
-          </div>
-          <div v-else>
-            <van-cell title="物品颜色" :value="extendInfo.Item_Color || '未填写'" />
-            <van-cell title="物品尺寸" :value="extendInfo.Item_Size || '未填写'" />
-            <van-cell title="物品单位" :value="extendInfo.Item_Unit || '未填写'" />
-
-            <van-cell title="物品材质">
-              <template #default>
-                <div class="material-content">{{ extendInfo.Item_Material || '未填写' }}</div>
-              </template>
-            </van-cell>
-
-            <!-- 图片展示区域 -->
-            <van-cell title="扩展图片" v-if="extendInfo.Item_Images && extendInfo.Item_Images.length > 0" />
-            <div class="image-container" v-if="extendInfo.Item_Images && extendInfo.Item_Images.length > 0">
-              <div
-                v-for="(img, index) in extendInfo.Item_Images"
-                :key="index"
-                class="image-item-container"
-              >
-                <div class="image-info">
-                  <span class="file-name">{{ img.File_Name }}</span>
-                  <span class="upload-time">{{ formatTime(img.Upload_Time) }}</span>
-                </div>
-                <van-button
-                  type="primary"
-                  size="small"
-                  class="preview-button"
-                  @click="previewImage(img)"
-                >
-                  预览
-                </van-button>
-              </div>
-            </div>
-            <van-cell v-else title="扩展图片" value="暂无图片" />
-          </div>
-        </div>
-
         <div class="button-group-container">
           <div class="button-row">
             <van-button size="small" class="action-button" @click="goToOutbound">快速出库</van-button>
             <van-button size="small" class="action-button" @click="goToInbound">快速入库</van-button>
+            <van-button size="small" class="action-button" @click="goToExtendInfoEdit">修改信息</van-button>
             <van-button size="small" class="action-button" @click="goToLog">操作日志</van-button>
-          </div>
-          <div class="button-row">
-            <van-button size="small" class="action-button" @click="goToExtendInfoEdit">修改扩展信息</van-button>
-            <van-button size="small" class="action-button" @click="goToExtendInfoAdd">新增扩展信息</van-button>
           </div>
         </div>
         <!-- 添加悬浮按钮 -->
@@ -126,7 +122,6 @@
   </div>
 </template>
 
-
 <script>
 import SensorRequest from '../../utils/SensorRequest';
 import {key_DingScannedInventoryQRCodeResult} from '../../utils/Dingding';
@@ -143,10 +138,6 @@ export default {
       inventoryItems: [],
       currentItem: null,
       selectedIndex: 0, // 新增选中索引
-
-      // 扩展信息相关数据
-      extendInfo: {},
-      extendLoading: true,
 
       // 图片预览相关数据
       showImagePreview: false,
@@ -174,23 +165,6 @@ export default {
   created() {
     this.loadInventoryData();
   },
-  mounted() {
-    // 页面加载完成后获取扩展信息
-    if (this.currentItem) {
-      this.fetchExtendInfo();
-    }
-  },
-  watch: {
-    // 监听 currentItem 变化，当 currentItem 更新时获取扩展信息
-    currentItem: {
-      handler(newVal) {
-        if (newVal) {
-          this.fetchExtendInfo();
-        }
-      },
-      immediate: true
-    }
-  },
   computed: {
     stockStatusClass() {
       if (!this.currentItem) return 'stock-normal';
@@ -209,6 +183,21 @@ export default {
         return '低库存';
       }
       return '正常';
+    },
+    // 解析更多字段信息
+    parsedMoreInfo() {
+      if (!this.currentItem || !this.currentItem.Item_Mores) {
+        return {};
+      }
+
+      try {
+        // 尝试解析JSON字符串
+        return JSON.parse(this.currentItem.Item_Mores);
+      } catch (e) {
+        console.error('解析更多字段信息失败:', e);
+        // 如果解析失败，返回空对象
+        return {};
+      }
     }
   },
   methods: {
@@ -253,7 +242,7 @@ export default {
       // 跳转到编辑扩展信息页面
       if (this.currentItem) {
         this.$router.push({
-          name: 'InventoryExtendInfoEdit',
+          name: 'InventoryInfoEdit',
           params: {
             department: this.$route.params.department
           },
@@ -281,46 +270,6 @@ export default {
       } else {
         this.$toast.fail('未查询到物品信息');
       }
-    },
-
-    // 获取扩展信息
-    fetchExtendInfo() {
-      if (!this.currentItem || !this.currentItem.Inventory_ID) {
-        this.$toast.fail('物品ID不能为空');
-        this.extendLoading = false;
-        return;
-      }
-
-      // 构造请求体
-      const payload = {
-        Inventory_ID: this.currentItem.Inventory_ID
-      };
-      console.log('获取扩展信息请求体:', payload);
-
-      SensorRequestPage.InventoryItemByCodeFun(
-        JSON.stringify(payload),
-        (respData) => {
-          try {
-            const result = JSON.parse(respData);
-            if (result && result.length > 0) {
-              // 假设后端返回的是数组，取第一个结果
-              this.extendInfo = result[0];
-            } else {
-              this.extendInfo = {};
-              // 不显示失败提示，只是没有扩展信息
-            }
-          } catch (e) {
-            console.error('解析扩展信息失败:', e);
-            this.extendInfo = {};
-          }
-          this.extendLoading = false;
-        },
-        (error) => {
-          console.error('获取扩展信息失败:', error);
-          this.extendInfo = {};
-          this.extendLoading = false;
-        }
-      );
     },
 
     // 预览图片
@@ -526,7 +475,7 @@ export default {
         this.loading = false;
         return;
       }
-// 调用后端接口获取库存信息
+      // 调用后端接口获取库存信息
       const params = {
         Shelf_Location: scannedResult
       };
@@ -647,8 +596,8 @@ export default {
   flex-direction: column;
   align-items: center;
   gap: 15px;
-  margin-top: 20px;
-  padding: 0 10px;
+  margin-top: 10px;
+  padding: 0 20px;
 }
 
 .button-row {
@@ -683,15 +632,6 @@ export default {
 }
 
 .container {
-  padding: 10px;
-}
-
-/* 扩展信息相关样式 */
-.card-container {
-  background-color: #fff;
-  border-radius: 10px;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-  margin: 10px;
   padding: 10px;
 }
 
@@ -746,19 +686,31 @@ export default {
   border: 1px solid #e0e0e0;
 }
 
-.no-record-message {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  padding: 40px 20px;
+/* 更多信息样式 */
+.more-info-content {
+  width: 100%;
 }
 
-.message-text {
-  margin-top: 10px;
-  font-size: 16px;
+.more-info-item {
+  display: flex;
+  flex-direction: column;
+  padding: 5px 0;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.more-info-item:last-child {
+  border-bottom: none;
+}
+
+.more-info-key {
+  font-weight: bold;
+  color: #333;
+  margin-bottom: 2px;
+}
+
+.more-info-value {
   color: #666;
-  text-align: center;
+  word-break: break-word;
 }
 
 /* 图片预览弹窗样式 */
@@ -821,4 +773,3 @@ export default {
   cursor: grabbing;
 }
 </style>
-

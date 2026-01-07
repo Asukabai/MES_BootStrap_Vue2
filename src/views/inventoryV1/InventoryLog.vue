@@ -194,6 +194,7 @@
 import SensorRequest from '../../utils/SensorRequest';
 import {key_DingName, key_DingUserIndex, key_DingUserPhone} from '../../utils/Dingding';
 import { GetDingUserToken } from "../../utils/Dingding";
+import SensorRequestPage from "../../utils/SensorRequestPage";
 
 function getLocalUserInfo() {
   const name = localStorage.getItem(key_DingName);
@@ -478,7 +479,7 @@ export default {
         }
       };
 
-      SensorRequest.InventoryTransactionsGetFun(
+      SensorRequestPage.InventoryTransactionGetFun(
         JSON.stringify(param),
         (respData) => {
           let JSON_Data = JSON.parse(respData)

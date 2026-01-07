@@ -317,6 +317,12 @@ const router = new Router({
       meta: { title: '新增物品' }
     },
     {
+      path: '/:department/inventory/addV1',
+      name: 'InventoryAddV1',
+      component: () => import('../views/inventoryV1/InventoryAddV1.vue'),
+      meta: { title: '新增物品信息V1.0' }
+    },
+    {
       path: '/:department/inventoryExtendInfoAdd',
       name: 'InventoryExtendInfoAdd',
       component: () => import('../views/inventory/InventoryExtendInfoAdd.vue'),
@@ -333,6 +339,12 @@ const router = new Router({
       name: 'InventoryExtendInfoEdit',
       component: () => import('../views/inventory/InventoryExtendInfoEdit.vue'),
       meta: { title: '物品扩展信息编辑表单' }
+    },
+    {
+      path: '/:department/InventoryInfoEdit',
+      name: 'InventoryInfoEdit',
+      component: () => import('../views/inventoryV1/InventoryInfoEdit.vue'),
+      meta: { title: '物品信息编辑表单V1.0' }
     },
     {
       path: '/:department/project-detail/:id',
