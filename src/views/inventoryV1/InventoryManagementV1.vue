@@ -105,7 +105,8 @@
 import { Toast } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import FloatingActionButton from '../../components/FloatingActionButton.vue';
-import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding"; // 引入组件
+import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding";
+import SensorRequestPage from "../../utils/SensorRequestPage"; // 引入组件
 export default {
   name: 'InventoryManagementV1',
   components: {
@@ -269,15 +270,21 @@ export default {
         };
 
         // 调用后端接口获取库存数据
-        SensorRequest.InventoryItemsGetFun(JSON.stringify(param), (respData) => {
+        SensorRequestPage.InventoryItemGetFun(JSON.stringify(param), (respData) => {
           try {
-            let newData = [];
+            let parsedData = null;
+
+            // 解析响应数据 - 新的数据格式是字符串化的JSON
             if (typeof respData === 'string') {
-              newData = JSON.parse(respData);
-            } else if (respData && Array.isArray(respData)) {
-              newData = respData;
-            } else if (respData && respData.data) {
-              newData = Array.isArray(respData.data) ? respData.data : [respData.data];
+              parsedData = JSON.parse(respData);
+            } else {
+              parsedData = respData;
+            }
+
+            // 提取实际的Data数组
+            let newData = [];
+            if (parsedData && parsedData.Data) {
+              newData = parsedData.Data;
             }
 
             // 处理返回的数据格式
@@ -305,9 +312,15 @@ export default {
               this.list = [...this.list, ...newItems];
             }
 
-            // 判断是否还有更多数据
+            // 根据返回的数据判断是否还有更多数据
+            // 如果返回的数据量小于页面大小，则表示已到最后一页
             this.finished = processedData.length < this.pageSize;
             this.currentPage++;
+
+            // 更新总记录数
+            if (parsedData && parsedData.TotalCount !== undefined) {
+              this.total = parsedData.TotalCount;
+            }
 
           } catch (error) {
             console.error('处理库存数据时出错:', error);

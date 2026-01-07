@@ -131,6 +131,7 @@
 import SensorRequest from '../../utils/SensorRequest';
 import {key_DingScannedInventoryQRCodeResult} from '../../utils/Dingding';
 import FloatingActionButton from "../../components/FloatingActionButton.vue";
+import SensorRequestPage from "../../utils/SensorRequestPage";
 
 export default {
   name: 'InventoryDetail',
@@ -294,8 +295,9 @@ export default {
       const payload = {
         Inventory_ID: this.currentItem.Inventory_ID
       };
+      console.log('获取扩展信息请求体:', payload);
 
-      SensorRequest.InventoryItemExtensionsGetFun(
+      SensorRequestPage.InventoryItemByCodeFun(
         JSON.stringify(payload),
         (respData) => {
           try {
@@ -524,25 +526,38 @@ export default {
         this.loading = false;
         return;
       }
-      // 调用后端接口获取库存信息
+// 调用后端接口获取库存信息
       const params = {
         Shelf_Location: scannedResult
       };
-
-      SensorRequest.InventoryItemsGetFun(
+      console.log('获取库存信息参数：', params);
+      SensorRequestPage.InventoryItemGetFun(
         JSON.stringify(params),
         (respData) => {
-          // alert('获取库存信息成功  :'+ respData)
-          this.inventoryItems = JSON.parse(respData);
-          this.loading = false;
-          // 自动选择第一个物品
-          if (this.inventoryItems.length > 0) {
-            this.currentItem = this.inventoryItems[0];
-            this.$toast.success('数据加载成功');
-          } else {
+          try {
+            // 解析响应数据
+            const responseJson = JSON.parse(respData);
+
+            // 从 Data 数组中获取库存项 （根据后端返回值结构解析）
+            if (responseJson.Data && Array.isArray(responseJson.Data) && responseJson.Data.length > 0) {
+              this.inventoryItems = responseJson.Data;
+
+              // 自动选择第一个物品
+              this.currentItem = this.inventoryItems[0];
+              this.$toast.success('数据加载成功');
+            } else {
+              this.inventoryItems = [];
+              this.currentItem = null;
+              this.$toast.fail('暂未查询到数据');
+            }
+          } catch (parseError) {
+            console.error('解析库存信息响应失败:', parseError);
+            this.inventoryItems = [];
             this.currentItem = null;
-            this.$toast.fail('暂未查询到数据');
+            this.$toast.fail('数据格式错误');
           }
+
+          this.loading = false;
         },
         (error) => {
           console.error('获取库存信息失败:', error);
