@@ -28,13 +28,13 @@
     <div
       v-if="showSubButtons"
       class="sub-buttons-container"
-      :style="{ bottom: (position.bottom) + 'px', right: (position.right + 70) + 'px' }"
+      :style="{ bottom: (position.bottom + 30) + 'px', right: (position.right) + 'px' }"
     >
       <div
         v-for="(button, index) in subButtons"
         :key="index"
         class="sub-button-wrapper"
-        :style="getCircularPosition(index)"
+        :style="getSubButtonStyle(button, index)"
       >
         <div
           class="sub-button"
@@ -57,8 +57,6 @@
     </div>
   </div>
 </template>
-
-
 
 <script>
 import { Icon as VanIcon } from 'vant';
@@ -90,7 +88,7 @@ export default {
     // 展开方向 ('vertical', 'horizontal', 'circular')
     expandDirection: {
       type: String,
-      default: 'circular'
+      default: 'vertical'
     },
     // 圆形展开半径
     circularRadius: {
@@ -162,7 +160,6 @@ export default {
     },
 
     // 计算圆形位置
-// 计算圆形位置
     getCircularPosition(index) {
       if (this.expandDirection !== 'circular' || !this.subButtons || this.subButtons.length === 0) {
         return {};
@@ -174,17 +171,46 @@ export default {
       const x = -Math.cos(angle) * this.circularRadius;
       const y = -Math.sin(angle) * this.circularRadius;
 
-      // 计算标签位置（在按钮下方）
-      const labelOffset = 40; // 按钮高度的一半加上标签高度的一半
-      const labelX = x;
-      const labelY = y + labelOffset;
+      return {
+        transform: `translate(${x}px, ${y}px)`
+      };
+    },
+
+    // 计算垂直位置（在主按钮正上方）
+    getVerticalPosition(index) {
+      if (this.expandDirection !== 'vertical' || !this.subButtons || this.subButtons.length === 0) {
+        return {};
+      }
+
+      // 每个子按钮和标签组合的间距为70px
+      const spacing = 70;
+      const offset = index * spacing;
 
       return {
-        '--button-x': `${x}px`,
-        '--button-y': `${y}px`,
-        '--label-x': `${labelX}px`,
-        '--label-y': `${labelY}px`
+        transform: `translateY(${-offset}px)`
       };
+    },
+
+    // 获取子按钮样式（支持自定义位置）
+    getSubButtonStyle(button, index) {
+      // 如果按钮有自定义位置配置，则使用自定义位置
+      if (button.position) {
+        const style = {
+          transform: `translate(${button.position.x }px, ${button.position.y }px)`
+        };
+
+        // 如果有额外的样式配置
+        if (button.position.style) {
+          Object.assign(style, button.position.style);
+        }
+        return style;
+      }
+      // 如果没有自定义位置，使用原有的计算方式
+      if (this.expandDirection === 'vertical') {
+        return this.getVerticalPosition(index);
+      } else {
+        return this.getCircularPosition(index);
+      }
     },
 
     // 切换子按钮显示状态
@@ -339,17 +365,18 @@ export default {
   position: fixed;
   z-index: 9998;
   transition: all 0.3s ease;
-  width: 200px;
-  height: 200px;
+  width: 80px;
+  height: auto;
   display: flex;
+  flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;
 }
 
 .sub-button {
-  position: absolute;
-  width: 60px;  /* 增大子按钮尺寸 */
-  height: 60px; /* 增大子按钮尺寸 */
+  position: relative;
+  width: 50px;  /* 增大子按钮尺寸 */
+  height: 50px; /* 增大子按钮尺寸 */
   border-radius: 50%;
   display: flex;
   align-items: center;
@@ -362,6 +389,8 @@ export default {
   -webkit-touch-callout: none;
   transition: all 0.3s ease;
   overflow: hidden;
+  z-index: 10000; /* 确保按钮在标签上方 */
+  background-color: #ffffff; /* 添加白色背景 */
 }
 
 .sub-button:hover {
@@ -396,38 +425,13 @@ export default {
 
 /* 子按钮包装器 */
 .sub-button-wrapper {
-  position: absolute;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
+  margin-bottom: 15px; /* 适当调整每个子按钮之间的间距 */
   transition: all 0.3s ease;
-  transform: translate(var(--button-x), var(--button-y));
 }
-
-.sub-button {
-  position: relative;
-  width: 60px;  /* 增大子按钮尺寸 */
-  height: 60px; /* 增大子按钮尺寸 */
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
-  cursor: pointer;
-  user-select: none;
-  touch-action: none;
-  -webkit-tap-highlight-color: transparent;
-  -webkit-touch-callout: none;
-  transition: all 0.3s ease;
-  overflow: hidden;
-  z-index: 10000; /* 确保按钮在标签上方 */
-}
-
-.sub-button:hover {
-  transform: scale(1.1);
-}
-
 .sub-button-label {
   position: relative;
   margin-top: 8px;
@@ -441,8 +445,4 @@ export default {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
   z-index: 9999; /* 确保标签在按钮下方但可见 */
 }
-
-
-
-
 </style>

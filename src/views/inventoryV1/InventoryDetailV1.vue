@@ -80,7 +80,7 @@
 
         <!-- 使用可展开悬浮按钮替换原来的按钮组 -->
         <ExpandableFloatingButton
-          :initial-position="{ bottom: 60, right: 10 }"
+          :initial-position="{ bottom: 60, right: 165 }"
           :main-icon="mainIcon"
           :sub-buttons="actionButtons"
 
@@ -89,7 +89,7 @@
         <template v-if="!currentItem">
           <FloatingActionButton
             @click="onFloatingButtonClick"
-            :initial-position="{ bottom: 150, right: 10 }"
+            :initial-position="{ bottom: 150, right: 20 }"
           />
         </template>
       </div>
@@ -212,27 +212,32 @@ export default {
       }
     },
     // 操作按钮配置
+// 操作按钮配置
     actionButtons() {
       return [
         {
           icon: icons.out,  // 本地图片路径
           handler: this.goToOutbound,
-          label: '快速出库'
+          label: '快速出库',
+          position: { x: 15, y: 160 }  // 自定义位置
         },
         {
           icon: icons.in, // 本地图片路径
           handler: this.goToInbound,
-          label: '快速入库'
+          label: '快速入库',
+          position: { x: 15, y: 175 } // 自定义位置
         },
         {
           icon: icons.fix,    // 本地图片路径
           handler: this.goToExtendInfoEdit,
-          label: '修改信息'
+          label: '修改信息',
+          position: { x: -60, y: 24 }  // 自定义位置
         },
         {
           icon: icons.log,    // 本地图片路径
           handler: this.goToLog,
-          label: '操作日志'
+          label: '操作日志',
+          position: { x: 85, y: -75 } // 自定义位置
         }
       ];
     }
@@ -252,7 +257,7 @@ export default {
       if (this.isNavigating) return;
       this.isNavigating = true;
       // alert('点击了悬浮按钮')
-      this.navigateTo('/inventory/add');
+      this.navigateTo('/inventory/addV1');
       // 延迟重置导航状态
       setTimeout(() => {
         this.isNavigating = false;
