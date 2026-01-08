@@ -59,7 +59,6 @@
             v-for="item in list"
             :key="item.Id"
             class="inventory-cell"
-            @click="viewDetail(item.Shelf_Location)"
           >
             <div class="cell-content">
               <div class="cell-header">
@@ -83,6 +82,13 @@
                   </div>
                 </div>
               </div>
+              <!-- 操作按钮 -->
+              <div class="cell-footer">
+                <van-button size="small" type="info" @click.stop="viewDetail(item.Shelf_Location)">查看</van-button>
+                <van-button size="small" type="info" @click.stop="showDeleteDialog(item)">删除</van-button>
+<!--                <van-button size="small" type="info"  @click="goToOutbound">快速出库</van-button>-->
+<!--                <van-button size="small" type="info"  @click="goToInbound">快速入库</van-button>-->
+              </div>
             </div>
           </van-cell>
         </van-list>
@@ -93,16 +99,28 @@
     <div v-if="hasSearched && list.length === 0 && !loading" class="empty-state">
       <van-empty description="暂无相关库存信息" />
     </div>
+
+    <!-- 删除确认弹窗 -->
+    <van-dialog
+      v-model="showDeleteConfirm"
+      title="确认删除"
+      :message="deleteConfirmMessage"
+      :show-cancel-button="true"
+      @confirm="confirmDelete"
+      @cancel="cancelDelete"
+      :confirm-button-text="'删除'"
+      :confirm-button-color="'#ee0a24'"
+    />
     <!-- 添加悬浮按钮 -->
     <FloatingActionButton
       @click="onFloatingButtonClick"
-      :initial-position="{ bottom: 80, right: 20 }"
+      :initial-position="{ bottom: 60, right: 10 }"
     />
   </div>
 </template>
 
 <script>
-import { Toast } from 'vant';
+import { Toast, Dialog } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import FloatingActionButton from '../../components/FloatingActionButton.vue';
 import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding";
@@ -168,11 +186,20 @@ export default {
       outboundProject: '',
       inboundRemark: '',
       outboundRemark: '',
-      outboundError: ''
+      outboundError: '',
+      showDeleteConfirm: false, // 控制删除确认弹窗显示
+      deletingItem: null // 正在删除的项目
     };
   },
   created() {
     this.loadProjectOptions();
+  },
+  computed: {
+    deleteConfirmMessage() {
+      return this.deletingItem ?
+        `确定要删除物品 "${this.deletingItem.Item_Name}" 吗？此操作不可恢复。` :
+        '确定要删除此物品吗？此操作不可恢复。';
+    }
   },
   methods: {
     navigateTo(path) {
@@ -362,6 +389,77 @@ export default {
         this.$toast.fail('路由参数缺失');
       }
     },
+
+    // 显示操作菜单（包括删除选项）
+    showOperationMenu(item) {
+      this.currentItem = item;
+      Dialog({
+        title: '操作选项',
+        message: `对物品 "${item.Item_Name}" 进行操作`,
+        actions: [
+          {
+            name: '删除',
+            color: '#ee0a24',
+            callback: () => {
+              this.showDeleteDialog(item);
+            }
+          },
+          {
+            name: '查看详情',
+            callback: () => {
+              this.viewDetail(item.Shelf_Location);
+            }
+          }
+        ],
+        actionsDirection: 'vertical',
+        overlay: true,
+        closeOnClickOverlay: true
+      });
+    },
+
+    // 显示删除确认弹窗
+    showDeleteDialog(item) {
+      this.deletingItem = item;
+      this.showDeleteConfirm = true;
+    },
+
+    // 确认删除
+    confirmDelete() {
+      if (!this.deletingItem) {
+        Toast('删除失败：未找到要删除的项目');
+        return;
+      }
+
+      // 构造删除请求参数
+      const param = {
+        "Id": this.deletingItem.Id
+      };
+
+      // 调用删除接口
+      SensorRequestPage.InventoryItemDeleteFun(
+        JSON.stringify(param),
+        (respData) => {
+          Toast('删除成功');
+          // 从列表中移除已删除的项目
+          this.list = this.list.filter(item => item.Id !== this.deletingItem.Id);
+          // 重置状态
+          this.showDeleteConfirm = false;
+          this.deletingItem = null;
+        },
+        (error) => {
+          console.error('删除库存失败:', error);
+          Toast('删除失败，请重试');
+          this.showDeleteConfirm = false;
+          this.deletingItem = null;
+        }
+      );
+    },
+
+    // 取消删除
+    cancelDelete() {
+      this.showDeleteConfirm = false;
+      this.deletingItem = null;
+    }
   }
 };
 </script>
@@ -433,7 +531,7 @@ export default {
 }
 
 .results-section {
-  padding: 18px;
+  padding: 10px;
 }
 
 .inventory-cell {
@@ -445,14 +543,14 @@ export default {
 }
 
 .cell-content {
-  padding: 10px 12px;
+  padding: 8px 10px;
 }
 
 .cell-header {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  margin-bottom: 8px;
+  margin-bottom: 5px;
 }
 
 .item-title {
@@ -512,9 +610,20 @@ export default {
 
 .cell-footer {
   display: flex;
-  justify-content: flex-end;
-  gap: 8px;
+  justify-content: flex-start;
+  gap: 12px;
 }
+
+/* 添加按钮圆角样式 */
+.cell-footer .van-button {
+  border-radius: 20px;
+  padding: 8px 16px;      /* 控制按钮大小 */
+  font-size: 12px;
+  height: auto;
+  line-height: normal;
+  min-width: 60px;        /* 设置最小宽度 */
+}
+
 
 .empty-state {
   padding: 50px 16px;

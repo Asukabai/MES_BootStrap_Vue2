@@ -32,6 +32,12 @@ const SensorRequestPage = {
           callSuccess(respData);
         }, callFail);
       },
+      // 库存信息删除
+      InventoryItemDeleteFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("InventoryItemDeleteFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       // 库存位置互换
       InventoryItemExchangeLocationFun(param, callSuccess, callFail) {
         ssDing.PostDataUrlPage("InventoryItemExchangeLocationFun", param, true, respData => {

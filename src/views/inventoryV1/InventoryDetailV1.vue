@@ -78,19 +78,18 @@
           <van-empty v-else-if="!currentItem" description="暂无库存信息录入，请点击 + 按钮进行信息新增，或请确认扫描二维码是否正确" />
         </van-pull-refresh>
 
-        <div class="button-group-container">
-          <div class="button-row">
-            <van-button size="small" class="action-button" @click="goToOutbound">快速出库</van-button>
-            <van-button size="small" class="action-button" @click="goToInbound">快速入库</van-button>
-            <van-button size="small" class="action-button" @click="goToExtendInfoEdit">修改信息</van-button>
-            <van-button size="small" class="action-button" @click="goToLog">操作日志</van-button>
-          </div>
-        </div>
+        <!-- 使用可展开悬浮按钮替换原来的按钮组 -->
+        <ExpandableFloatingButton
+          :initial-position="{ bottom: 60, right: 10 }"
+          :main-icon="mainIcon"
+          :sub-buttons="actionButtons"
+
+        />
         <!-- 添加悬浮按钮 -->
         <template v-if="!currentItem">
           <FloatingActionButton
             @click="onFloatingButtonClick"
-            :initial-position="{ bottom: 80, right: 20 }"
+            :initial-position="{ bottom: 150, right: 10 }"
           />
         </template>
       </div>
@@ -123,16 +122,29 @@
 </template>
 
 <script>
+// 在 script 部分导入图片
 import SensorRequest from '../../utils/SensorRequest';
 import {key_DingScannedInventoryQRCodeResult} from '../../utils/Dingding';
 import FloatingActionButton from "../../components/FloatingActionButton.vue";
+import ExpandableFloatingButton from "../../components/ExpandableFloatingButton.vue"; // 新增导入
 import SensorRequestPage from "../../utils/SensorRequestPage";
-
+// 创建一个图标管理器
+const icons = {
+  main: require('@/assets/企业头像.png'),
+  fix: require('@/assets/修改.png'),
+  log: require('@/assets/日志管理.png'),
+  out: require('@/assets/出库.png'),
+  in: require('@/assets/入库.png'),
+};
 export default {
   name: 'InventoryDetail',
-  components: {FloatingActionButton},
+  components: {
+    FloatingActionButton,
+    ExpandableFloatingButton // 新增组件注册
+  },
   data() {
     return {
+      mainIcon: require('@/assets/蓝莓.png'),  // 使用 require 函数
       loading: true,
       refreshing: false, // 添加刷新状态
       inventoryItems: [],
@@ -198,6 +210,31 @@ export default {
         // 如果解析失败，返回空对象
         return {};
       }
+    },
+    // 操作按钮配置
+    actionButtons() {
+      return [
+        {
+          icon: icons.out,  // 本地图片路径
+          handler: this.goToOutbound,
+          label: '快速出库'
+        },
+        {
+          icon: icons.in, // 本地图片路径
+          handler: this.goToInbound,
+          label: '快速入库'
+        },
+        {
+          icon: icons.fix,    // 本地图片路径
+          handler: this.goToExtendInfoEdit,
+          label: '修改信息'
+        },
+        {
+          icon: icons.log,    // 本地图片路径
+          handler: this.goToLog,
+          label: '操作日志'
+        }
+      ];
     }
   },
   methods: {
