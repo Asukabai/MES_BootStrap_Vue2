@@ -1,0 +1,582 @@
+<html lang="zh-CN"><head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>陕西晟思市场部内部工具增值税计算器</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+        }
+        
+        body {
+            background-color: #f5f7fa;
+            color: #333;
+            line-height: 1.6;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: flex-start;
+            min-height: 100vh;
+        }
+        
+        .container {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 5px 20px rgba(0, 0, 0, 0.08);
+            width: 100%;
+            max-width: 900px;
+            padding: 30px;
+            margin: 20px;
+        }
+        
+        h1 {
+            color: #2c3e50;
+            text-align: center;
+            margin-bottom: 5px;
+            font-weight: 600;
+        }
+        
+        .subtitle {
+            text-align: center;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+            font-size: 1rem;
+        }
+        
+        .calculator-section {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+            margin-bottom: 30px;
+        }
+        
+        @media (max-width: 768px) {
+            .calculator-section {
+                grid-template-columns: 1fr;
+            }
+        }
+        
+        .input-section {
+            padding: 25px;
+            background-color: #f9fafc;
+            border-radius: 10px;
+        }
+        
+        .input-group {
+            margin-bottom: 25px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #34495e;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 12px 15px;
+            border: 1px solid #dce1e6;
+            border-radius: 6px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 2px rgba(52, 152, 219, 0.2);
+        }
+        
+        .tax-rate-container {
+            margin-top: 25px;
+        }
+        
+        .tax-rate-title {
+            margin-bottom: 15px;
+            font-weight: 500;
+            color: #34495e;
+        }
+        
+        .tax-rate-options {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .tax-rate-options {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+        
+        .tax-rate-option {
+            text-align: center;
+            padding: 10px 5px;
+            border: 2px solid #e0e6ed;
+            border-radius: 6px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: 500;
+        }
+        
+        .tax-rate-option:hover {
+            background-color: #edf2f7;
+        }
+        
+        .tax-rate-option.selected {
+            background-color: #3498db;
+            color: white;
+            border-color: #3498db;
+        }
+        
+        .button-container {
+            display: flex;
+            gap: 15px;
+            margin-top: 25px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 14px;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .calculate-btn {
+            background-color: #3498db;
+            color: white;
+        }
+        
+        .calculate-btn:hover {
+            background-color: #2980b9;
+        }
+        
+        .reset-btn {
+            background-color: #ecf0f1;
+            color: #2c3e50;
+        }
+        
+        .reset-btn:hover {
+            background-color: #dde4e6;
+        }
+        
+        .results-section {
+            padding: 25px;
+            background-color: #f9fafc;
+            border-radius: 10px;
+        }
+        
+        .results-title {
+            margin-bottom: 20px;
+            font-weight: 500;
+            color: #34495e;
+        }
+        
+        .result-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 15px 0;
+            border-bottom: 1px solid #eef1f5;
+        }
+        
+        .result-item:last-child {
+            border-bottom: none;
+        }
+        
+        .result-label {
+            font-weight: 500;
+            color: #5d6d7e;
+        }
+        
+        .result-value {
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 18px;
+        }
+        
+        .highlight {
+            color: #e74c3c;
+        }
+        
+        .download-section {
+            margin-top: 30px;
+            padding-top: 30px;
+            border-top: 1px solid #ecf0f1;
+            text-align: center;
+        }
+        
+        .download-btn {
+            background-color: #27ae60;
+            color: white;
+            padding: 15px 30px;
+            font-size: 16px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .download-btn:hover {
+            background-color: #219653;
+        }
+        
+        .history-section {
+            margin-top: 30px;
+            padding: 20px;
+            background-color: #f9fafc;
+            border-radius: 10px;
+        }
+        
+        .history-title {
+            margin-bottom: 15px;
+            font-weight: 500;
+            color: #34495e;
+        }
+        
+        .history-list {
+            max-height: 150px;
+            overflow-y: auto;
+        }
+        
+        .history-item {
+            padding: 8px 0;
+            border-bottom: 1px dashed #e0e6ed;
+            font-size: 14px;
+        }
+        
+        .history-item:last-child {
+            border-bottom: none;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #95a5a6;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>陕西晟思市场部内部工具增值税计算器</h1>
+        <div class="subtitle">支持3%、6%、9%、10%、11%、13%多种税率计算</div>
+        
+        <div class="calculator-section">
+            <div class="input-section">
+                <div class="input-group">
+                    <label for="amountType">计算类型</label>
+                    <select id="amountType">
+                        <option value="withTax">根据含税价格计算</option>
+                        <option value="withoutTax">根据不含税价格计算</option>
+                    </select>
+                </div>
+                
+                <div class="input-group">
+                    <label for="amountInput">金额（元）</label>
+                    <input type="number" id="amountInput" placeholder="请输入金额" min="0" step="0.01">
+                </div>
+                
+                <div class="tax-rate-container">
+                    <div class="tax-rate-title">选择增值税率</div>
+                    <div class="tax-rate-options">
+                        <div class="tax-rate-option" data-rate="3">3%</div>
+                        <div class="tax-rate-option" data-rate="6">6%</div>
+                        <div class="tax-rate-option" data-rate="9">9%</div>
+                        <div class="tax-rate-option" data-rate="10">10%</div>
+                        <div class="tax-rate-option" data-rate="11">11%</div>
+                        <div class="tax-rate-option" data-rate="13">13%</div>
+                        <!-- <div class="tax-rate-option" data-rate="16">16%</div>
+                        <div class="tax-rate-option selected" data-rate="17">17%</div> -->
+                    </div>
+                </div>
+                
+                <div class="button-container">
+                    <button class="calculate-btn" id="calculateBtn">计算增值税</button>
+                    <button class="reset-btn" id="resetBtn">重置</button>
+                </div>
+            </div>
+            
+            <div class="results-section">
+                <div class="results-title">计算结果</div>
+                <div class="result-item">
+                    <span class="result-label">不含税价格：</span>
+                    <span class="result-value" id="priceWithoutTax">854.70</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">增值税额：</span>
+                    <span class="result-value highlight" id="taxAmount">145.30</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">含税价格：</span>
+                    <span class="result-value" id="priceWithTax">1000.00</span>
+                </div>
+                <div class="result-item">
+                    <span class="result-label">适用税率：</span>
+                    <span class="result-value" id="taxRateDisplay">6%</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- <div class="history-section">
+            <div class="history-title">计算历史</div>
+            <div class="history-list" id="historyList"><div class="history-item">
+                    <div><strong>2025/12/24 上午10:06:17</strong></div>
+                    <div>税率: 17%, 计算方式: 含税价</div>
+                    <div>不含税: 854.70元, 税额: 145.30元, 含税: 1000.00元</div>
+                </div><div class="history-item">
+                    <div><strong>2025/12/24 上午10:03:30</strong></div>
+                    <div>税率: 6%, 计算方式: 不含税价</div>
+                    <div>不含税: 1000.00元, 税额: 60.00元, 含税: 1060.00元</div>
+                </div><div class="history-item">
+                    <div><strong>2025/12/24 上午10:02:44</strong></div>
+                    <div>税率: 6%, 计算方式: 含税价</div>
+                    <div>不含税: 3774726.42元, 税额: 226483.58元, 含税: 4001210.00元</div>
+                </div><div class="history-item">
+                    <div><strong>2025/12/24 上午10:02:01</strong></div>
+                    <div>税率: 17%, 计算方式: 含税价</div>
+                    <div>不含税: 854.70元, 税额: 145.30元, 含税: 1000.00元</div>
+                </div></div>
+        </div> -->
+        
+        <div class="download-section">
+            <button class="download-btn" id="downloadBtn">
+                <svg xmlns="www.sensor-smart.com" width="16" height="16" fill="currentColor" viewBox="0 0 16 16">
+                    <path d=" "></path>
+                    <path d=" "></path>
+                </svg>
+                陕西晟思智能测控有限公司
+            </button>
+        </div>
+        
+        <div class="footer">
+            <p>本计算器仅供参考，实际税务计算请以税务机关规定为准</p>
+            <p>© 2025 陕西晟思智能测控有限公司市场部内部学习使用 </p>
+        </div>
+    </div>
+
+    <script>
+        // 当前选中的税率
+        let currentTaxRate = 6;
+        // 计算历史记录
+        let calculationHistory = [];
+        
+        // DOM元素
+        const amountTypeSelect = document.getElementById('amountType');
+        const amountInput = document.getElementById('amountInput');
+        const taxRateOptions = document.querySelectorAll('.tax-rate-option');
+        const calculateBtn = document.getElementById('calculateBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const downloadBtn = document.getElementById('downloadBtn');
+        
+        // 结果元素
+        const priceWithoutTaxEl = document.getElementById('priceWithoutTax');
+        const taxAmountEl = document.getElementById('taxAmount');
+        const priceWithTaxEl = document.getElementById('priceWithTax');
+        const taxRateDisplayEl = document.getElementById('taxRateDisplay');
+        const historyListEl = document.getElementById('historyList');
+        
+        // 初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            // 设置默认选中的税率
+            updateSelectedTaxRate();
+            
+            // 添加事件监听器
+            taxRateOptions.forEach(option => {
+                option.addEventListener('click', function() {
+                    currentTaxRate = parseInt(this.getAttribute('data-rate'));
+                    updateSelectedTaxRate();
+                });
+            });
+            
+            calculateBtn.addEventListener('click', calculateTax);
+            resetBtn.addEventListener('click', resetCalculator);
+            downloadBtn.addEventListener('click', downloadCalculator);
+            
+            // 按Enter键也可以计算
+            amountInput.addEventListener('keyup', function(event) {
+                if (event.key === 'Enter') {
+                    calculateTax();
+                }
+            });
+            
+            // 加载历史记录
+            loadHistoryFromStorage();
+        });
+        
+        // 更新选中的税率样式
+        function updateSelectedTaxRate() {
+            taxRateOptions.forEach(option => {
+                const rate = parseInt(option.getAttribute('data-rate'));
+                if (rate === currentTaxRate) {
+                    option.classList.add('selected');
+                } else {
+                    option.classList.remove('selected');
+                }
+            });
+            
+            taxRateDisplayEl.textContent = `${currentTaxRate}%`;
+        }
+        
+        // 计算增值税
+        function calculateTax() {
+            const amount = parseFloat(amountInput.value);
+            const amountType = amountTypeSelect.value;
+            
+            // 验证输入
+            if (isNaN(amount) || amount <= 0) {
+                alert('请输入有效的金额（大于0）');
+                amountInput.focus();
+                return;
+            }
+            
+            let priceWithoutTax, taxAmount, priceWithTax;
+            const taxRate = currentTaxRate / 100;
+            
+            if (amountType === 'withTax') {
+                // 根据含税价格计算
+                priceWithTax = amount;
+                priceWithoutTax = priceWithTax / (1 + taxRate);
+                taxAmount = priceWithoutTax * taxRate;
+            } else {
+                // 根据不含税价格计算
+                priceWithoutTax = amount;
+                taxAmount = priceWithoutTax * taxRate;
+                priceWithTax = priceWithoutTax + taxAmount;
+            }
+            
+            // 更新结果显示
+            updateResults(priceWithoutTax, taxAmount, priceWithTax);
+            
+            // 保存到历史记录
+            addToHistory(priceWithoutTax, taxAmount, priceWithTax);
+        }
+        
+        // 更新结果
+        function updateResults(priceWithoutTax, taxAmount, priceWithTax) {
+            priceWithoutTaxEl.textContent = priceWithoutTax.toFixed(2);
+            taxAmountEl.textContent = taxAmount.toFixed(2);
+            priceWithTaxEl.textContent = priceWithTax.toFixed(2);
+            taxRateDisplayEl.textContent = `${currentTaxRate}%`;
+        }
+        
+        // 添加到历史记录
+        function addToHistory(priceWithoutTax, taxAmount, priceWithTax) {
+            const calculation = {
+                date: new Date().toLocaleString(),
+                taxRate: currentTaxRate,
+                priceWithoutTax: priceWithoutTax.toFixed(2),
+                taxAmount: taxAmount.toFixed(2),
+                priceWithTax: priceWithTax.toFixed(2),
+                amountType: amountTypeSelect.value === 'withTax' ? '含税价' : '不含税价'
+            };
+            
+            calculationHistory.unshift(calculation); // 添加到开头
+            
+            // 限制历史记录数量
+            if (calculationHistory.length > 10) {
+                calculationHistory = calculationHistory.slice(0, 10);
+            }
+            
+            // 更新历史记录显示
+            updateHistoryDisplay();
+            
+            // 保存到本地存储
+            saveHistoryToStorage();
+        }
+        
+        // 更新历史记录显示
+        function updateHistoryDisplay() {
+            historyListEl.innerHTML = '';
+            
+            if (calculationHistory.length === 0) {
+                historyListEl.innerHTML = '<div class="history-item">暂无计算历史</div>';
+                return;
+            }
+            
+            calculationHistory.forEach(calc => {
+                const historyItem = document.createElement('div');
+                historyItem.className = 'history-item';
+                historyItem.innerHTML = `
+                    <div><strong>${calc.date}</strong></div>
+                    <div>税率: ${calc.taxRate}%, 计算方式: ${calc.amountType}</div>
+                    <div>不含税: ${calc.priceWithoutTax}元, 税额: ${calc.taxAmount}元, 含税: ${calc.priceWithTax}元</div>
+                `;
+                historyListEl.appendChild(historyItem);
+            });
+        }
+        
+        // 保存历史记录到本地存储
+        function saveHistoryToStorage() {
+            try {
+                localStorage.setItem('vatCalculatorHistory', JSON.stringify(calculationHistory));
+            } catch (e) {
+                console.warn('无法保存历史记录到本地存储:', e);
+            }
+        }
+        
+        // 从本地存储加载历史记录
+        function loadHistoryFromStorage() {
+            try {
+                const savedHistory = localStorage.getItem('vatCalculatorHistory');
+                if (savedHistory) {
+                    calculationHistory = JSON.parse(savedHistory);
+                    updateHistoryDisplay();
+                }
+            } catch (e) {
+                console.warn('无法从本地存储加载历史记录:', e);
+            }
+        }
+        
+        // 重置计算器
+        function resetCalculator() {
+            amountInput.value = '';
+            updateResults(0, 0, 0);
+            amountInput.focus();
+        }
+        
+        // 下载计算器
+        function downloadCalculator() {
+            // 获取当前HTML内容
+            const htmlContent = document.documentElement.outerHTML;
+            
+            // 创建Blob对象
+            const blob = new Blob([htmlContent], { type: 'text/html' });
+            
+            // 创建下载链接
+            const downloadLink = document.createElement('a');
+            downloadLink.href = URL.createObjectURL(blob);
+            downloadLink.download = '增值税计算器.html';
+            
+            // 触发下载
+            // document.body.appendChild(downloadLink);
+            // downloadLink.click();
+            // document.body.removeChild(downloadLink);
+            
+            // 显示下载成功提示
+            const originalText = downloadBtn.innerHTML;
+            downloadBtn.innerHTML = '<span>✓ 陕西晟思市场部</span>';
+            downloadBtn.style.backgroundColor = '#27ae60';
+            
+            // 3秒后恢复原状
+            setTimeout(() => {
+                downloadBtn.innerHTML = originalText;
+                downloadBtn.style.backgroundColor = '';
+            }, 3000);
+        }
+        
+        // 示例计算
+        window.addEventListener('load', function() {
+            // 设置一个示例值
+            amountInput.value = "1000";
+            // 自动计算示例
+            setTimeout(calculateTax, 500);
+        });
+    </script>
+
+</body></html>

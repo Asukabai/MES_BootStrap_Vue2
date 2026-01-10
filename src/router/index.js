@@ -347,6 +347,18 @@ const router = new Router({
       meta: { title: '物品信息编辑表单V1.0' }
     },
     {
+      path: '/:department/excelUpload',
+      name: 'ExcelUpload',
+      component: () => import('../views/inventoryV1/ExcelUpload.vue'),
+      meta: { title: '物品信息批量导入' }
+    },
+    {
+      path: '/:department/vat-calculator',
+      name: 'VatCalculator',
+      component: () => import('@/components/VatCalculator.vue'),
+      meta: { title: '增值税计算器' }
+    },
+    {
       path: '/:department/project-detail/:id',
       name: 'ProjectDetail',
       component: () => import('@/views/project/ProjectDetail.vue'),

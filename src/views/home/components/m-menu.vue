@@ -9,7 +9,8 @@
           class="col-xs-3 col-sm-3 col-md-2 menu-item"
           @click="handleGridClick(item)"
         >
-          <div class="menu-item-content">
+          <!-- 只在PC端显示库存导入按钮 -->
+          <div v-if="!item.hiddenOnMobile || isPC" class="menu-item-content">
             <div class="icon-wrapper">
               <img class="icon img-responsive center-block" :src="item.icon" :alt="item.title">
             </div>
@@ -18,9 +19,15 @@
         </div>
       </div>
     </div>
+
+    <!-- 可展开悬浮按钮 -->
+    <ExpandableFloatingButton
+      :initial-position="{ bottom: 100, right: 20 }"
+      :main-icon="mainIcon"
+      :sub-buttons="actionButtons"
+    />
   </div>
 </template>
-
 
 <script>
 import taskCalendarIcon from '@/assets/日历图标.png'
@@ -33,14 +40,19 @@ import allIcon from '@/assets/省略号.png'
 import inventoryIcon from '@/assets/库存-库存单据.png'
 import inventoryIconNew from '@/assets/库存业务.png'
 import scanConfigIcon from '@/assets/scan_icon.png'
+import uploadIcon from '@/assets/跨公司调拨.png'
 import {
   key_DingScannedInventoryQRCodeResult,
   updateCachedInventoryProductId,
 } from "../../../utils/Dingding";
 import * as dd from 'dingtalk-jsapi'
+import ExpandableFloatingButton from "../../../components/ExpandableFloatingButton.vue";
 
 export default {
   name: 'MMenu',
+  components: {
+    ExpandableFloatingButton // 注册组件
+  },
   data() {
     return {
       menuList: [
@@ -94,8 +106,41 @@ export default {
           title: '周报管理',
           path: '',
         },
-      ]
+        {
+          icon: uploadIcon,
+          title: '库存导入',
+          path: '/excel-upload', // 新增路径
+          hiddenOnMobile: true // 仅在PC端显示
+        },
+      ],
+      // 悬浮按钮图标
+      mainIcon: require('@/assets/企业头像.png'), // 主按钮图标
     };
+  },
+  computed: {
+    // 检测是否为PC端
+    isPC() {
+      const userAgent = navigator.userAgent;
+      const mobileKeywords = ['Android', 'iPhone', 'iPad', 'Mobile', 'Mobile Web', 'Windows Phone'];
+      return !mobileKeywords.some(keyword => userAgent.includes(keyword));
+    },
+    // 悬浮按钮配置
+    actionButtons() {
+      return [
+        {
+          icon: require('@/assets/秘钥1.png'), // 子按钮图标
+          label: '获取秘钥',
+          handler: this.handleEdit,
+          position: { x: 15, y: 60 }  // 自定义位置
+        },
+        {
+          icon: require('@/assets/计算器.png'), // 子按钮图标
+          label: '增值税计算器',
+          handler: this.handleVatCalculator,
+          position: { x: -70, y: 10 }  // 自定义位置
+        },
+      ];
+    }
   },
   methods: {
     isValidQRCode(content) {
@@ -184,6 +229,23 @@ export default {
       if (item.title === '库存扫码') {
         this.scanInventoryQRCode();
       }
+      if (item.title === '库存导入') {
+        // 仅在PC端允许跳转
+        if (this.isPC) {
+          this.navigateTo('/excelUpload');
+        } else {
+          this.$toast.fail('此功能仅在PC端可用');
+        }
+      }
+    },
+    // 处理编辑按钮点击
+    handleEdit() {
+      this.$toast('点击了编辑');
+      // 这里可以添加编辑功能的具体实现
+    },
+    // 处理增值税计算器点击
+    handleVatCalculator() {
+      this.navigateTo('/vat-calculator');
     },
     // 库存扫码逻辑...
     scanInventoryQRCode() {
@@ -220,14 +282,13 @@ export default {
       });
     },
     testScanInventoryQRCode() {
-            const result = "1号货架一层01"; // 获取扫描结果
-            if (result) {
-              // 存储扫码结果
-              sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, result);
-              // 更新全局变量
-              updateCachedInventoryProductId(result);
-              this.navigateTo('/inventoryDetail');}}
-
+      const result = "1号货架一层01"; // 获取扫描结果
+      if (result) {
+        // 存储扫码结果
+        sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, result);
+        // 更新全局变量
+        updateCachedInventoryProductId(result);
+        this.navigateTo('/inventoryDetail');}}
   }
 };
 </script>
@@ -236,6 +297,7 @@ export default {
 .menu-container {
   padding: 15px;
   background: transparent; /* 背景设为透明 */
+  position: relative; /* 为悬浮按钮定位做准备 */
 }
 
 /* 新增卡片样式 */
@@ -321,4 +383,3 @@ export default {
   }
 }
 </style>
-
