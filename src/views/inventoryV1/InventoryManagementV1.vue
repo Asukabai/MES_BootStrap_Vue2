@@ -60,34 +60,28 @@
             :key="item.Id"
             class="inventory-cell"
           >
-            <div class="cell-content">
+            <div class="cell-content" @click="viewDetail(item.Shelf_Location)">
+              <!-- 右上角删除按钮 -->
+              <div class="delete-btn" @click.stop="showDeleteDialog(item)">
+                <van-icon name="delete" />
+              </div>
+
               <div class="cell-header">
                 <div class="item-title">物品名称：{{ item.Item_Name }}</div>
-                <div class="item-title">物品类型：{{ item.Item_Model }}</div>
-                <div class="item-stock">库存数量: {{ item.Current_Stock }}</div>
+                <div class="item-subtitle">
+                  型号：<span class="model-value">{{ item.Item_Model }}</span> |
+                  库存：<span class="stock-value">{{ item.Current_Stock }}</span>
+                </div>
               </div>
               <div class="cell-body">
                 <div class="item-info">
                   <div class="info-row">
                     <span class="label">公司:</span>
                     <span class="value">{{ item.Company }}</span>
-                  </div>
-                  <div class="info-row">
                     <span class="label">位置:</span>
                     <span class="value">{{ item.Shelf_Location }}</span>
                   </div>
-                  <div class="info-row">
-                    <span class="label">分类:</span>
-                    <span class="value">{{ item.Category_Type }}</span>
-                  </div>
                 </div>
-              </div>
-              <!-- 操作按钮 -->
-              <div class="cell-footer">
-                <van-button size="small" type="info" @click.stop="viewDetail(item.Shelf_Location)">查看</van-button>
-                <van-button size="small" type="info" @click.stop="showDeleteDialog(item)">删除</van-button>
-<!--                <van-button size="small" type="info"  @click="goToOutbound">快速出库</van-button>-->
-<!--                <van-button size="small" type="info"  @click="goToInbound">快速入库</van-button>-->
               </div>
             </div>
           </van-cell>
@@ -543,33 +537,70 @@ export default {
 }
 
 .cell-content {
-  padding: 8px 10px;
+  padding: 8px;
+  position: relative; /* 为删除按钮定位做准备 */
+  cursor: pointer; /* 表示这是一个可点击的卡片 */
+}
+
+.cell-content:hover {
+  background-color: #f8f8f8; /* 鼠标悬停时的视觉反馈 */
+}
+
+.delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  z-index: 1;
+  background-color: #f5f5f5;
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.delete-btn:hover {
+  background-color: #e0e0e0;
+}
+
+.delete-btn .van-icon {
+  font-size: 16px;
+  color: #ff6b6b;
 }
 
 .cell-header {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  margin-bottom: 5px;
+  margin-bottom: 4px;
 }
 
 .item-title {
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 500;
   color: #333;
   flex: 1;
   margin-right: 4px;
   line-height: 1.3;
 }
-
-.item-stock {
-  font-size: 14px;
-  font-weight: 600;
-  color: orange;
-  white-space: nowrap;
-  align-self: flex-end;/* 确保库存数量在右侧 */
+.item-subtitle {
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+  font-weight: 500; /* 整体加粗 */
 }
 
+.item-subtitle .model-value {
+  font-weight: 500; /* 型号加粗 */
+}
+
+.item-subtitle .stock-value {
+  font-weight: 600; /* 库存加粗 */
+  color: orange;    /* 库存橙色 */
+}
 .cell-body {
   display: flex;
   justify-content: space-between;
@@ -582,9 +613,10 @@ export default {
 
 .info-row {
   display: flex;
-  margin-bottom: 3px;
-  font-size: 12px;
+  flex-wrap: wrap; /* 允许换行 */
+  font-size: 12px; /* 减小字体 */
   align-items: baseline;
+  gap: 8px; /* 添加间隙 */
 }
 
 /* 确保所有 info-row 内的文本统一 */
@@ -597,33 +629,22 @@ export default {
 
 .label {
   color: #999;
-  margin-right: 4px;
-  min-width: 30px;
-  flex-shrink: 0; /* 防止标签被压缩 */
+  margin-right: 2px; /* 减少间距 */
+  flex-shrink: 0;
+  font-size: 11px; /* 减小标签字体 */
 }
 
 .value {
   color: #666;
   flex: 1;
-  word-break: break-all; /* 防止长文本溢出 */
+  word-break: break-all;
+  font-size: 12px; /* 减小值字体 */
 }
 
+/* 隐藏原有的按钮区域 */
 .cell-footer {
-  display: flex;
-  justify-content: flex-start;
-  gap: 12px;
+  display: none;
 }
-
-/* 添加按钮圆角样式 */
-.cell-footer .van-button {
-  border-radius: 20px;
-  padding: 8px 16px;      /* 控制按钮大小 */
-  font-size: 12px;
-  height: auto;
-  line-height: normal;
-  min-width: 60px;        /* 设置最小宽度 */
-}
-
 
 .empty-state {
   padding: 50px 16px;

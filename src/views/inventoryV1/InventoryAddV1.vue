@@ -503,7 +503,15 @@ export default {
         this.$toast.fail('处理文件失败');
       }
     },
-
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     // 在 methods 中修改 onSubmit 方法
     async onSubmit(values) {
       // 显示确认弹窗，让用户确认信息是否无误
@@ -562,8 +570,9 @@ export default {
 
         SensorRequestPage.InventoryItemAddFun(JSON.stringify(param), (respData) => {
           Toast.success('新增物品成功');
-          // 返回上一页
-          this.$router.go(-1);
+          // // 返回上一页
+          // this.$router.go(-1);
+          this.navigateTo('/inventoryV1');
         }, (error) => {
           console.error('新增物品失败:', error);
           Toast.fail('新增物品失败');

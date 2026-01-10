@@ -78,14 +78,15 @@
           <van-empty v-else-if="!currentItem" description="暂无库存信息录入，请点击 + 按钮进行信息新增，或请确认扫描二维码是否正确" />
         </van-pull-refresh>
 
-        <!-- 使用可展开悬浮按钮替换原来的按钮组 -->
+        <!-- 只有当有内容时才显示主功能按钮 -->
         <ExpandableFloatingButton
+          v-if="currentItem"
           :initial-position="{ bottom: 60, right: 165 }"
           :main-icon="mainIcon"
           :sub-buttons="actionButtons"
-
         />
-        <!-- 添加悬浮按钮 -->
+
+        <!-- 当没有内容时，只显示新增按钮 -->
         <template v-if="!currentItem">
           <FloatingActionButton
             @click="onFloatingButtonClick"
@@ -120,6 +121,7 @@
     </van-popup>
   </div>
 </template>
+
 
 <script>
 // 在 script 部分导入图片
