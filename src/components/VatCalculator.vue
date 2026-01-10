@@ -30,18 +30,6 @@
           <van-cell title="适用税率" :value="`${currentTaxRate}%`" />
         </van-cell-group>
       </div>
-
-      <div class="history-section" v-if="calculationHistory.length > 0">
-        <van-cell title="计算历史" />
-        <van-list>
-          <van-cell
-            v-for="(item, index) in calculationHistory"
-            :key="index"
-            :title="`${item.date}`"
-            :label="`税率: ${item.taxRate}%, 方式: ${item.amountType} | 不含税: ${item.priceWithoutTax}元, 税额: ${item.taxAmount}元, 含税: ${item.priceWithTax}元`"
-          />
-        </van-list>
-      </div>
     </div>
 
     <!-- 计算类型选择器 -->
@@ -50,6 +38,7 @@
         :columns="amountTypeColumns"
         @confirm="onAmountTypeConfirm"
         @cancel="showAmountTypePicker = false"
+        show-toolbar
       />
     </van-popup>
 
@@ -59,8 +48,15 @@
         :columns="taxRateColumns"
         @confirm="onTaxRateConfirm"
         @cancel="showTaxRatePicker = false"
+        show-toolbar
       />
     </van-popup>
+
+    <!-- 页脚 -->
+    <div class="footer">
+      <p>本计算器仅供参考，实际税务计算请以税务机关规定为准</p>
+      <p>@ {{ currentYear }} <a href="https://www.sensor-smart.com/" target="_blank">陕西晟思智能测控有限公司</a></p>
+    </div>
   </div>
 </template>
 
@@ -82,6 +78,7 @@ export default {
       calculationHistory: [],
       showAmountTypePicker: false,
       showTaxRatePicker: false,
+      currentYear: new Date().getFullYear(), // 当前年份
       amountTypeColumns: [
         { text: '根据含税价格计算', value: 'withTax' },
         { text: '根据不含税价格计算', value: 'withoutTax' }
@@ -125,7 +122,7 @@ export default {
         // 根据含税价格计算
         priceWithTax = amount
         priceWithoutTax = priceWithTax / (1 + taxRate)
-        taxAmount = priceWithoutTax * taxRate
+        taxAmount = priceWithTax - priceWithoutTax  // 修正：正确计算税额
       } else {
         // 根据不含税价格计算
         priceWithoutTax = amount
@@ -137,11 +134,14 @@ export default {
       this.results = {
         priceWithoutTax: priceWithoutTax.toFixed(2),
         taxAmount: taxAmount.toFixed(2),
-        priceWithTax: priceWithTax.toFixed(2)
+        priceWithTax: priceWithTax.toFixed(2)  // 修复：修正变量名
       }
 
       // 保存到历史记录
       this.addToHistory(priceWithoutTax, taxAmount, priceWithTax)
+
+      // 显示成功提示
+      Toast('计算完成')
     },
     resetCalculator() {
       this.amount = ''
@@ -150,6 +150,7 @@ export default {
         taxAmount: '0.00',
         priceWithTax: '0.00'
       }
+      Toast('已重置计算器')  // 添加重置提示
     },
     addToHistory(priceWithoutTax, taxAmount, priceWithTax) {
       const calculation = {
@@ -170,8 +171,6 @@ export default {
 
       // 保存到本地存储
       this.saveHistoryToStorage()
-
-      Toast('计算完成')
     },
     saveHistoryToStorage() {
       try {
@@ -230,18 +229,65 @@ export default {
   margin-bottom: 16px;
 }
 
-.history-section {
-  background-color: white;
-  border-radius: 10px;
-  padding: 16px;
-}
-
 .button-container {
   margin-top: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px; /* 按钮间距 */
+}
+.button-container .van-button {
+  border-radius: 50px; /* 更圆滑的边角 */
+  height: 50px; /* 统一高度 */
+  font-weight: 600; /* 字体加粗 */
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1); /* 立体阴影 */
+  transition: all 0.3s ease; /* 平滑过渡效果 */
+  border: none; /* 移除默认边框 */
+}
+
+.button-container .van-button::before {
+  border-radius: 50px; /* 确保伪元素也有圆角 */
+}
+
+.button-container .van-button:active {
+  transform: translateY(2px); /* 点击时下沉效果 */
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* 点击时阴影变化 */
+}
+
+/* 特定按钮样式 */
+.button-container .van-button--info {
+  background: linear-gradient(145deg, #1989fa, #0d7bea); /* 渐变背景 */
+}
+
+.button-container .van-button--default {
+  background: linear-gradient(145deg, #f2f3f5, #dcdde0); /* 浅色渐变 */
+  color: #323233;
 }
 
 .highlight {
   color: #e74c3c;
   font-weight: bold;
+}
+
+.footer {
+  padding: 16px;
+  text-align: center;
+  background-color: #f5f7fa;
+  border-top: 1px solid #ebedf0;
+  color: #969799;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.footer p {
+  margin: 0 0 4px 0;
+}
+
+.footer p:last-child {
+  margin-bottom: 0;
+}
+
+.footer a {
+  color: #969799;
+  text-decoration: underline;
 }
 </style>
