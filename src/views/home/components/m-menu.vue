@@ -26,6 +26,53 @@
       :main-icon="mainIcon"
       :sub-buttons="actionButtons"
     />
+
+    <!-- 秘钥弹窗 -->
+    <van-popup
+      v-model="showSecretKeyPopup"
+      position="bottom"
+      :style="{ height: '30%' }"
+      round
+    >
+      <div class="secret-key-popup">
+        <div class="popup-header">
+          <h3>获取的秘钥</h3>
+          <van-button
+            type="default"
+            size="small"
+            @click="closeSecretKeyPopup"
+            class="close-btn"
+          >
+            关闭
+          </van-button>
+        </div>
+
+        <div class="secret-content">
+          <div
+            class="secret-value"
+            @click="copySecretKey"
+            @dblclick="copySecretKey"
+          >
+            {{ secretKeyValue || '正在获取...' }}
+          </div>
+
+          <div v-if="countdownVisible" class="countdown-info">
+            有效期: <span class="countdown-timer">{{ countdownTime }}s</span>
+          </div>
+        </div>
+
+        <div class="popup-actions">
+          <van-button
+            type="primary"
+            block
+            @click="copySecretKey"
+            :disabled="!secretKeyValue"
+          >
+            复制验证码
+          </van-button>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -44,9 +91,12 @@ import uploadIcon from '@/assets/跨公司调拨.png'
 import {
   key_DingScannedInventoryQRCodeResult,
   updateCachedInventoryProductId,
+  key_DingTokenJWT,
+  getLoginCodeByDepartment
 } from "../../../utils/Dingding";
 import * as dd from 'dingtalk-jsapi'
 import ExpandableFloatingButton from "../../../components/ExpandableFloatingButton.vue";
+import SensorRequest from '../../../utils/SensorRequest.js';
 
 export default {
   name: 'MMenu',
@@ -115,6 +165,14 @@ export default {
       ],
       // 悬浮按钮图标
       mainIcon: require('@/assets/企业头像.png'), // 主按钮图标
+
+      // 弹窗相关数据
+      showSecretKeyPopup: false, // 控制秘钥弹窗显示
+      secretKeyValue: '', // 存储秘钥值
+      countdownTime: 0, // 倒计时时间
+      countdownVisible: false, // 是否显示倒计时
+      countdownInterval: null, // 倒计时定时器
+      isFetchingSecret: false, // 防止重复请求
     };
   },
   computed: {
@@ -130,7 +188,7 @@ export default {
         {
           icon: require('@/assets/秘钥1.png'), // 子按钮图标
           label: '获取秘钥',
-          handler: this.handleEdit,
+          handler: this.handleGetSecretKey,
           position: { x: 15, y: 60 }  // 自定义位置
         },
         {
@@ -143,6 +201,128 @@ export default {
     }
   },
   methods: {
+    // 获取秘钥方法
+    async handleGetSecretKey() {
+      // 防止短时间内重复请求
+      if (this.isFetchingSecret) {
+        this.$toast('正在获取秘钥，请稍候...');
+        return;
+      }
+
+      this.isFetchingSecret = true;
+
+      try {
+        // 获取当前部门
+        const department = this.$route.params.department;
+
+        // 获取钉钉token
+        const token = localStorage.getItem(key_DingTokenJWT);
+
+        // 获取对应部门的登录方法
+        const loginMethod = getLoginCodeByDepartment(department);
+
+        // 请求后端获取秘钥
+        const response = await this.fetchSecretKeyFromBackend(loginMethod, token);
+
+        if (response && typeof response === 'string') {
+          this.secretKeyValue = response.trim(); // 去除首尾空格
+          this.showSecretKeyPopup = true; // 显示弹窗
+          this.startCountdown(); // 开始倒计时
+        } else {
+          this.$toast.fail('获取秘钥失败');
+        }
+      } catch (error) {
+        console.error('获取秘钥出错:', error);
+        this.$toast.fail('获取秘钥失败');
+      } finally {
+        this.isFetchingSecret = false;
+      }
+    },
+
+    // 后端请求方法
+    fetchSecretKeyFromBackend(loginMethod, token) {
+      return new Promise((resolve, reject) => {
+        SensorRequest.GetDDingCode(
+          loginMethod,
+          token,
+          (response) => {
+            resolve(response);
+          },
+          (error) => {
+            reject(error);
+          }
+        );
+      });
+    },
+
+    // 开始倒计时
+    startCountdown() {
+      // 清除之前的定时器
+      if (this.countdownInterval) {
+        clearInterval(this.countdownInterval);
+      }
+
+      this.countdownTime = 30; // 30秒倒计时
+      this.countdownVisible = true;
+
+      this.countdownInterval = setInterval(() => {
+        this.countdownTime--;
+        if (this.countdownTime <= 0) {
+          this.countdownVisible = false;
+          clearInterval(this.countdownInterval);
+          this.showSecretKeyPopup = false; // 自动关闭弹窗
+          this.secretKeyValue = ''; // 清空秘钥
+        }
+      }, 1000);
+    },
+
+    // 复制秘钥
+    copySecretKey() {
+      if (!this.secretKeyValue) {
+        this.$toast('没有可复制的秘钥');
+        return;
+      }
+
+      // 使用现代Clipboard API或传统方法复制
+      const cleanCode = this.secretKeyValue.trim();
+      if (navigator.clipboard && window.isSecureContext) {
+        navigator.clipboard.writeText(cleanCode)
+          .then(() => {
+            this.$toast.success('秘钥已复制到剪贴板');
+          })
+          .catch(err => {
+            console.error('复制失败:', err);
+            this.$toast.fail('复制失败');
+          });
+      } else {
+        // 降级处理
+        try {
+          const textArea = document.createElement('textarea');
+          textArea.value = cleanCode;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+          this.$toast.success('秘钥已复制到剪贴板');
+        } catch (err) {
+          console.error('复制失败:', err);
+          this.$toast.fail('复制失败');
+        }
+      }
+    },
+
+    // 关闭弹窗
+    closeSecretKeyPopup() {
+      this.showSecretKeyPopup = false;
+      this.secretKeyValue = '';
+
+      // 清除倒计时
+      if (this.countdownInterval) {
+        clearInterval(this.countdownInterval);
+        this.countdownInterval = null;
+      }
+    },
+
     isValidQRCode(content) {
       // 检查是否为网址
       const urlPattern = /^(https?:\/\/|www\.)/i;
@@ -238,11 +418,6 @@ export default {
         }
       }
     },
-    // 处理编辑按钮点击
-    handleEdit() {
-      this.$toast('点击了编辑');
-      // 这里可以添加编辑功能的具体实现
-    },
     // 处理增值税计算器点击
     handleVatCalculator() {
       this.navigateTo('/vat-calculator');
@@ -289,6 +464,12 @@ export default {
         // 更新全局变量
         updateCachedInventoryProductId(result);
         this.navigateTo('/inventoryDetail');}}
+  },
+  beforeDestroy() {
+    // 清除定时器
+    if (this.countdownInterval) {
+      clearInterval(this.countdownInterval);
+    }
   }
 };
 </script>
@@ -381,5 +562,60 @@ export default {
   .title {
     font-size: 14px;
   }
+}
+
+/* 秘钥弹窗样式 */
+.secret-key-popup {
+  padding: 20px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.close-btn {
+  flex-shrink: 0;
+}
+
+.secret-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+
+.secret-value {
+  font-size: 16px;
+  font-weight: bold;
+  word-break: break-all;
+  cursor: pointer;
+  padding: 10px;
+  border: 1px dashed #ccc;
+  border-radius: 4px;
+  user-select: text;
+  max-width: 100%;
+}
+
+.countdown-info {
+  margin-top: 15px;
+  font-size: 14px;
+  color: #999;
+}
+
+.countdown-timer {
+  color: #ff6b6b;
+  font-weight: bold;
+}
+
+.popup-actions {
+  margin-top: 20px;
 }
 </style>
