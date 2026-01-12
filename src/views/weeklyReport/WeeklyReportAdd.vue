@@ -104,6 +104,22 @@
             type="number"
           />
 
+          <!-- 倒计时天数 -->
+          <van-field
+            v-model.number="formData.Countdown_Days"
+            label="倒计时天数"
+            placeholder="系统自动计算"
+            readonly
+          />
+
+          <!-- 是否延期 -->
+          <van-field
+            v-model="formData.Is_Delayed"
+            label="是否延期"
+            placeholder="系统自动判断"
+            readonly
+          />
+
           <!-- 实际工作内容 -->
           <van-field
             v-model="formData.Actual_Work"
@@ -150,7 +166,8 @@
   </div>
 </template>
 
-<script>import { Toast } from 'vant';
+<script>
+import { Toast } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import { key_DingName, key_DingUserIndex, key_DingUserPhone } from '../../utils/Dingding.js';
 
@@ -187,6 +204,9 @@ export default {
           Person_Name: '',
           Person_Department: ''
         },
+        Countdown_Days: 0,
+        Is_Delayed: '否',
+        Project_ExEndTime: null,
         Actual_Work: '',
         Plan_Work: ''
       }
@@ -322,6 +342,30 @@ export default {
       return uuid;
     },
 
+    // 计算倒计时天数和延期状态
+    calculateCountdownAndDelay() {
+      if (!this.formData.Project_ExEndTime || !this.formData.Week_StartDate) {
+        // 如果缺少必要信息，则设置默认值
+        this.formData.Countdown_Days = 0;
+        this.formData.Is_Delayed = '否';
+        return;
+      }
+
+      // 解析项目预计结束时间和周次开始时间
+      const projectExEndTime = new Date(this.formData.Project_ExEndTime);
+      const weekStartTime = new Date(this.formData.Week_StartDate);
+
+      // 计算剩余天数
+      const timeDiff = projectExEndTime.getTime() - weekStartTime.getTime();
+      const daysDiff = Math.ceil(timeDiff / (1000 * 3600 * 24));
+
+      // 设置倒计时天数
+      this.formData.Countdown_Days = daysDiff;
+
+      // 判断是否延期
+      this.formData.Is_Delayed = daysDiff < 0 ? '是' : '否';
+    },
+
     // 项目选择确认
     onProjectConfirm(value) {
       this.formData.Project_Name = value;
@@ -343,10 +387,11 @@ export default {
             console.log("新增页面：获取选中项目的详细信息: ", data);
             if (data && data.length > 0) {
               const project = data[0];
-              // alert( "新增：project.uuid: "+project.Uuid)
               this.formData.Project_Uuid = project.Uuid;
+              // 获取项目预计结束时间
+              this.formData.Project_ExEndTime = project.Project_ExEndTime || null;
+
               // 设置项目经理信息，确保不为空
-              // 注意：根据后端数据结构，项目经理信息在 Project_Leader 数组中
               if (project.Project_Leader && project.Project_Leader.length > 0) {
                 const leader = project.Project_Leader[0]; // 取第一个作为项目经理
                 this.formData.Project_Manager.Person_Name = leader.Person_Name || '未知经理';
@@ -354,14 +399,17 @@ export default {
                 this.formData.Project_Manager.Person_Phone = leader.Person_Phone || '0000000000';
                 this.formData.Project_Manager.Person_Department = leader.Person_Department || '未知部门';
               } else {
-                // 如果没有项目经理信息，设置默认值
                 this.formData.Project_Manager.Person_Name = '未知经理';
                 this.formData.Project_Manager.Person_DingID = '0000000000';
                 this.formData.Project_Manager.Person_Phone = '0000000000';
                 this.formData.Project_Manager.Person_Department = '未知部门';
               }
+
+              // 如果已经选择了周次，则重新计算倒计时和延期状态
+              if (this.formData.Week_StartDate) {
+                this.calculateCountdownAndDelay();
+              }
             } else {
-              // 如果没有获取到项目信息，设置默认值
               this.formData.Project_Uuid = this.generateProjectUuid();
               this.formData.Project_Manager.Person_Name = '未知经理';
               this.formData.Project_Manager.Person_DingID = '0000000000';
@@ -370,7 +418,6 @@ export default {
             }
           } catch (error) {
             console.error('解析项目详情失败:', error);
-            // 出错时设置默认值
             this.formData.Project_Uuid = this.generateProjectUuid();
             this.formData.Project_Manager.Person_Name = '未知经理';
             this.formData.Project_Manager.Person_DingID = '0000000000';
@@ -380,7 +427,6 @@ export default {
         },
         (error) => {
           console.error('获取项目详情失败:', error);
-          // 出错时设置默认值
           this.formData.Project_Uuid = this.generateProjectUuid();
           this.formData.Project_Manager.Person_Name = '未知经理';
           this.formData.Project_Manager.Person_DingID = '0000000000';
@@ -408,7 +454,6 @@ export default {
         if (startDateStr.length === 4) {
           const startMonth = startDateStr.substring(0, 2);
           const startDay = startDateStr.substring(2, 4);
-          // 添加前导零格式化
           const formattedStartMonth = startMonth.padStart(2, '0');
           const formattedStartDay = startDay.padStart(2, '0');
           this.formData.Week_StartDate = `${year}-${formattedStartMonth}-${formattedStartDay}`;
@@ -418,13 +463,16 @@ export default {
         if (endDateStr.length === 4) {
           const endMonth = endDateStr.substring(0, 2);
           const endDay = endDateStr.substring(2, 4);
-          // 添加前导零格式化
           const formattedEndMonth = endMonth.padStart(2, '0');
           const formattedEndDay = endDay.padStart(2, '0');
           this.formData.Week_EndDate = `${year}-${formattedEndMonth}-${formattedEndDay}`;
         }
+
+        // 如果已经选择了项目，则重新计算倒计时和延期状态
+        if (this.formData.Project_ExEndTime) {
+          this.calculateCountdownAndDelay();
+        }
       } else {
-        // 如果格式不匹配，清空日期并提示用户手动选择
         this.formData.Week_StartDate = '';
         this.formData.Week_EndDate = '';
         Toast.fail('周次格式不匹配，请手动选择日期');
@@ -435,6 +483,11 @@ export default {
     onStartDateConfirm(value) {
       this.formData.Week_StartDate = this.formatDate(value);
       this.showStartDatePicker = false;
+
+      // 如果已经选择了项目，则重新计算倒计时和延期状态
+      if (this.formData.Project_ExEndTime) {
+        this.calculateCountdownAndDelay();
+      }
     },
 
     // 结束日期选择确认
@@ -513,8 +566,8 @@ export default {
         Project_Nodes: '',
         Required_Nodes: '',
         Actual_CompletionNode: '',
-        Countdown_Days: 0,
-        Is_Delayed: '否',
+        Countdown_Days: this.formData.Countdown_Days,
+        Is_Delayed: this.formData.Is_Delayed,
         Delay_Reason: '',
         Actual_Work: this.formData.Actual_Work,
         Plan_Work: this.formData.Plan_Work
@@ -556,7 +609,8 @@ export default {
 };
 </script>
 
-<style scoped>.weekly-report-add {
+<style scoped>
+.weekly-report-add {
   min-height: 100vh;
   background-color: #f5f5f5;
 }
