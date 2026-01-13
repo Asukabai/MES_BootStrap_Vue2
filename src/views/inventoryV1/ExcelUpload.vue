@@ -50,9 +50,9 @@
   </div>
 </template>
 
-
 <script>
-import { Toast } from 'vant'
+import { Toast, Dialog } from 'vant'
+import * as XLSX from 'xlsx'
 import SensorRequestPage from "../../utils/SensorRequestPage";
 
 export default {
@@ -81,7 +81,7 @@ export default {
       }
 
       // 验证文件大小 (例如限制为10MB)
-      const maxSize = 5 * 1024 * 1024; // 10MB
+      const maxSize = 5 * 1024 * 1024; // 5MB
       if (file.size > maxSize) {
         Toast.fail('文件大小不能超过5MB');
         return;
@@ -121,10 +121,202 @@ export default {
       else return (size / 1048576).toFixed(1) + ' MB';
     },
 
+    // 验证 Excel 文件内容
+    async validateExcelContent(file) {
+      try {
+        // 读取文件内容
+        const data = await this.readFileAsArrayBuffer(file);
+        const workbook = XLSX.read(data, { type: 'array' });
+
+        // 获取第一个工作表
+        const firstSheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[firstSheetName];
+
+        // 转换为 JSON 格式
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+
+        // 验证行数（排除标题行）
+        const dataRows = jsonData.slice(1); // 排除标题行
+
+        if (dataRows.length > 100) {
+          Dialog.alert({
+            title: '提示',
+            message: `文件内容行数超出限制！最多支持100条数据，当前文件包含${dataRows.length}条数据，请拆分后分别上传。`
+          }).then(() => {
+            // 验证失败后清空已选择的文件
+            this.selectedFile = null;
+            Toast('文件不符合要求已清空列表，请修改后重新上传');
+          });
+          return false;
+        }
+
+        // 验证 A列和J列的组合唯一性
+        const combinationSet = new Set();
+        const duplicateCombinations = [];
+
+        // 存储验证错误信息
+        const validationErrors = [];
+
+        for (let i = 0; i < dataRows.length; i++) {
+          const row = dataRows[i];
+
+          // 检查是否至少有14列数据（N列是第14列）
+          if (row.length < 14) {
+            validationErrors.push(`第${i + 2}行数据不完整，缺少必要列信息，请检查数据完整性。`);
+            continue; // 跳过此行后续验证
+          }
+
+          // 检查整行是否全为空（A到N列）
+          const isRowEmpty = row.slice(0, 14).every(cell =>
+            cell === null || cell === undefined || String(cell).trim() === ''
+          );
+
+          if (!isRowEmpty) {
+            // 如果不是全空行，则验证必填字段
+            const colA = row[0];  // A列 - 货架编号
+            const colB = row[1];  // B列 - 物品名称
+            const colE = row[4];  // E列 - 当前库存
+            const colF = row[5];  // F列 - 品牌
+            const colH = row[7];  // H列 - 预警阈值
+            const colJ = row[9];  // J列 - 公司
+
+            // 检查必填字段是否为空
+            if (colA === null || colA === undefined || String(colA).trim() === '') {
+              validationErrors.push(`第${i + 2}行A列(货架编号)不能为空`);
+            }
+            if (colB === null || colB === undefined || String(colB).trim() === '') {
+              validationErrors.push(`第${i + 2}行B列(物品名称)不能为空`);
+            }
+            if (colE === null || colE === undefined || String(colE).trim() === '') {
+              validationErrors.push(`第${i + 2}行E列(当前库存)不能为空`);
+            }
+            if (colF === null || colF === undefined || String(colF).trim() === '') {
+              validationErrors.push(`第${i + 2}行F列(品牌)不能为空`);
+            }
+            if (colH === null || colH === undefined || String(colH).trim() === '') {
+              validationErrors.push(`第${i + 2}行H列(预警阈值)不能为空`);
+            }
+            if (colJ === null || colJ === undefined || String(colJ).trim() === '') {
+              validationErrors.push(`第${i + 2}行J列(公司)不能为空`);
+            }
+
+            // 检查F列为"项目"时，G列不能为空
+            if (String(colF).trim() === '项目') {
+              const colG = row[6];  // G列 - 关联项目
+              if (colG === null || colG === undefined || String(colG).trim() === '') {
+                validationErrors.push(`第${i + 2}行F列值为"项目"时，G列(关联项目)不能为空`);
+              }
+            }
+          }
+
+          // 验证A列和J列的组合唯一性（只对非全空行进行验证）
+          if (!isRowEmpty) {
+            const colAValue = String(row[0] || '').trim(); // A列
+            const colJValue = String(row[9] || '').trim(); // J列
+
+            const combination = `${colAValue}_${colJValue}`;
+
+            if (combinationSet.has(combination)) {
+              duplicateCombinations.push(`${colAValue}-${colJValue}`);
+            } else {
+              combinationSet.add(combination);
+            }
+          }
+        }
+
+        // 如果有验证错误，统一显示
+        if (validationErrors.length > 0) {
+          Dialog.alert({
+            title: '数据验证错误',
+            message: validationErrors.join('\n'),
+            messageAlign: 'left'
+          }).then(() => {
+            // 验证失败后清空已选择的文件
+            this.selectedFile = null;
+            Toast('文件不符合要求已清空列表，请修改后重新上传');
+          });
+          return false;
+        }
+
+        // 如果有重复组合，显示错误
+        if (duplicateCombinations.length > 0) {
+          Dialog.alert({
+            title: '提示',
+            message: `检测到重复的A列和J列组合：${duplicateCombinations.join(', ')}。请确保A列与J列的组合内容不重复后再上传。`
+          }).then(() => {
+            // 验证失败后清空已选择的文件
+            this.selectedFile = null;
+            Toast('文件不符合要求已清空列表，请修改后重新上传');
+          });
+          return false;
+        }
+
+        // 验证H列（第8列，索引为7）的值不能小于0
+        const invalidHValues = [];
+        for (let i = 0; i < dataRows.length; i++) {
+          const row = dataRows[i];
+          if (row.length >= 8) { // 至少有8列数据才能检查H列
+            const hValue = row[7]; // H列是第8列，索引为7
+            if (hValue !== undefined && hValue !== null && hValue !== '') {
+              const numericValue = Number(hValue);
+              if (isNaN(numericValue) || numericValue < 0) {
+                invalidHValues.push(`第${i + 2}行`);
+              }
+            }
+          }
+        }
+
+        if (invalidHValues.length > 0) {
+          Dialog.alert({
+            title: '提示',
+            message: `H列（预警阈值）的值不能小于0，请检查以下行：${invalidHValues.join(', ')}`
+          }).then(() => {
+            // 验证失败后清空已选择的文件
+            this.selectedFile = null;
+            Toast('文件不符合要求已清空列表，请修改后重新上传');
+          });
+          return false;
+        }
+
+        return true; // 验证通过
+      } catch (error) {
+        console.error('验证Excel文件时发生错误:', error);
+        Dialog.alert({
+          title: '提示',
+          message: '读取Excel文件时发生错误，请检查文件格式是否正确。'
+        }).then(() => {
+          // 验证失败后清空已选择的文件
+          this.selectedFile = null;
+          Toast('文件不符合要求已清空列表，请修改后重新上传');
+        });
+        return false;
+      }
+    },
+
+    // 将文件读取为 ArrayBuffer
+    readFileAsArrayBuffer(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          resolve(e.target.result);
+        };
+        reader.onerror = (error) => {
+          reject(error);
+        };
+        reader.readAsArrayBuffer(file);
+      });
+    },
+
     async uploadFile() {
       if (!this.selectedFile) {
         Toast.fail('请选择要上传的文件');
         return;
+      }
+
+      // 先验证 Excel 文件内容
+      const isValid = await this.validateExcelContent(this.selectedFile);
+      if (!isValid) {
+        return; // 如果验证失败，则不执行上传
       }
 
       this.uploading = true;
@@ -136,15 +328,11 @@ export default {
         // 发送到后端的参数
         const uploadParams = {
           File_Name: this.selectedFile.name,
-          // fileSize: this.selectedFile.size,
-          // fileType: this.selectedFile.type,
           File_Base64: base64,// Base64编码的文件内容
           File_Md5: "" // Base64编码的文件内容
-
         };
 
         // 调用后端API上传文件
-        // 示例调用（需要根据实际API接口调整）
         SensorRequestPage.InventoryFileUploadAnalysisFun(
           JSON.stringify(uploadParams),
           (respData) => {
@@ -169,7 +357,6 @@ export default {
             this.uploading = false;
           }
         );
-
 
       } catch (error) {
         console.error('上传失败:', error);
@@ -220,7 +407,6 @@ export default {
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   box-sizing: border-box;
 }
-
 
 .upload-container h2 {
   text-align: center;
