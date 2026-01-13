@@ -53,7 +53,7 @@
 
 <script>
 import { Toast } from 'vant'
-import SensorRequest from '@/utils/SensorRequest'
+import SensorRequestPage from "../../utils/SensorRequestPage";
 
 export default {
   name: 'ExcelUpload',
@@ -81,9 +81,9 @@ export default {
       }
 
       // 验证文件大小 (例如限制为10MB)
-      const maxSize = 10 * 1024 * 1024; // 10MB
+      const maxSize = 5 * 1024 * 1024; // 10MB
       if (file.size > maxSize) {
-        Toast.fail('文件大小不能超过10MB');
+        Toast.fail('文件大小不能超过5MB');
         return;
       }
 
@@ -135,26 +135,41 @@ export default {
 
         // 发送到后端的参数
         const uploadParams = {
-          fileName: this.selectedFile.name,
-          fileSize: this.selectedFile.size,
-          fileType: this.selectedFile.type,
-          fileContent: base64 // Base64编码的文件内容
+          File_Name: this.selectedFile.name,
+          // fileSize: this.selectedFile.size,
+          // fileType: this.selectedFile.type,
+          File_Base64: base64,// Base64编码的文件内容
+          File_Md5: "" // Base64编码的文件内容
+
         };
 
         // 调用后端API上传文件
         // 示例调用（需要根据实际API接口调整）
-        SensorRequest.ExcelImportFun(
+        SensorRequestPage.InventoryFileUploadAnalysisFun(
           JSON.stringify(uploadParams),
           (respData) => {
             Toast.success('文件上传成功');
-            // 成功后返回上一页
-            this.goBack();
+            // 解析后端返回的数据并跳转到预览页面
+            if (respData) {
+              this.$router.push({
+                name: 'InventoryPreview',
+                params: {
+                  department: this.$route.params.department
+                },
+                query: {
+                  item: encodeURIComponent(JSON.stringify(respData))
+                }
+              });
+            } else {
+              this.$toast.fail('未查询到物品信息');
+            }
           },
           (error) => {
             Toast.fail('上传失败: ' + error);
             this.uploading = false;
           }
         );
+
 
       } catch (error) {
         console.error('上传失败:', error);

@@ -44,8 +44,20 @@ const SensorRequestPage = {
           callSuccess(respData);
         }, callFail);
       },
-    // 扫码获取库存信息(分页)
-    InventoryItemByCodeFun(param, callSuccess, callFail) {
+      // 库存文件上传解析（EXCEL 批量）
+      InventoryFileUploadAnalysisFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("InventoryFileUploadAnalysisFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 库存文件上传保存（EXCEL 批量）
+      InventoryItemBatchAddFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("InventoryItemBatchAddFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 扫码获取库存信息(分页)
+      InventoryItemByCodeFun(param, callSuccess, callFail) {
         ssDing.PostDataUrlPage("InventoryItemByCodeFun", param, true, respData => {
           callSuccess(respData);
         }, callFail);

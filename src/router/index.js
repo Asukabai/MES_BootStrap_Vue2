@@ -353,6 +353,12 @@ const router = new Router({
       meta: { title: '物品信息批量导入' }
     },
     {
+      path: '/:department/inventoryPreview',
+      name: 'InventoryPreview',
+      component: () => import('../views/inventoryV1/InventoryPreview.vue'),
+      meta: { title: '物品信息批量导入预览' }
+    },
+    {
       path: '/:department/vat-calculator',
       name: 'VatCalculator',
       component: () => import('@/components/VatCalculator.vue'),
