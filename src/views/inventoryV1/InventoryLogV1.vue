@@ -518,7 +518,7 @@ export default {
         }
       };
 
-      SensorRequest.InventoryTransactionsGetFun(
+      SensorRequestPage.InventoryTransactionGetFun(
         JSON.stringify(param),
         (respData) => {
           let JSON_Data = JSON.parse(respData)

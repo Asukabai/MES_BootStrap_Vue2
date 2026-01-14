@@ -17,9 +17,9 @@
           style="display: none;"
         />
         <div class="upload-instruction" v-if="!selectedFile">
-          <van-icon name="description" size="40" color="#ccc" />
-          <p>拖拽Excel文件到此处</p>
-          <p>或</p>
+          <van-icon name="description" size="45" color="#ccc" />
+          <p>点击页面右下角图标，下载对应模板文件; 编辑信息后拖拽Excel文件到此处</p>
+          <p>或点击下方按钮选择编辑后的文件</p>
           <van-button type="info" @click="$refs.fileInput.click()">选择文件</van-button>
         </div>
         <div class="file-info" v-else>
@@ -35,7 +35,7 @@
           @click="goBack"
           :disabled="uploading"
         >
-          取消
+          返回
         </van-button>
         <van-button
           type="info"
@@ -55,6 +55,10 @@
       :sub-buttons="floatingSubButtons"
       expand-direction="vertical"
     />
+    <!-- 页脚 -->
+    <div class="footer">
+      <p>@ {{ currentYear }} <a href="https://www.sensor-smart.com/" target="_blank">陕西晟思智能测控有限公司</a></p>
+    </div>
   </div>
 </template>
 
@@ -71,6 +75,7 @@ export default {
   },
   data() {
     return {
+      currentYear: new Date().getFullYear(), // 当前年份
       // 悬浮按钮图标
       mainIcon: require('@/assets/导入下载.png'), // 主按钮图标
       selectedFile: null,
@@ -179,6 +184,28 @@ export default {
 
         // 验证行数（排除标题行）
         const dataRows = jsonData.slice(1); // 排除标题行
+
+        // 检查是否只有表头，其余行都是空的
+        if (dataRows.length > 0) {
+          const hasNonEmptyRow = dataRows.some(row => {
+            return row.some(cell => cell !== null && cell !== undefined && String(cell).trim() !== '');
+          });
+
+          if (!hasNonEmptyRow) {
+            Dialog.alert({
+              title: '提示',
+              message: '文件内容为空！请确保文件中包含有效数据后再上传。'
+            }).then(() => {
+              // 验证失败后清空已选择的文件
+              this.selectedFile = null;
+              // 重置文件输入元素
+              this.$refs.fileInput.value = '';
+              Toast('文件不符合要求已清空列表，请修改后重新上传');
+            });
+            return false;
+          }
+        }
+
         if (dataRows.length > 100) {
           Dialog.alert({
             title: '提示',
@@ -186,6 +213,8 @@ export default {
           }).then(() => {
             // 验证失败后清空已选择的文件
             this.selectedFile = null;
+            // 重置文件输入元素
+            this.$refs.fileInput.value = '';
             Toast('文件不符合要求已清空列表，请修改后重新上传');
           });
           return false;
@@ -274,6 +303,8 @@ export default {
           }).then(() => {
             // 验证失败后清空已选择的文件
             this.selectedFile = null;
+            // 重置文件输入元素
+            this.$refs.fileInput.value = '';
             Toast('文件不符合要求已清空列表，请修改后重新上传');
           });
           return false;
@@ -287,6 +318,8 @@ export default {
           }).then(() => {
             // 验证失败后清空已选择的文件
             this.selectedFile = null;
+            // 重置文件输入元素
+            this.$refs.fileInput.value = '';
             Toast('文件不符合要求已清空列表，请修改后重新上传');
           });
           return false;
@@ -314,6 +347,8 @@ export default {
           }).then(() => {
             // 验证失败后清空已选择的文件
             this.selectedFile = null;
+            // 重置文件输入元素
+            this.$refs.fileInput.value = '';
             Toast('文件不符合要求已清空列表，请修改后重新上传');
           });
           return false;
@@ -328,6 +363,8 @@ export default {
         }).then(() => {
           // 验证失败后清空已选择的文件
           this.selectedFile = null;
+          // 重置文件输入元素
+          this.$refs.fileInput.value = '';
           Toast('文件不符合要求已清空列表，请修改后重新上传');
         });
         return false;
@@ -422,6 +459,8 @@ export default {
     goBack() {
       // 清空已选择的文件
       this.selectedFile = null;
+      // 重置文件输入元素
+      this.$refs.fileInput.value = '';
       // 返回上一页
       this.$router.go(-1);
     }
@@ -498,4 +537,26 @@ export default {
 .upload-actions .van-button {
   flex: 1;
 }
+
+.footer {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  padding: 10px 0;
+  color: #666;
+  font-size: 14px;
+  background-color: #f5f5f5;
+}
+
+.footer a {
+  color: #3fb3fb;
+  text-decoration: none;
+}
+
+.footer a:hover {
+  text-decoration: underline;
+}
+
 </style>

@@ -563,7 +563,7 @@ export default {
       // 跳转到出库页面，传递当前选中的物品信息
       if (this.currentItem) {
         this.$router.push({
-          name: 'InventoryOutbound',
+          name: 'InventoryOutboundV1',
           params: {
             department: this.$route.params.department
           },
@@ -580,7 +580,7 @@ export default {
       // 跳转到入库页面，传递当前选中的物品信息
       if (this.currentItem) {
         this.$router.push({
-          name: 'InventoryInbound',
+          name: 'InventoryInboundV1',
           params: {
             department: this.$route.params.department
           },
@@ -596,7 +596,7 @@ export default {
       // 跳转到日志页面，传递当前选中的物品信息
       if (this.currentItem) {
         this.$router.push({
-          name: 'InventoryLog',
+          name: 'InventoryLogV1',
           params: {
             department: this.$route.params.department
           },

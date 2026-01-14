@@ -311,6 +311,24 @@ const router = new Router({
       meta: { title: '日志记录' }
     },
     {
+      path: '/:department/inventory-outboundV1',
+      name: 'InventoryOutboundV1',
+      component: () => import('../views/inventoryV1/InventoryOutboundV1.vue'),
+      meta: { title: '快速出库V1' }
+    },
+    {
+      path: '/:department/inventory-inboundV1',
+      name: 'InventoryInboundV1',
+      component: () => import('../views/inventoryV1/InventoryInboundV1.vue'),
+      meta: { title: '快速入库V1' }
+    },
+    {
+      path: '/:department/inventoryLogV1',
+      name: 'InventoryLogV1',
+      component: () => import('../views/inventoryV1/InventoryLogV1.vue'),
+      meta: { title: '日志记录V1' }
+    },
+    {
       path: '/:department/inventory/add',
       name: 'InventoryAdd',
       component: () => import('../views/inventory/InventoryAdd.vue'),

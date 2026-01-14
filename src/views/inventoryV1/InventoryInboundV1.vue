@@ -181,7 +181,7 @@ export default {
           },
           Remark: this.remark || this.itemData.Remark || ''
         };
-        // 调用出库接口
+        // 调用入库接口
         SensorRequestPage.InventoryTransactionAddFun(
           JSON.stringify(requestData),
           (respData) => {

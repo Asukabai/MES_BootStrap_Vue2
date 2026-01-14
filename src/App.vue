@@ -42,7 +42,7 @@ export default {
     showTabBar() {
       const hiddenPaths = ['login', 'inventory', 'weeklyReport', 'chatDetail', 'chat_category',
         'post-detail', 'createGroup', 'DingtalkFilePreview','inventoryExtendInfoAdd',
-        'InventoryExtendInfoView','InventoryExtendInfoEdit','vat-calculator' ]
+        'InventoryExtendInfoView','InventoryExtendInfoEdit','vat-calculator','excelUpload' ]
       return !hiddenPaths.some(path => this.$route.path.includes(path))
     },
     notifications() {
