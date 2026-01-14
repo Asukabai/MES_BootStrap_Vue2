@@ -176,8 +176,9 @@ export default {
           Quantity_Change: this.outboundQuantity,
           Current_Quantity: this.itemData.Current_Stock + this.outboundQuantity,
           Report_Person: {
-            Person_Name: getLocalUserInfo().name || '缓存过期',
-            Person_ID: getLocalUserInfo().dingID || '缓存过期'
+            Person_Name: getLocalUserInfo().name ,
+            Person_Phone: getLocalUserInfo().phone ,
+            Person_DingID: getLocalUserInfo().dingID
           },
           Remark: this.remark || this.itemData.Remark || ''
         };

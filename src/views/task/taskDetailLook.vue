@@ -157,7 +157,9 @@ export default {
       currentContent: {},
       currentPopupTitle: '',
       filePopupVisible: false,
-      hiddenFields: ['Task_Code', 'ID_TaskInfo', 'Uuid', 'Logic_del', 'Id', 'Task_StageFile', 'Ts_create', 'Ts_edit', 'Task_Files', 'Task_Evidence']
+      hiddenFields: ['Task_Code', 'ID_TaskInfo', 'Uuid',
+        'Logic_del', 'Id', 'Task_StageFile', 'PageIndex', 'PageSize', 'RowIndex',
+        'Ts_create', 'Ts_edit', 'Task_Files', 'Task_Evidence']
     }
   },
   mounted() {

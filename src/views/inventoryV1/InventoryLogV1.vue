@@ -88,104 +88,104 @@
       </van-tab>
 
       <!-- 个人操作日志 -->
-      <van-tab title="个人操作日志">
-        <template #title>
-          <span>个人操作</span>
-        </template>
-        <!-- 下拉刷新组件 -->
-        <van-pull-refresh v-model="personRefreshing" @refresh="onPersonRefresh">
-          <!-- 标签栏 -->
-<!--          <div class="filter-tags-container">-->
-<!--            <van-tabs v-model="personFilterTab" animated @change="onPersonFilterChange">-->
-<!--              <van-tab title="时间正序" name="asc"></van-tab>-->
-<!--              <van-tab title="时间倒序" name="desc"></van-tab>-->
-<!--              <van-tab title="入库操作" name="inbound"></van-tab>-->
-<!--              <van-tab title="出库操作" name="outbound"></van-tab>-->
-<!--            </van-tabs>-->
+<!--      <van-tab title="个人操作日志">-->
+<!--        <template #title>-->
+<!--          <span>个人操作</span>-->
+<!--        </template>-->
+<!--        &lt;!&ndash; 下拉刷新组件 &ndash;&gt;-->
+<!--        <van-pull-refresh v-model="personRefreshing" @refresh="onPersonRefresh">-->
+<!--          &lt;!&ndash; 标签栏 &ndash;&gt;-->
+<!--&lt;!&ndash;          <div class="filter-tags-container">&ndash;&gt;-->
+<!--&lt;!&ndash;            <van-tabs v-model="personFilterTab" animated @change="onPersonFilterChange">&ndash;&gt;-->
+<!--&lt;!&ndash;              <van-tab title="时间正序" name="asc"></van-tab>&ndash;&gt;-->
+<!--&lt;!&ndash;              <van-tab title="时间倒序" name="desc"></van-tab>&ndash;&gt;-->
+<!--&lt;!&ndash;              <van-tab title="入库操作" name="inbound"></van-tab>&ndash;&gt;-->
+<!--&lt;!&ndash;              <van-tab title="出库操作" name="outbound"></van-tab>&ndash;&gt;-->
+<!--&lt;!&ndash;            </van-tabs>&ndash;&gt;-->
+<!--&lt;!&ndash;          </div>&ndash;&gt;-->
+<!--          &lt;!&ndash; 个人操作日志部分的过滤控件 &ndash;&gt;-->
+<!--          <div class="filter-segment-container">-->
+<!--            <van-grid :column-num="4" :border="false">-->
+<!--              <van-grid-item>-->
+<!--                <div-->
+<!--                  :class="['filter-item', personFilterTab === 'desc' ? 'active' : '']"-->
+<!--                  @click="() => onPersonFilterChange('desc')"-->
+<!--                >-->
+<!--                  <van-icon name="arrow-down" />-->
+<!--                  <div>倒序</div>-->
+<!--                </div>-->
+<!--              </van-grid-item>-->
+<!--              <van-grid-item>-->
+<!--                <div-->
+<!--                  :class="['filter-item', personFilterTab === 'asc' ? 'active' : '']"-->
+<!--                  @click="() => onPersonFilterChange('asc')"-->
+<!--                >-->
+<!--                  <van-icon name="arrow-up" />-->
+<!--                  <div>正序</div>-->
+<!--                </div>-->
+<!--              </van-grid-item>-->
+
+<!--              <van-grid-item>-->
+<!--                <div-->
+<!--                  :class="['filter-item', personFilterTab === 'inbound' ? 'active' : '']"-->
+<!--                  @click="() => onPersonFilterChange('inbound')"-->
+<!--                >-->
+<!--                  <van-icon name="passed" />-->
+<!--                  <div>入库</div>-->
+<!--                </div>-->
+<!--              </van-grid-item>-->
+<!--              <van-grid-item>-->
+<!--                <div-->
+<!--                  :class="['filter-item', personFilterTab === 'outbound' ? 'active' : '']"-->
+<!--                  @click="() => onPersonFilterChange('outbound')"-->
+<!--                >-->
+<!--                  <van-icon name="underway" />-->
+<!--                  <div>出库</div>-->
+<!--                </div>-->
+<!--              </van-grid-item>-->
+<!--            </van-grid>-->
 <!--          </div>-->
-          <!-- 个人操作日志部分的过滤控件 -->
-          <div class="filter-segment-container">
-            <van-grid :column-num="4" :border="false">
-              <van-grid-item>
-                <div
-                  :class="['filter-item', personFilterTab === 'desc' ? 'active' : '']"
-                  @click="() => onPersonFilterChange('desc')"
-                >
-                  <van-icon name="arrow-down" />
-                  <div>倒序</div>
-                </div>
-              </van-grid-item>
-              <van-grid-item>
-                <div
-                  :class="['filter-item', personFilterTab === 'asc' ? 'active' : '']"
-                  @click="() => onPersonFilterChange('asc')"
-                >
-                  <van-icon name="arrow-up" />
-                  <div>正序</div>
-                </div>
-              </van-grid-item>
+<!--          <div class="cards-container">-->
+<!--            <van-empty description="" v-if="personList.length === 0 && !personLoading && personFinished" />-->
+<!--            <van-list-->
+<!--              :loading="personLoading"-->
+<!--              :finished="personFinished"-->
+<!--              finished-text="没有更多了"-->
+<!--              @load="loadPersonData"-->
+<!--            >-->
+<!--              <van-card-->
+<!--                v-for="item in personList"-->
+<!--                :key="item.Id"-->
+<!--                :title="`操作类型：${item.Transaction_Type || '未知'}`"-->
+<!--                class="share-card"-->
+<!--              >-->
+<!--                <template #desc>-->
+<!--                  <div class="card-desc">-->
+<!--                    <div>库存ID: {{ item.Inventory_ID }}</div>-->
+<!--                    <div>操作人: {{ item.Report_Person.Person_Name || '无' }}</div>-->
+<!--                    <div>备注: {{ item.Remark || '无' }}</div>-->
+<!--                  </div>-->
+<!--                </template>-->
+<!--                <template #tags>-->
+<!--                  <van-tag plain type="primary" style="margin-right: 8px; margin-bottom: 8px;">-->
+<!--                    数量变化：{{ formatQuantityChange(item) }}-->
+<!--                  </van-tag>-->
+<!--                  <van-tag plain type="success" style="margin-right: 8px; margin-bottom: 8px;">操作后库存：{{ item.Current_Quantity }}</van-tag>-->
+<!--                </template>-->
 
-              <van-grid-item>
-                <div
-                  :class="['filter-item', personFilterTab === 'inbound' ? 'active' : '']"
-                  @click="() => onPersonFilterChange('inbound')"
-                >
-                  <van-icon name="passed" />
-                  <div>入库</div>
-                </div>
-              </van-grid-item>
-              <van-grid-item>
-                <div
-                  :class="['filter-item', personFilterTab === 'outbound' ? 'active' : '']"
-                  @click="() => onPersonFilterChange('outbound')"
-                >
-                  <van-icon name="underway" />
-                  <div>出库</div>
-                </div>
-              </van-grid-item>
-            </van-grid>
-          </div>
-          <div class="cards-container">
-            <van-empty description="" v-if="personList.length === 0 && !personLoading && personFinished" />
-            <van-list
-              :loading="personLoading"
-              :finished="personFinished"
-              finished-text="没有更多了"
-              @load="loadPersonData"
-            >
-              <van-card
-                v-for="item in personList"
-                :key="item.Id"
-                :title="`操作类型：${item.Transaction_Type || '未知'}`"
-                class="share-card"
-              >
-                <template #desc>
-                  <div class="card-desc">
-                    <div>库存ID: {{ item.Inventory_ID }}</div>
-                    <div>操作人: {{ item.Report_Person.Person_Name || '无' }}</div>
-                    <div>备注: {{ item.Remark || '无' }}</div>
-                  </div>
-                </template>
-                <template #tags>
-                  <van-tag plain type="primary" style="margin-right: 8px; margin-bottom: 8px;">
-                    数量变化：{{ formatQuantityChange(item) }}
-                  </van-tag>
-                  <van-tag plain type="success" style="margin-right: 8px; margin-bottom: 8px;">操作后库存：{{ item.Current_Quantity }}</van-tag>
-                </template>
-
-                <template #footer>
-                  <van-button
-                    icon="clock-o"
-                    round
-                    size="small"
-                    type="info"
-                  >{{ formatDate(item.Ts_create) }}</van-button>
-                </template>
-              </van-card>
-            </van-list>
-          </div>
-        </van-pull-refresh>
-      </van-tab>
+<!--                <template #footer>-->
+<!--                  <van-button-->
+<!--                    icon="clock-o"-->
+<!--                    round-->
+<!--                    size="small"-->
+<!--                    type="info"-->
+<!--                  >{{ formatDate(item.Ts_create) }}</van-button>-->
+<!--                </template>-->
+<!--              </van-card>-->
+<!--            </van-list>-->
+<!--          </div>-->
+<!--        </van-pull-refresh>-->
+<!--      </van-tab>-->
     </van-tabs>
   </div>
 </template>
@@ -485,7 +485,7 @@ export default {
           let JSON_Data = JSON.parse(respData)
           console.log("加载库存操作日志数据 JSON_Data : "+respData)
           // 成功回调
-          this.originalInventoryList = JSON_Data || [];
+          this.originalInventoryList = JSON_Data.Data || [];
           this.inventoryList = [...this.originalInventoryList];
 
           // 根据当前过滤选项处理数据
@@ -524,7 +524,7 @@ export default {
           let JSON_Data = JSON.parse(respData)
           console.log("加载个人操作日志数据 JSON_Data : "+respData)
           // 成功回调
-          this.originalPersonList = JSON_Data || [];
+          this.originalPersonList = JSON_Data.Data || [];
           this.personList = [...this.originalPersonList];
 
           // 根据当前过滤选项处理数据
