@@ -47,6 +47,14 @@
         </van-button>
       </div>
     </div>
+
+    <!-- 悬浮按钮组件 -->
+    <ExpandableFloatingButton
+      :initial-position="{ bottom: 100, right: 50 }"
+      :main-icon="mainIcon"
+      :sub-buttons="floatingSubButtons"
+      expand-direction="vertical"
+    />
   </div>
 </template>
 
@@ -54,16 +62,50 @@
 import { Toast, Dialog } from 'vant'
 import * as XLSX from 'xlsx'
 import SensorRequestPage from "../../utils/SensorRequestPage";
+import ExpandableFloatingButton from '@/components/ExpandableFloatingButton.vue'; // 引入悬浮按钮组件
 
 export default {
   name: 'ExcelUpload',
+  components: {
+    ExpandableFloatingButton // 注册组件
+  },
   data() {
     return {
+      // 悬浮按钮图标
+      mainIcon: require('@/assets/导入下载.png'), // 主按钮图标
       selectedFile: null,
-      uploading: false
+      uploading: false,
+      floatingSubButtons: [
+        {
+          icon: require('@/assets/导入Excel模板文件.png'), // 子按钮图标
+          label: '下载空模板文件',
+          handler: () => this.downloadTemplate(),
+          position: { x: 15, y: 60 }  // 自定义位置
+        },
+        {
+          icon: require('@/assets/注意事项.png'), // 子按钮图标
+          label: '下载示例数据模板文件',
+          handler: () => this.exportData(),
+          position: { x: -105, y: 40 }  // 自定义位置
+        }
+      ]
     }
   },
   methods: {
+    // 下载模板功能（占位实现）
+    downloadTemplate() {
+      console.log('下载模板功能触发');
+      // TODO: 实际的下载模板逻辑
+      Toast('正在下载模板文件...');
+    },
+
+    // 导出数据功能（占位实现）
+    exportData() {
+      console.log('导出数据功能触发');
+      // TODO: 实际的导出数据逻辑
+      Toast('正在导出数据...');
+    },
+
     handleFileSelect(event) {
       const files = event.target.files;
       if (files.length > 0) {
@@ -137,7 +179,6 @@ export default {
 
         // 验证行数（排除标题行）
         const dataRows = jsonData.slice(1); // 排除标题行
-
         if (dataRows.length > 100) {
           Dialog.alert({
             title: '提示',
@@ -161,10 +202,10 @@ export default {
           const row = dataRows[i];
 
           // 检查是否至少有14列数据（N列是第14列）
-          if (row.length < 14) {
-            validationErrors.push(`第${i + 2}行数据不完整，缺少必要列信息，请检查数据完整性。`);
-            continue; // 跳过此行后续验证
-          }
+          // if (row.length < 14) {
+          //   validationErrors.push(`第${i + 2}行数据不完整，缺少必要列信息，请检查数据完整性。`);
+          //   continue; // 跳过此行后续验证
+          // }
 
           // 检查整行是否全为空（A到N列）
           const isRowEmpty = row.slice(0, 14).every(cell =>
