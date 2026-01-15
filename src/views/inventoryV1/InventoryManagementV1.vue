@@ -105,10 +105,28 @@
       :confirm-button-text="'删除'"
       :confirm-button-color="'#ee0a24'"
     />
-    <!-- 添加悬浮按钮 -->
-    <FloatingActionButton
-      @click="onFloatingButtonClick"
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 200, right: 10 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="53"
+      :icon-size="53"
+      :on-click="goBack"
+    />
+    <!-- 使用自定义图标悬浮按钮 -->
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 130, right: 10 }"
+      :icon-src="require('@/assets/高级检索.png')"
+      :background-size="55"
+      :icon-size="35"
+      :on-click="navigateToAdvancedSearch"
+    />
+    <!-- 使用自定义图标悬浮按钮 -->
+    <CustomizableFloatingButton
       :initial-position="{ bottom: 60, right: 10 }"
+      :icon-src="require('@/assets/新增图标.png')"
+      :background-size="53"
+      :icon-size="53"
+      :on-click="onFloatingButtonClick"
     />
   </div>
 </template>
@@ -118,10 +136,12 @@ import { Toast, Dialog } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import FloatingActionButton from '../../components/FloatingActionButton.vue';
 import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding";
-import SensorRequestPage from "../../utils/SensorRequestPage"; // 引入组件
+import SensorRequestPage from "../../utils/SensorRequestPage";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue"; // 引入组件
 export default {
   name: 'InventoryManagementV1',
   components: {
+    CustomizableFloatingButton,
     FloatingActionButton // 注册组件
   },
   data() {
@@ -196,6 +216,20 @@ export default {
     }
   },
   methods: {
+    // 返回上一页
+    goBack() {
+      this.$router.go(-1);
+    },
+    // 跳转到高级检索页面
+    navigateToAdvancedSearch() {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}/advanced-search`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     navigateTo(path) {
       const department = this.$route.params.department;
       if (department) {

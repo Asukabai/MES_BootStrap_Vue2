@@ -139,6 +139,43 @@
           </template>
         </van-cell>
 
+        <!-- 标签编辑区域 -->
+        <van-cell title="物品标签">
+          <template #default>
+            <div class="tags-container">
+              <!-- 已添加的标签 -->
+              <div class="tag-list">
+                <div
+                  v-for="(tag, index) in itemTags"
+                  :key="index"
+                  class="custom-tag-item"
+                >
+                  <span class="tag-text">{{ tag }}</span>
+                  <span class="tag-close" @click="removeTag(index)">×</span>
+                </div>
+              </div>
+              <!-- 标签输入 -->
+              <div class="tag-input-wrapper">
+                <van-field
+                  v-model="newTag"
+                  placeholder="输入标签后按回车添加"
+                  class="tag-input"
+                  @keypress.enter="addTag"
+                />
+                <van-button
+                  type="primary"
+                  size="small"
+                  @click="addTag"
+                  class="add-tag-btn"
+                  native-type="button"
+                >
+                  添加
+                </van-button>
+              </div>
+            </div>
+          </template>
+        </van-cell>
+
         <!-- 更多信息编辑 -->
         <van-cell :border="false">
           <template #title>
@@ -177,7 +214,6 @@
             + 自定义添加更多信息字段
           </van-button>
         </div>
-
 
         <van-cell title="上传图片(正视图、左视图、俯视图)">
           <template #label>
@@ -314,7 +350,8 @@ export default {
         Item_Unit: '',
         Item_Material: '',
         Item_Images: [],
-        Item_Mores: ''
+        Item_Mores: '',
+        Item_Tags: [] // 新增标签字段
       },
       // 添加用于显示的字段
       itemName: this.getItemName(),
@@ -329,6 +366,9 @@ export default {
       loading: true, // 加载状态
       // 更多字段
       moreFields: [],
+      // 标签相关
+      itemTags: [], // 存储标签数组
+      newTag: '', // 输入的新标签
       // 新增图片预览相关数据
       showImagePreview: false,
       currentImage: null,
@@ -459,8 +499,12 @@ export default {
                 Item_Unit: itemData.Item_Unit || '',
                 Item_Material: itemData.Item_Material || '',
                 Item_Images: itemData.Item_Images || [],
-                Item_Mores: itemData.Item_Mores || ''
+                Item_Mores: itemData.Item_Mores || '',
+                Item_Tags: itemData.Item_Tags || [] // 加载标签信息
               };
+
+              // 初始化标签
+              this.itemTags = [...(itemData.Item_Tags || [])];
 
               // 解析更多信息
               if (itemData.Item_Mores) {
@@ -510,6 +554,28 @@ export default {
     // 移除更多字段
     removeMoreField(index) {
       this.moreFields.splice(index, 1);
+    },
+
+    // 添加标签方法
+    addTag() {
+      if (this.newTag.trim()) {
+        // 检查标签是否已存在，避免重复
+        if (!this.itemTags.includes(this.newTag.trim())) {
+          this.itemTags.push(this.newTag.trim());
+          this.newTag = ''; // 清空输入框
+          this.$toast.success('标签添加成功');
+        } else {
+          this.$toast('标签已存在');
+        }
+      } else {
+        this.$toast('请输入标签内容');
+      }
+    },
+
+    // 删除标签方法
+    removeTag(index) {
+      this.itemTags.splice(index, 1);
+      this.$toast.success('标签已删除');
     },
 
     // 将文件转换为base64的方法
@@ -767,7 +833,7 @@ export default {
 
       this.isSubmitting = true;
 
-      // 准备提交的数据（合并保留的原有图片和新上传的图片）
+      // 准备提交的数据（只使用用户保留的原有图片和新上传的图片）
       const allImages = [...this.existingImagesToKeep, ...this.imageList];
 
       // 构造更多信息JSON字符串
@@ -802,7 +868,8 @@ export default {
           File_Base64: img.File_Base64 || "",
           Upload_Time: img.Upload_Time || new Date().toISOString()
         })),
-        Item_Mores: itemMores
+        Item_Mores: itemMores,
+        Item_Tags: this.itemTags // 添加标签信息
       };
 
       try {
@@ -820,8 +887,23 @@ export default {
         this.$toast.success('修改成功');
         // 清空表单
         this.resetForm();
+        // setTimeout(() => {
+        //   // this.$router.go(-1); Vue 组件缓存：浏览器历史记录返回不会重新创建组件实例
+        // 数据未刷新：InventoryDetailV1.vue 的 loadInventoryData() 方法不会自动执行
+        // }, 1000);
         setTimeout(() => {
-          this.$router.go(-1);
+          const department = this.$route.params.department;
+          if (department) {
+            this.$router.push(`/${department}/inventoryDetailV1`);
+            // 传递参数通知父页面需要刷新
+            // this.$router.push({
+            //   path: '/'+ this.$route.params.department + '/inventoryDetailV1',
+            //   query: { refresh: 'true' }
+            // });
+          } else {
+            console.error('未找到 department 参数');
+            this.$toast.fail('路由参数缺失');
+          }
         }, 1000);
       } catch (error) {
         this.$toast.fail('修改失败：' + error.message);
@@ -849,8 +931,11 @@ export default {
         Item_Unit: '',
         Item_Material: '',
         Item_Images: [],
-        Item_Mores: ''
+        Item_Mores: '',
+        Item_Tags: []
       };
+      this.itemTags = []; // 清空标签
+      this.newTag = ''; // 清空新标签输入框
       this.imageList = [];
       this.fileList = [];
       this.existingImages = [];
@@ -997,6 +1082,71 @@ export default {
 .remove-field-btn {
   align-self: flex-end; /* 将删除按钮对齐到右侧 */
   margin-top: 5px;
+}
+
+/* 标签编辑样式 */
+.tags-container {
+  width: 100%;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.custom-tag-item {
+  display: inline-flex;
+  align-items: center;
+  background-color: #f5f5f5;
+  border: 1px solid #ebedf0;
+  border-radius: 16px;
+  padding: 4px 8px 4px 12px;
+  margin-right: 5px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.tag-text {
+  margin-right: 5px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background-color: #c8c9cc;
+  border-radius: 50%;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.tag-close:hover {
+  background-color: #ee0a24;
+}
+
+.tag-input-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.tag-input {
+  flex: 1;
+  min-width: 0; /* 防止输入框溢出 */
+}
+
+.add-tag-btn {
+  flex-shrink: 0;
 }
 
 /* 图片预览弹窗样式 */

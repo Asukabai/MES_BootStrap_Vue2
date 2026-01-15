@@ -175,7 +175,43 @@
             </van-button>
           </div>
 
-
+          <!-- 标签输入区域 -->
+          <van-cell :border="false">
+            <template #title>
+              <span>物品标签</span>
+            </template>
+          </van-cell>
+          <div class="tags-container">
+            <!-- 已添加的标签 -->
+            <div class="tag-list">
+              <div
+                v-for="(tag, index) in itemTags"
+                :key="index"
+                class="custom-tag-item"
+              >
+                <span class="tag-text">{{ tag }}</span>
+                <span class="tag-close" @click="removeTag(index)">×</span>
+              </div>
+            </div>
+            <!-- 标签输入 -->
+            <div class="tag-input-wrapper">
+              <van-field
+                v-model="newTag"
+                placeholder="输入标签后按回车添加"
+                class="tag-input"
+                @keypress.enter="addTag"
+              />
+              <van-button
+                type="primary"
+                size="small"
+                @click="addTag"
+                class="add-tag-btn"
+                native-type="button"
+              >
+                添加
+              </van-button>
+            </div>
+          </div>
 
           <!-- 图片上传 -->
           <van-cell title="物品图片">
@@ -267,7 +303,10 @@ export default {
       moreFields: [],
       // 图片相关
       fileList: [],
-      imageList: []
+      imageList: [],
+      // 标签相关
+      itemTags: [], // 存储标签数组
+      newTag: '' // 输入的新标签
     };
   },
   created() {
@@ -446,6 +485,28 @@ export default {
       this.moreFields.splice(index, 1);
     },
 
+    // 添加标签方法
+    addTag() {
+      if (this.newTag.trim()) {
+        // 检查标签是否已存在，避免重复
+        if (!this.itemTags.includes(this.newTag.trim())) {
+          this.itemTags.push(this.newTag.trim());
+          this.newTag = ''; // 清空输入框
+          Toast.success('标签添加成功');
+        } else {
+          Toast('标签已存在');
+        }
+      } else {
+        Toast('请输入标签内容');
+      }
+    },
+
+    // 删除标签方法
+    removeTag(index) {
+      this.itemTags.splice(index, 1);
+      Toast.success('标签已删除');
+    },
+
     // 将文件转换为base64的方法
     processFileToBase64(file) {
       return new Promise((resolve, reject) => {
@@ -542,7 +603,8 @@ export default {
           Current_Stock: 0, // 新增物品初始库存为0
           Is_Low_Stock: '', // 初始状态不设置低库存标记
           Item_Images: this.imageList, // 设置图片信息
-          Item_Mores: this.convertMoreFieldsToString() // 将更多字段转换为字符串
+          Item_Mores: this.convertMoreFieldsToString(), // 将更多字段转换为字符串
+          Item_Tags: this.itemTags // 添加标签信息
         };
 
         // 如果是项目分类，需要查找对应的项目代码
@@ -618,7 +680,7 @@ export default {
           Company: this.itemForm.Company
         };
 
-        SensorRequest.InventoryItemsGetFun(JSON.stringify(checkParam), (respData) => {
+        SensorRequestPage.InventoryItemGetFun(JSON.stringify(checkParam), (respData) => {
           try {
             const data = JSON.parse(respData);
             // 如果返回空数组，说明位置不存在，可以新增
@@ -685,7 +747,6 @@ export default {
   margin-top: 5px;
 }
 
-
 .more-field-row {
   display: flex;
   align-items: center;
@@ -721,5 +782,67 @@ export default {
   padding: 20px;
   border: 1px dashed #e5e5e5;
   border-radius: 4px;
+}
+
+.tags-container {
+  padding-left: 16px;
+  padding-right: 16px;
+  margin-bottom: 15px;
+}
+
+.tag-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 10px;
+}
+
+.custom-tag-item {
+  display: inline-flex;
+  align-items: center;
+  background-color: #f5f5f5;
+  border: 1px solid #ebedf0;
+  border-radius: 16px;
+  padding: 4px 8px 4px 12px;
+  margin-right: 5px;
+  margin-bottom: 5px;
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.tag-text {
+  margin-right: 5px;
+  max-width: 100px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tag-close {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  background-color: #c8c9cc;
+  border-radius: 50%;
+  color: white;
+  font-size: 12px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.tag-close:hover {
+  background-color: #ee0a24;
+}
+
+.tag-input-wrapper {
+  display: flex;
+  gap: 8px;
+}
+
+.tag-input {
+  flex: 1;
+  min-width: 0; /* 防止输入框溢出 */
 }
 </style>

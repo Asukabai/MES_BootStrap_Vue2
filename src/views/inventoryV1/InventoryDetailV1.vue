@@ -17,6 +17,23 @@
                 </van-cell>
                 <van-cell title="货架位置" :value="currentItem.Shelf_Location" />
                 <van-cell title="物品型号" :value="currentItem.Item_Model" />
+                <!-- 标签展示区域 -->
+                <van-cell title="物品标签">
+                  <template #default>
+                    <div class="tags-display-container">
+                      <template v-if="currentItem.Item_Tags && currentItem.Item_Tags.length > 0">
+                        <div
+                          v-for="(tag, index) in currentItem.Item_Tags"
+                          :key="index"
+                          class="display-tag-item"
+                        >
+                          <span class="tag-text">{{ tag }}</span>
+                        </div>
+                      </template>
+                      <span v-else class="no-tags">暂无标签</span>
+                    </div>
+                  </template>
+                </van-cell>
                 <van-cell title="物品颜色" :value="currentItem.Item_Color || '未填写'" />
                 <van-cell title="物品尺寸" :value="currentItem.Item_Size || '未填写'" />
                 <van-cell title="物品单位" :value="currentItem.Item_Unit || '未填写'" />
@@ -78,10 +95,19 @@
           <van-empty v-else-if="!currentItem" description="暂无库存信息录入，请点击 + 按钮进行信息新增，或请确认扫描二维码是否正确" />
         </van-pull-refresh>
 
+        <CustomizableFloatingButton
+          v-if="currentItem"
+          :initial-position="{ bottom: 60, right: 130 }"
+          :icon-src="require('@/assets/返回.png')"
+          :background-size="49"
+          :icon-size="49"
+          :on-click="goBack"
+        />
+
         <!-- 只有当有内容时才显示主功能按钮 -->
         <ExpandableFloatingButton
           v-if="currentItem"
-          :initial-position="{ bottom: 60, right: 165 }"
+          :initial-position="{ bottom: 60, right: 205 }"
           :main-icon="mainIcon"
           :sub-buttons="actionButtons"
         />
@@ -130,6 +156,7 @@ import {key_DingScannedInventoryQRCodeResult} from '../../utils/Dingding';
 import FloatingActionButton from "../../components/FloatingActionButton.vue";
 import ExpandableFloatingButton from "../../components/ExpandableFloatingButton.vue"; // 新增导入
 import SensorRequestPage from "../../utils/SensorRequestPage";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 // 创建一个图标管理器
 const icons = {
   main: require('@/assets/企业头像.png'),
@@ -141,6 +168,7 @@ const icons = {
 export default {
   name: 'InventoryDetail',
   components: {
+    CustomizableFloatingButton,
     FloatingActionButton,
     ExpandableFloatingButton // 新增组件注册
   },
@@ -176,6 +204,9 @@ export default {
       isDragging: false,
     };
   },
+  // 添加 activated 钩子
+  // this.$router.push(): 创建新组件实例 → 触发 created、mounted
+  // this.$router.go(-1): 返回历史记录 → 如果组件被缓存，则触发 activated
   created() {
     this.loadInventoryData();
   },
@@ -245,6 +276,9 @@ export default {
     }
   },
   methods: {
+    goBack() {
+      this.$router.go(-1);
+    },
     navigateTo(path) {
       const department = this.$route.params.department;
       if (department) {
@@ -815,5 +849,40 @@ export default {
 
 .preview-image:active {
   cursor: grabbing;
+}
+/* 标签展示样式 */
+.tags-display-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  justify-content: flex-end; /* 右对齐 */
+  align-items: center;
+  min-height: 24px;
+  width: 100%;
+  /* 不设置max-width，让flex容器自然填充剩余空间 */
+}
+
+.display-tag-item {
+  display: inline-flex;
+  align-items: center;
+  background-color: #f5f5f5;
+  border: 1px solid #ebedf0;
+  border-radius: 16px;
+  padding: 4px 8px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: #333;
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  flex-shrink: 1; /* 允许收缩 */
+  box-sizing: border-box; /* 确保盒子模型正确 */
+}
+
+.no-tags {
+  color: #969799;
+  font-size: 14px;
+  text-align: right; /* 右对齐 */
 }
 </style>

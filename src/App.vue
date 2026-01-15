@@ -15,7 +15,7 @@
       </div>
     </div>
       <div class="main-content">
-        <router-view />
+          <router-view/>
       </div>
       <!-- 底部导航 -->
       <MainTabBar v-if="showTabBar" />
@@ -42,7 +42,8 @@ export default {
     showTabBar() {
       const hiddenPaths = ['login', 'inventory', 'weeklyReport', 'chatDetail', 'chat_category',
         'post-detail', 'createGroup', 'DingtalkFilePreview','inventoryExtendInfoAdd',
-        'InventoryExtendInfoView','InventoryExtendInfoEdit','vat-calculator','excelUpload' ]
+        'InventoryExtendInfoView','InventoryExtendInfoEdit','vat-calculator',
+        'excelUpload','InventoryInfoEdit','advanced-search','download' ]
       return !hiddenPaths.some(path => this.$route.path.includes(path))
     },
     notifications() {

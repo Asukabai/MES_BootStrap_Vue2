@@ -138,6 +138,7 @@
 import { Toast } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import * as dd from 'dingtalk-jsapi';
+import SensorRequestPage from "../../utils/SensorRequestPage";
 
 export default {
   name: 'InventoryAdd',
@@ -294,7 +295,7 @@ export default {
             param.Project_Code = '';
           }
 
-          SensorRequest.InventoryItemsAddFun(JSON.stringify(param), (respData) => {
+          SensorRequestPage.InventoryItemAddFun(JSON.stringify(param), (respData) => {
             Toast.success('新增物品成功');
             // 返回上一页
             this.$router.go(-1);
@@ -324,7 +325,7 @@ export default {
           Company: this.itemForm.Company
         };
 
-        SensorRequest.InventoryItemsGetFun(JSON.stringify(checkParam), (respData) => {
+        SensorRequestPage.InventoryItemGetFun(JSON.stringify(checkParam), (respData) => {
           try {
             const data = JSON.parse(respData);
             // 如果返回空数组，说明位置不存在，可以新增
