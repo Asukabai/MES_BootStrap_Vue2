@@ -66,8 +66,8 @@
 import { Toast, Dialog } from 'vant'
 import * as XLSX from 'xlsx'
 import SensorRequestPage from "../../utils/SensorRequestPage";
-import ExpandableFloatingButton from '@/components/ExpandableFloatingButton.vue'; // 引入悬浮按钮组件
-
+import ExpandableFloatingButton from '@/components/ExpandableFloatingButton.vue';
+import {downloadFile} from '../../utils/fileUtils';
 export default {
   name: 'ExcelUpload',
   components: {
@@ -100,15 +100,39 @@ export default {
     // 下载模板功能（占位实现）
     downloadTemplate() {
       console.log('下载模板功能触发');
-      // TODO: 实际的下载模板逻辑
       Toast('正在下载模板文件...');
+      // 构造文件对象
+      const file = {
+        "File_Name": "导入模版_带条件格式.xlsx",
+        "File_Md5": "ec373ab394f04287dfee3000e68d5267",
+        "Person_Name": "张学进"
+      };
+      // 调用下载文件方法，使用固定的部门名称或者从当前路由获取
+      this.downloadFileWithDepartment(file);
     },
 
     // 导出数据功能（占位实现）
     exportData() {
-      console.log('导出数据功能触发');
-      // TODO: 实际的导出数据逻辑
-      Toast('正在导出数据...');
+      console.log('正在下载模板文件(含示例数据)...');
+      Toast('正在下载模板文件(含示例数据)...');
+      const file = {
+        "File_Name": "导入模版_带示例数据.xlsx",
+        "File_Md5": "7891a612a62cd9debaf895d4f2e1a616",
+        "Person_Name": "张学进"
+      };
+      // 调用下载文件方法，使用固定的部门名称或者从当前路由获取
+      this.downloadFileWithDepartment(file);
+    },
+    // 新增辅助方法用于处理文件下载
+    async downloadFileWithDepartment(file) {
+      try {
+        // 从路由参数中获取部门信息，如果没有则使用默认值
+        const department = this.$route.params.department || 'inventoryV1';
+        await downloadFile(file, department);
+      } catch (error) {
+        console.error('下载文件失败:', error);
+        Toast.fail('文件下载失败，请稍后重试');
+      }
     },
 
     handleFileSelect(event) {

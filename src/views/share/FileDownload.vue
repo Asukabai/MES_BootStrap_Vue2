@@ -35,14 +35,23 @@
       <p>✅ 下载已完成</p>
       <a :href="downloadLink" :download="fileName" target="_blank">点击下载文件</a>
     </div>
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 100, right: 40 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="53"
+      :icon-size="53"
+      :on-click="goBack"
+    />
   </div>
 </template>
 
 <script>
 import axios from 'axios'
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 export default {
   name: 'FileDownload',
+  components: {CustomizableFloatingButton},
   data() {
     return {
       downloading: false,
@@ -60,6 +69,10 @@ export default {
     this.initDownload()
   },
   methods: {
+    // 返回上一页
+    goBack() {
+      this.$router.go(-1);
+    },
     isMobile() {
       return /Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini|HarmonyOS|OpenHarmony/i.test(navigator.userAgent)
     },
