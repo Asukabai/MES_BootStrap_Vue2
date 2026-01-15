@@ -377,6 +377,12 @@ const router = new Router({
       meta: { title: '物品信息批量导入预览' }
     },
     {
+      path: '/:department/advanced-search',
+      name: 'AdvancedSearch',
+      component: () => import('../views/inventoryV1/AdvancedSearch.vue'),
+      meta: { title: '标签索引' }
+    },
+    {
       path: '/:department/vat-calculator',
       name: 'VatCalculator',
       component: () => import('@/components/VatCalculator.vue'),
