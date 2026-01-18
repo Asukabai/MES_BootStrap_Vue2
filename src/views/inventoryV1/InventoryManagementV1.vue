@@ -61,25 +61,38 @@
             class="inventory-cell"
           >
             <div class="cell-content" @click="viewDetail(item.Shelf_Location)">
-              <!-- 右上角删除按钮 -->
-              <div class="delete-btn" @click.stop="showDeleteDialog(item)">
-                <van-icon name="delete" />
+              <!-- 左侧图片区域（30%） -->
+              <div class="image-section">
+                <img
+                  :src="getImageUrl(item)"
+                  alt="物品图片"
+                  class="item-image"
+                  @error="onImageError"
+                />
               </div>
 
-              <div class="cell-header">
-                <div class="item-title">物品名称：{{ item.Item_Name }}</div>
-                <div class="item-subtitle">
-                  型号：<span class="model-value">{{ item.Item_Model }}</span> |
-                  库存：<span class="stock-value">{{ item.Current_Stock }}</span>
+              <!-- 右侧信息区域（70%） -->
+              <div class="info-section">
+                <!-- 右上角删除按钮 -->
+                <div class="delete-btn" @click.stop="showDeleteDialog(item)">
+                  <van-icon name="delete" />
                 </div>
-              </div>
-              <div class="cell-body">
-                <div class="item-info">
-                  <div class="info-row">
-                    <span class="label">公司:</span>
-                    <span class="value">{{ item.Company }}</span>
-                    <span class="label">位置:</span>
-                    <span class="value">{{ item.Shelf_Location }}</span>
+
+                <div class="cell-header">
+                  <div class="item-title">物品名称：{{ item.Item_Name }}</div>
+                  <div class="item-subtitle">
+                    型号：<span class="model-value">{{ item.Item_Model }}</span> |
+                    库存：<span class="stock-value">{{ item.Current_Stock }}</span>
+                  </div>
+                </div>
+                <div class="cell-body">
+                  <div class="item-info">
+                    <div class="info-row">
+                      <span class="label">公司:</span>
+                      <span class="value">{{ item.Company }}</span>
+                      <span class="label">位置:</span>
+                      <span class="value">{{ item.Shelf_Location }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -105,6 +118,18 @@
       :confirm-button-text="'删除'"
       :confirm-button-color="'#ee0a24'"
     />
+
+    <!-- 库存不为零提示弹窗 -->
+    <van-dialog
+      v-model="showStockCheckDialog"
+      title="库存检查"
+      :message="stockCheckMessage"
+      :show-confirm-button="false"
+      :show-cancel-button="true"
+      @cancel="cancelDelete"
+      :cancel-button-text="'关闭'"
+    />
+
     <CustomizableFloatingButton
       :initial-position="{ bottom: 200, right: 10 }"
       :icon-src="require('@/assets/返回.png')"
@@ -132,7 +157,7 @@
 </template>
 
 <script>
-import { Toast, Dialog } from 'vant';
+import {Dialog, Toast} from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import FloatingActionButton from '../../components/FloatingActionButton.vue';
 import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding";
@@ -202,6 +227,7 @@ export default {
       outboundRemark: '',
       outboundError: '',
       showDeleteConfirm: false, // 控制删除确认弹窗显示
+      showStockCheckDialog: false, // 控制库存检查弹窗显示
       deletingItem: null // 正在删除的项目
     };
   },
@@ -213,12 +239,17 @@ export default {
       return this.deletingItem ?
         `确定要删除物品 "${this.deletingItem.Item_Name}" 吗？此操作不可恢复。` :
         '确定要删除此物品吗？此操作不可恢复。';
+    },
+    stockCheckMessage() {
+      return this.deletingItem ?
+        `物品 "${this.deletingItem.Item_Name}" 当前库存为 ${this.deletingItem.Current_Stock}，请先将库存清零后再删除。` :
+        '当前物品库存不为零，请先清空库存后再删除。';
     }
   },
   methods: {
     // 返回上一页
     goBack() {
-      this.$router.go(-1);
+      this.navigateTo('/index');
     },
     // 跳转到高级检索页面
     navigateToAdvancedSearch() {
@@ -308,6 +339,7 @@ export default {
       });
     },
 
+// 修改 onLoad 方法以预加载图片 URL
     onLoad() {
       return new Promise((resolve) => {
         this.loading = true;
@@ -342,20 +374,62 @@ export default {
               newData = parsedData.Data;
             }
 
-            // 处理返回的数据格式
-            const processedData = newData.map(item => ({
-              ...item,
-              id: item.Id,
-              name: `${item.Item_Name} ${item.Item_Model || ''}`.trim(),
-              description: item.Remark || '',
-              category: item.Category_Type || '未知',
-              status: item.Is_Low_Stock === '是' ? '紧张' : '充足',
-              company: item.Company || '',
-              location: item.Shelf_Location || '',
-              stock: item.Current_Stock || 0,
-              model: item.Item_Model || '',
-              brand: item.Item_Brand || ''
-            }));
+            // 处理返回的数据格式并预加载图片URL
+            const processedData = newData.map(item => {
+              const processedItem = {
+                ...item,
+                id: item.Id,
+                name: `${item.Item_Name} ${item.Item_Model || ''}`.trim(),
+                description: item.Remark || '',
+                category: item.Category_Type || '未知',
+                status: item.Is_Low_Stock === '是' ? '紧张' : '充足',
+                company: item.Company || '',
+                location: item.Shelf_Location || '',
+                stock: item.Current_Stock || 0,
+                model: item.Item_Model || '',
+                brand: item.Item_Brand || '',
+                // 添加图片信息
+                Item_Images: item.Item_Images || [],
+                // 初始化图片URL为空字符串
+                imageUrl: ''
+              };
+
+              // 预加载图片URL
+              if (processedItem.Item_Images && processedItem.Item_Images.length > 0) {
+                const firstImage = processedItem.Item_Images[0];
+                if (firstImage.File_Md5) {
+                  // 调用后端接口获取临时下载URL
+                  const param = {
+                    remoteLocation: firstImage.File_Md5
+                  };
+
+                  SensorRequest.Minio_PresignedDownloadUrl5B(
+                    JSON.stringify(param),
+                    (respData) => {
+                      if (respData) {
+                        // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
+                        processedItem.imageUrl = respData.replace(
+                          'http://127.0.0.1:9000',
+                          'https://api-v2.sensor-smart.cn:22027'
+                        );
+                      } else {
+                        processedItem.imageUrl = require('@/assets/暂无图片1.png');
+                      }
+                    },
+                    (error) => {
+                      console.error('获取图片URL失败:', error);
+                      processedItem.imageUrl = require('@/assets/暂无图片1.png');
+                    }
+                  );
+                } else {
+                  processedItem.imageUrl = require('@/assets/暂无图片1.png');
+                }
+              } else {
+                processedItem.imageUrl = require('@/assets/暂无图片1.png');
+              }
+
+              return processedItem;
+            });
 
             if (this.currentPage === 1) {
               this.list = processedData;
@@ -392,6 +466,12 @@ export default {
           resolve();
         });
       });
+    },
+
+    // 修改获取图片URL方法
+    getImageUrl(item) {
+      // 直接返回预加载的图片URL
+      return item.imageUrl || require('@/assets/暂无图片1.png');
     },
 
     onRefresh() {
@@ -448,7 +528,15 @@ export default {
     // 显示删除确认弹窗
     showDeleteDialog(item) {
       this.deletingItem = item;
-      this.showDeleteConfirm = true;
+
+      // 检查库存数量
+      if (item.Current_Stock > 0) {
+        // 如果库存大于0，显示库存检查弹窗
+        this.showStockCheckDialog = true;
+      } else {
+        // 如果库存为0，直接显示删除确认弹窗
+        this.showDeleteConfirm = true;
+      }
     },
 
     // 确认删除
@@ -486,7 +574,12 @@ export default {
     // 取消删除
     cancelDelete() {
       this.showDeleteConfirm = false;
+      this.showStockCheckDialog = false;
       this.deletingItem = null;
+    },
+    // 图片加载失败时的处理
+    onImageError(event) {
+      event.target.src = require('@/assets/暂无图片1.png');
     }
   }
 };
@@ -571,6 +664,7 @@ export default {
 }
 
 .cell-content {
+  display: flex;
   padding: 8px;
   position: relative; /* 为删除按钮定位做准备 */
   cursor: pointer; /* 表示这是一个可点击的卡片 */
@@ -578,6 +672,27 @@ export default {
 
 .cell-content:hover {
   background-color: #f8f8f8; /* 鼠标悬停时的视觉反馈 */
+}
+
+.image-section {
+  width: 30%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding-right: 8px;
+}
+
+.item-image {
+  width: 100%;
+  height: 80px;
+  object-fit: cover;
+  border-radius: 4px;
+  border: 1px solid #eee;
+}
+
+.info-section {
+  width: 70%;
+  position: relative;
 }
 
 .delete-btn {
