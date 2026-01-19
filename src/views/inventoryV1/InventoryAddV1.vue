@@ -185,12 +185,20 @@
             <!-- 已添加的标签 -->
             <div class="tag-list">
               <div
-                v-for="(tag, index) in itemTags"
+                v-for="(tag, index) in allTags"
                 :key="index"
-                class="custom-tag-item"
+                :class="['custom-tag-item', isSystemTag(tag) ? 'system-tag' : 'user-tag']"
               >
                 <span class="tag-text">{{ tag }}</span>
-                <span class="tag-close" @click="removeTag(index)">×</span>
+                <span
+                  v-if="!isSystemTag(tag)"
+                  class="tag-close"
+                  @click="removeTag(index)"
+                >×</span>
+                <span
+                  v-else
+                  class="system-tag-indicator"
+                >🔒</span>
               </div>
             </div>
             <!-- 标签输入 -->
@@ -305,9 +313,24 @@ export default {
       fileList: [],
       imageList: [],
       // 标签相关
-      itemTags: [], // 存储标签数组
+      userTags: [], // 存储用户添加的标签数组
+      systemTags: [], // 存储系统标签（公司和分类）
       newTag: '' // 输入的新标签
     };
+  },
+  computed: {
+    // 合并系统标签和用户标签
+    allTags() {
+      return [...this.systemTags, ...this.userTags];
+    }
+  },
+  watch: {
+    'itemForm.Company'() {
+      this.updateSystemTags();
+    },
+    'itemForm.Category_Type'() {
+      this.updateSystemTags();
+    }
   },
   created() {
     this.loadProjectOptions();
@@ -394,6 +417,7 @@ export default {
     },
 
     // 显示已存在的物品信息弹窗
+// 显示已存在的物品信息弹窗
     showExistingItemsDialog(items) {
       // 构建弹窗内容
       let message = '该位置已存在以下物品信息：\n\n';
@@ -401,10 +425,12 @@ export default {
       items.forEach((item, index) => {
         const createTime = item.Ts_create ? new Date(item.Ts_create).toLocaleString('zh-CN') : '未知时间';
         const companyName = item.Company || '未知公司';
+        const shelfLocation = item.Shelf_Location || '未知位置';
 
         message += `${index + 1}. ${companyName}库房已于${createTime}新建一条数据\n`;
         message += `   物品名称：${item.Item_Name || '未知'}\n`;
         message += `   物品型号：${item.Item_Model || '未知'}\n`;
+        message += `   货架位置：${shelfLocation}\n`;
         message += `   当前库存：${item.Current_Stock || 0}\n\n`;
       });
 
@@ -417,14 +443,195 @@ export default {
         messageAlign: 'left',
         confirmButtonText: '继续添加',
         cancelButtonText: '取消'
-      }).then(() => {
-        // 用户选择继续添加，不做任何操作，保持当前表单状态
-        Toast.info('您可以继续添加新物品');
+      }).then(async () => {
+        // 用户选择继续添加，显示储物箱规则弹窗
+        const storageBoxMessage = `继续添加将默认此位置为储物箱非收纳格。
+请按照如下编号规则进行物品添加，且编号不能与已有物品编号重复：
+编码规则：货架-层数-位置-序号
+例如：A1L-2-003-01
+同一货位存放多个物品时使用序号区分
+若是上一个编号是AL1-01-012，则生成的是AL1-01-012-01，
+若上一个编号是AL1-01-012-05，则生成的是AL1-01-012-06，
+生成的编号会自动填入对应的位置中，
+并且此时会产生一个标签"储物箱"作为固定标签，不能删除。`;
+
+        try {
+          await this.$dialog.confirm({
+            title: '储物箱规则',
+            message: storageBoxMessage,
+            confirmButtonText: '确定',
+            cancelButtonText: '取消'
+          });
+
+          // 获取该位置的所有物品编号并生成新编号
+          // 使用最后一个数据的Shelf_Location作为基准
+          const lastItem = items[items.length - 1]; // 获取最后一个数据
+          const newNumber = await this.generateNextItemNumber(lastItem.Shelf_Location);
+
+          // 确保在异步操作完成后更新字段
+          this.$nextTick(() => {
+            // 自动填入新生成的编号到货架位置字段（而不是物品名称字段）
+            this.itemForm.Shelf_Location = newNumber;
+
+            // 添加"储物箱"标签到系统标签中
+            if (!this.systemTags.includes('储物箱')) {
+              this.systemTags.push('储物箱');
+            }
+            Toast('已按照储物箱规则生成新编号并添加储物箱标签，若生成有误请手动修正');
+          });
+        } catch (error) {
+          // 用户取消储物箱规则确认，不清空货架位置
+          Toast('已取消储物箱添加');
+        }
       }).catch(() => {
         // 用户选择取消，清空已填入的货架位置
         this.itemForm.Shelf_Location = '';
-        Toast.info('已取消添加');
+        Toast('已取消添加');
       });
+    },
+
+    // 检查是否为有效的编号格式
+    isValidNumberFormat(location) {
+      // 检查是否包含"-数字"格式，这是编号的特征
+      return /-\d+$/.test(location);
+    },
+
+    // 生成下一个物品编号的方法
+    async generateNextItemNumber(shelfLocation) {
+      return new Promise((resolve, reject) => {
+        // 构造查询参数，获取该货架位置下的所有物品
+        // 调用后端接口获取库存信息
+        const param = {
+          Shelf_Location: shelfLocation
+        };
+        console.log('获取库存信息参数：', param);
+        SensorRequestPage.InventoryItemGetFun(
+          JSON.stringify(param),
+          (respData) => {
+            try {
+              // 解析响应数据 (模仿第401-407行的解析逻辑)
+              const responseJson = JSON.parse(respData);
+
+              // 从 Data 数组中获取库存项
+              let items = [];
+              if (responseJson.Data && Array.isArray(responseJson.Data)) {
+                items = responseJson.Data;
+              }
+
+              // 从返回的items中获取所有的Shelf_Location内容
+              const allShelfLocations = items.map(item => item.Shelf_Location).filter(location => location);
+              // alert('所有货架位置：'+ allShelfLocations);
+
+              if (allShelfLocations.length > 0) {
+                // 对Shelf_Location进行排序，找出最大的编号
+                const sortedLocations = allShelfLocations.sort((a, b) => {
+                  const partsA = a.split('-');
+                  const partsB = b.split('-');
+
+                  const maxLength = Math.max(partsA.length, partsB.length);
+                  for (let i = 0; i < maxLength; i++) {
+                    // 如果一个数组结束了，另一个还有内容，则长度长的更大
+                    if (i >= partsA.length) return -1; // b更长，b更大
+                    if (i >= partsB.length) return 1;  // a更长，a更大
+
+                    const partA = partsA[i];
+                    const partB = partsB[i];
+
+                    // 检查是否都是纯数字
+                    const isNumA = /^\d+$/.test(partA);
+                    const isNumB = /^\d+$/.test(partB);
+
+                    if (isNumA && isNumB) {
+                      // 都是数字，按数值比较
+                      const numA = parseInt(partA);
+                      const numB = parseInt(partB);
+                      if (numA !== numB) {
+                        return numA - numB;
+                      }
+                    } else {
+                      // 非数字部分按字符串比较
+                      const comparison = partA.localeCompare(partB);
+                      if (comparison !== 0) {
+                        return comparison;
+                      }
+                    }
+                  }
+                  return 0;
+                });
+
+                const lastShelfLocation = sortedLocations[sortedLocations.length - 1];
+
+                // 检查最后一条数据的Shelf_Location是否符合编号规则
+                if (this.isValidNumberFormat(lastShelfLocation)) {
+                  // 如果最后一条数据的Shelf_Location已经有编号格式，基于它生成下一个编号
+                  const newNumber = this.incrementNumber(lastShelfLocation);
+                  resolve(newNumber);
+                } else {
+                  // 如果没有编号格式，基于原始扫描位置生成
+                  const basePart = shelfLocation.replace(/[^A-Za-z0-9]/g, '');
+                  resolve(`${basePart}-01`);
+                }
+              } else {
+                // 如果没有找到相关数据，基于原始扫描位置生成
+                const basePart = shelfLocation.replace(/[^A-Za-z0-9]/g, '');
+                console.log('basePart 11:', basePart);
+                resolve(`${basePart}-01`);
+              }
+            } catch (error) {
+              console.error('解析物品数据失败:', error);
+              reject(error);
+            }
+          },
+          (error) => {
+            console.error('获取物品数据失败:', error);
+            reject(error);
+          }
+        );
+      });
+    },
+
+    // 从货架位置中提取编号部分
+    extractNumberFromShelfLocation(shelfLocation) {
+      // 检查是否已经是标准格式（包含至少两个连字符）
+      if ((shelfLocation.match(/-/g) || []).length >= 2) {
+        // 如果是形如 "A1L-2-003-01" 或 "AL1-01-012-01" 的格式
+        return shelfLocation;
+      } else {
+        // 如果不是标准格式，尝试构建一个基础编号
+        return shelfLocation;
+      }
+    },
+
+    // 从物品名称中提取编号部分
+    extractNumberFromItemName(itemName) {
+      // 检查是否已经是标准格式（包含至少两个连字符）
+      if ((itemName.match(/-/g) || []).length >= 2) {
+        // 如果是形如 "A1L-2-003-01" 或 "AL1-01-012-01" 的格式
+        return itemName;
+      } else {
+        // 如果不是标准格式，尝试构建一个基础编号
+        return itemName;
+      }
+    },
+
+    // 递增编号的方法
+    // A2L-2-005 → A2L-2-005-01（首次扩展）
+    // A2L-2-005-01 → A2L-2-005-02（继续递增）
+    incrementNumber(number) {
+      // 检查编号是否已经包含扩展序号（如 A2L-2-005-01）
+      const parts = number.split('-');
+
+      // 检查是否已经是扩展编号格式（最后一个是数字）
+      if (parts.length >= 4 && /^\d+$/.test(parts[parts.length - 1])) {
+        // 已经是扩展编号格式，递增最后一个数字部分
+        const lastNum = parseInt(parts[parts.length - 1]);
+        const incrementedNum = String(lastNum + 1).padStart(parts[parts.length - 1].length, '0');
+        parts[parts.length - 1] = incrementedNum;
+        return parts.join('-');
+      } else {
+        // 不是扩展编号格式，添加 -01 作为扩展序号
+        return number + '-01';
+      }
     },
 
     onCategoryChange(value) {
@@ -485,16 +692,50 @@ export default {
       this.moreFields.splice(index, 1);
     },
 
+    // 更新系统标签（公司和分类）
+    updateSystemTags() {
+      const newSystemTags = [];
+      // 添加公司标签（如果已选择）
+      if (this.itemForm.Company) {
+        newSystemTags.push(this.itemForm.Company);
+      }
+      // 添加分类标签（如果已选择）
+      if (this.itemForm.Category_Type) {
+        newSystemTags.push(this.itemForm.Category_Type);
+      }
+      // 保留原有的特殊系统标签（如储物箱）
+      const specialSystemTags = ['储物箱']; // 定义特殊标签列表
+      specialSystemTags.forEach(tag => {
+        if (this.systemTags.includes(tag) && !newSystemTags.includes(tag)) {
+          newSystemTags.push(tag);
+        }
+      });
+
+      // 重新排序：系统标签在前，用户标签在后
+      this.systemTags = newSystemTags;
+    },
+    // 判断是否为系统标签
+    isSystemTag(tag) {
+      return this.systemTags.includes(tag);
+    },
+
     // 添加标签方法
     addTag() {
       if (this.newTag.trim()) {
-        // 检查标签是否已存在，避免重复
-        if (!this.itemTags.includes(this.newTag.trim())) {
-          this.itemTags.push(this.newTag.trim());
-          this.newTag = ''; // 清空输入框
-          Toast.success('标签添加成功');
+        // 检查标签是否已存在（包括系统标签和用户标签）
+        const allCurrentTags = [...this.systemTags, ...this.userTags];
+
+        if (!allCurrentTags.includes(this.newTag.trim())) {
+          // 确保不是系统标签才添加到用户标签
+          if (!this.systemTags.includes(this.newTag.trim())) {
+            this.userTags.push(this.newTag.trim());
+            this.newTag = ''; // 清空输入框
+            Toast.success('标签添加成功');
+          } else {
+            Toast('系统标签不可手动添加');
+          }
         } else {
-          Toast('标签已存在');
+          Toast('标签已存在，不允许重复添加');
         }
       } else {
         Toast('请输入标签内容');
@@ -503,8 +744,20 @@ export default {
 
     // 删除标签方法
     removeTag(index) {
-      this.itemTags.splice(index, 1);
-      Toast.success('标签已删除');
+      // 计算实际在userTags中的索引
+      const actualIndex = index - this.systemTags.length;
+
+      // 检查是否为系统标签
+      if (index < this.systemTags.length) {
+        Toast('系统标签不可删除');
+        return;
+      }
+
+      // 从用户标签中删除
+      if (actualIndex >= 0 && actualIndex < this.userTags.length) {
+        this.userTags.splice(actualIndex, 1);
+        Toast.success('标签已删除');
+      }
     },
 
     // 将文件转换为base64的方法
@@ -604,7 +857,7 @@ export default {
           Is_Low_Stock: '', // 初始状态不设置低库存标记
           Item_Images: this.imageList, // 设置图片信息
           Item_Mores: this.convertMoreFieldsToString(), // 将更多字段转换为字符串
-          Item_Tags: this.itemTags // 添加标签信息
+          Item_Tags: [...this.systemTags, ...this.userTags] // 使用合并后的标签数组，确保包含储物箱标签
         };
 
         // 如果是项目分类，需要查找对应的项目代码
@@ -637,7 +890,7 @@ export default {
           this.navigateTo('/inventoryV1');
         }, (error) => {
           console.error('新增物品失败:', error);
-          Toast.fail('新增物品失败');
+          Toast.fail('新增物品失败：'+ error)
         });
       } catch (error) {
         console.error('检查货架位置失败:', error);
@@ -810,6 +1063,16 @@ export default {
   line-height: 1.2;
 }
 
+.system-tag {
+  background-color: #d0f0ff;
+  border: 1px solid #87ceeb;
+}
+
+.user-tag {
+  background-color: #f5f5f5;
+  border: 1px solid #ebedf0;
+}
+
 .tag-text {
   margin-right: 5px;
   max-width: 100px;
@@ -834,6 +1097,16 @@ export default {
 
 .tag-close:hover {
   background-color: #ee0a24;
+}
+
+.system-tag-indicator {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  font-size: 12px;
+  margin-left: 5px;
 }
 
 .tag-input-wrapper {
