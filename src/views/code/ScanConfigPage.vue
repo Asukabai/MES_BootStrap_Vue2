@@ -64,6 +64,13 @@
         <van-button type="info" block @click="goToConfigList">配置列表</van-button>
       </van-col>
     </van-row>
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 60, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBack"
+    />
   </div>
 </template>
 
@@ -71,9 +78,11 @@
 import * as dd from 'dingtalk-jsapi'
 import SensorRequest from "@/utils/SensorRequest";
 import {GetDingUserToken} from "../../utils/Dingding";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 export default {
   name: 'ScanConfigPage',
+  components: {CustomizableFloatingButton},
   data() {
     return {
       scanIcon: require('@/assets/scan_icon.png'),
@@ -100,6 +109,19 @@ export default {
     GetDingUserToken(department,(token) => {},(token) => {})
   },
   methods: {
+    goBack() {
+      // this.$router.go(-1);
+      this.navigateTo('/all-applications');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     handleScanClick() {
       this.scanQRCode();
     },

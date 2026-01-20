@@ -26,15 +26,24 @@
         </van-row>
       </van-cell>
     </van-list>
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 60, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBack"
+    />
   </div>
 </template>
 
 <script>
 import { Dialog } from 'vant';
 import SensorRequest from "@/utils/SensorRequest";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 export default {
   name: 'ScanConfigList',
+  components: {CustomizableFloatingButton},
   data() {
     return {
       list: [],
@@ -46,6 +55,19 @@ export default {
     this.fetchData();
   },
   methods: {
+    goBack() {
+      // this.$router.go(-1);
+      this.navigateTo('/code/config');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     fetchData() {
       this.loading = true;
 
@@ -54,7 +76,6 @@ export default {
           '', // 参数为空
           (response) => {
             console.log('查询结果:', response);
-
             let json_response;
             try {
               json_response = JSON.parse(response);
