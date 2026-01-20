@@ -72,6 +72,8 @@ import allIcon from '@/assets/I导航主页.png'
 import inventoryIcon from '@/assets/库存-库存单据.png'
 import inventoryIconNew from '@/assets/库存业务.png'
 import scanConfigIcon from '@/assets/scan_icon.png'
+import scanLog from '@/assets/日志详情.png'
+import scanConfig from '@/assets/扫码配置.png'
 import uploadIcon from '@/assets/跨公司调拨.png'
 import {
   key_DingScannedInventoryQRCodeResult,
@@ -130,6 +132,16 @@ export default {
           icon: uploadIcon,
           title: '库存导入',
           path: '/excel-upload',
+        },
+        {
+          icon: scanConfig,  // 使用导入的图标
+          title: '资产扫码配置',
+          path: '/code/config',  // 对应路由配置中的路径
+        },
+        {
+          icon: scanLog,  // 使用导入的图标
+          title: '资产扫码日志',
+          path: '/code/codeList',  // 对应路由配置中的路径
         },
       ],
       applications: [] // 显示的应用列表
@@ -226,6 +238,12 @@ export default {
       // 根据应用标题映射到正确的路径
       let targetPath = path;
       switch (this.getApplicationByPath(path).title) {
+        case '资产扫码配置':
+          targetPath = '/code/config';
+          break;
+        case '资产扫码日志':
+          targetPath = '/code/codeList';
+          break;
         case '周报管理':
           targetPath = '/weeklyReportManagement';
           break;
