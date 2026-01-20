@@ -72,6 +72,8 @@ import allIcon from '@/assets/I导航主页.png'
 import inventoryIcon from '@/assets/库存-库存单据.png'
 import inventoryIconNew from '@/assets/库存业务.png'
 import scanConfigIcon from '@/assets/scan_icon.png'
+import scansingle from '@/assets/单板扫码.png'
+import scanMore from '@/assets/批量扫码.png'
 import scanLog from '@/assets/日志详情.png'
 import scanConfig from '@/assets/扫码配置.png'
 import uploadIcon from '@/assets/跨公司调拨.png'
@@ -80,6 +82,8 @@ import {
   updateCachedInventoryProductId
 } from '@/utils/Dingding';
 import CustomizableFloatingButton from "./CustomizableFloatingButton.vue";
+import SensorRequest from "../utils/SensorRequest";
+import {key_DingScannedResult, updateCachedProductId} from "../utils/Dingding";
 
 export default {
   name: 'AllApplications',
@@ -134,14 +138,24 @@ export default {
           path: '/excel-upload',
         },
         {
-          icon: scanConfig,  // 使用导入的图标
+          icon: scanConfig,
           title: '资产扫码配置',
-          path: '/code/config',  // 对应路由配置中的路径
+          path: '/code/config',
         },
         {
-          icon: scanLog,  // 使用导入的图标
+          icon: scanLog,
           title: '资产扫码日志',
-          path: '/code/codeList',  // 对应路由配置中的路径
+          path: '/code/codeList',
+        },
+        {
+          icon: scansingle,
+          title: '资产单次扫码',
+          path: '/code/add-stored',
+        },
+        {
+          icon: scanMore,
+          title: '资产批量扫码',
+          path: '/code/batch_scan_results',
         },
       ],
       applications: [] // 显示的应用列表
@@ -151,25 +165,20 @@ export default {
     // 按字母分组的应用程序列表
     groupedApplications() {
       const groups = {};
-
       this.applications.forEach(app => {
         // 获取标题的第一个字符，并转换为大写
         const firstChar = app.title.charAt(0).toUpperCase();
-
         // 如果该字母还没有分组，则创建一个新数组
         if (!groups[firstChar]) {
           groups[firstChar] = [];
         }
-
         // 将应用程序添加到对应字母的分组中
         groups[firstChar].push(app);
       });
-
       // 对每个字母组内的应用进行排序
       Object.keys(groups).forEach(letter => {
         groups[letter].sort((a, b) => a.title.localeCompare(b.title, 'zh-CN'));
       });
-
       // 按字母顺序排序分组
       return Object.keys(groups)
         .sort()
@@ -253,8 +262,13 @@ export default {
         case '新库存管理':
           targetPath = '/inventoryV1';
           break;
+        case '资产单次扫码':
+          this.scanQRCode();
+          return;
+        case '资产批量扫码':
+          this.scanQRCodeList();
+          return;
         case '库存扫码':
-          // 扫码功能需要特殊处理，在这里可以添加提示或直接跳转
           this.scanInventoryQRCode();
           return;
         case '库存导入':
@@ -361,6 +375,240 @@ export default {
       }
 
       return true;
+    },
+
+    // 资产单次扫码逻辑
+    scanQRCode() {
+      // 判断是否为PC端（非钉钉环境或钉钉PC端）
+      if (typeof dd === 'undefined' || !dd.env || dd.env.platform === 'pc') {
+        this.$toast.fail('PC端暂不支持扫码功能，请在钉钉移动端使用');
+        return;
+      }
+      console.log("开始资产扫码");
+      dd.ready(() => {
+        dd.biz.util.scan({
+          type: 'qrCode',
+          onSuccess: (data) => {
+            const result = data.text; // 获取扫描结果
+            if (result) {
+              const parts = result.split('_');
+              if (parts.length < 3) {
+                // 扫描结果中没有 '_'
+                this.$message({
+                  message: '二维码的类型不符，请切换板卡重新扫描!',
+                  type: 'info',
+                  duration: 2000, // 2秒后自动关闭
+                  showClose: true // 显示关闭按钮
+                });
+                return;
+              }
+              // 先检查二维码是否存在于数据库中
+              SensorRequest.GetAssetInfoByAssetCodeFun(JSON.stringify({ Asset_Code: result }), (response) => {
+                // alert("response : "+ response)
+                let respone_Object = JSON.parse(response)
+                const department = this.$route.params.department;
+                // console.log(respone_Object.Module_Type)
+                // console.log(respone_Object.Module_Name)
+                // 接受的是一个 对象
+                if (respone_Object.Project_Code === '' && respone_Object.Project_Name === ''){
+                  this.$router.push({
+                    path: `/${department}/code/AddStored`,
+                    query: {
+                      Module_Name: respone_Object.Module_Name,
+                      Module_Type: respone_Object.Module_Type
+                    }
+                  });
+                }else{
+                  this.$router.push({
+                    path: `/${department}/code/AddHistory`,
+                    query: {
+                      Module_Name: respone_Object.Module_Name,
+                      Module_Type: respone_Object.Module_Type
+                    }
+                  });
+                }
+              }, (searchError) => {
+                // 处理搜索错误
+                console.error(searchError);
+                // alert(searchError);
+                this.$message({
+                  message: '二维码未查询到，请联系管理员配置录入！',
+                  type: 'error'
+                });
+              });
+              // 存储扫码结果
+              sessionStorage.setItem(key_DingScannedResult, result);
+              // 更新全局变量
+              updateCachedProductId(result);
+            } else {
+              alert("扫描的二维码不符合要求，请重新扫描！");
+            }
+          },
+          onFail: (err) => {
+            if (err.errorCode !== 300001) {
+              // alert("未扫描到二维码！");
+              let errorMessage = '未扫描到二维码 ！';
+              this.$toast.fail(errorMessage);
+            }
+          }
+        });
+      });
+    },
+// 修改 scanQRCodeList 方法
+    scanQRCodeList() {
+      // 判断是否为PC端（非钉钉环境或钉钉PC端）
+      if (typeof dd === 'undefined' || !dd.env || dd.env.platform === 'pc') {
+        this.$toast.fail('PC端暂不支持扫码功能，请在钉钉移动端使用');
+        return;
+      }
+
+      console.log("开始资产批量扫码");
+
+      // 提示用户进入批量扫描模式
+      this.$toast({
+        message: '已进入批量扫码模式，请扫描相同类型资产！',
+        type: 'info',
+        duration: 2000
+      });
+
+      const scannedResults = []; // 用于存储扫码结果的列表
+      let firstPrefix = null; // 存储第一次扫码内容的 _ 前部分
+
+      // 定义递归扫描函数
+      const startScan = () => {
+        dd.ready(() => {
+          dd.biz.util.scan({
+            type: 'qrCode',
+            onSuccess: (data) => {
+              const result = data.text; // 获取扫描结果
+              console.log("扫描结果:", result);
+              if (result) {
+                const parts = result.split('_');
+                if (parts.length < 3) {
+                  // 扫描结果中没有 _
+                  this.$toast({
+                    message: '二维码的类型不符，请切换板卡重新扫描!',
+                    type: 'fail',
+                    duration: 2000
+                  });
+                  // 继续扫描
+                  setTimeout(startScan, 1000);
+                  return;
+                }
+                let prefix = parts.slice(0, 2).join('_'); // 拼接第一个和第二个 _ 之间的部分
+
+                // 检查是否重复扫码
+                if (scannedResults.includes(result)) {
+                  this.$toast({
+                    message: '二维码重复扫描,此次记录不算，请重新扫码！',
+                    type: 'fail',
+                    duration: 2000
+                  });
+                  // 继续扫描
+                  setTimeout(startScan, 1000);
+                  return;
+                }
+                // 检查是否为同类型资产
+                SensorRequest.GetAssetInfoByAssetCodeFun(
+                  JSON.stringify({ Asset_Code: result }),
+                  (response) => {
+                    try {
+                      if (scannedResults.length === 0) {
+                        // 第一次扫码
+                        firstPrefix = prefix;
+                        scannedResults.push(result);
+                        this.$toast.success('首次扫码成功');
+                      } else {
+                        // 从第二次扫码开始
+                        if (prefix === firstPrefix) {
+                          // 扫描的是相同类型的资产
+                          scannedResults.push(result);
+                          this.$toast.success(`已扫描 ${scannedResults.length} 个`);
+                        } else {
+                          // 扫描的是不同类型资产
+                          this.$toast.fail("扫描了不同类型的资产，请重新扫描相同的资产类型！");
+                          // 询问用户是否继续
+                          this.$dialog.confirm({
+                            title: '提示',
+                            message: '扫描了不同类型的资产，是否继续扫描？',
+                          }).then(() => {
+                            // 继续扫描
+                            setTimeout(startScan, 1000);
+                          }).catch(() => {
+                            // 停止扫描
+                            this.stopScan(scannedResults);
+                          });
+                          return;
+                        }
+                      }
+                      // 询问用户是否继续扫描
+                      this.$dialog.confirm({
+                        title: '继续扫描',
+                        message: `扫码成功！内容是:${result} 是否继续扫描？`
+                      }).then(() => {
+                        // 用户选择继续扫描
+                        setTimeout(startScan, 1000);
+                      }).catch(() => {
+                        // 用户选择停止扫描
+                        this.stopScan(scannedResults);
+                      });
+                    } catch (error) {
+                      console.error('处理响应时出错:', error);
+                      this.$toast.fail('处理扫码结果时出错');
+                      setTimeout(startScan, 1000);
+                    }
+                  },
+                  (error) => {
+                    this.$toast.fail('二维码未查询到，请联系管理员录入！');
+                    // 继续扫描
+                    setTimeout(startScan, 1000);
+                  }
+                );
+              } else {
+                this.$toast({
+                  message: '扫描的二维码不符合要求，将自动重新扫描！',
+                  type: 'fail',
+                  duration: 2000
+                });
+                // 继续扫描
+                setTimeout(startScan, 1000);
+              }
+            },
+            onFail: (err) => {
+              console.log('扫码失败:', err);
+              if (err.errorCode !== 300001) {
+                this.$toast.fail("未扫描到二维码，请重新扫描！");
+              }
+              // 继续扫描
+              setTimeout(startScan, 1000);
+            },
+            onCancel: () => {
+              console.log('用户取消扫描');
+              this.stopScan(scannedResults); // 用户取消扫描时停止扫描
+            }
+          });
+        });
+      };
+
+      // 启动首次扫描
+      startScan();
+    },
+
+    stopScan(scannedResults) {
+      this.$toast({
+        message: `已停止批量扫描，共扫描${scannedResults.length}个！`,
+        type: 'success',
+        duration: 2000
+      });
+      this.navigateToResultsPage(scannedResults); // 跳转到结果页面
+    },
+
+    navigateToResultsPage(scannedResults) {
+      const department = this.$route.params.department;
+      this.$router.push({
+        path: `/${department}/code/batch_scan_results`,
+        query: { scannedResults: JSON.stringify(scannedResults) }
+      });
     }
   }
 };
