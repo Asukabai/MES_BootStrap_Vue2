@@ -43,7 +43,9 @@ export default {
       const hiddenPaths = ['login', 'inventory', 'weeklyReport', 'chatDetail', 'chat_category',
         'post-detail', 'createGroup', 'DingtalkFilePreview','inventoryExtendInfoAdd',
         'InventoryExtendInfoView','InventoryExtendInfoEdit','vat-calculator',
-        'excelUpload','InventoryInfoEdit','advanced-search','download' ]
+        'excelUpload','InventoryInfoEdit','advanced-search','download','allTagsPage',
+        'all-applications','project-manage','task-manage','statistical-report',
+        'inventory-scan-results','config','codeList','AddStored','batch_scan_results']
       return !hiddenPaths.some(path => this.$route.path.includes(path))
     },
     notifications() {

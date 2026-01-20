@@ -87,6 +87,12 @@ const router = new Router({
       meta: { title: '个人资料' }
     },
     {
+      path: '/:department/all-applications',
+      name: 'AllApplications',
+      component: () => import('../../src/components/AllApplications.vue'),
+      meta: { title: '全部应用' }
+    },
+    {
       path: '/:department/project-code',
       name: 'ProjectCode',
       component: () => import('@/views/project/ProjectCode.vue'),
@@ -180,7 +186,7 @@ const router = new Router({
       path: '/:department/code/codeList',
       name: 'CodeList',
       component: () => import('@/views/code/CodeList.vue'),
-      meta: { title: '扫码记录日志时间列表' }
+      meta: { title: '资产扫码记录日志' }
     },
     {
       path: '/:department/code/config',
@@ -291,6 +297,18 @@ const router = new Router({
       component: () => import('../views/inventoryV1/InventoryDetailV1.vue'),
       meta: { title: '库存详情V1.0' }
     },
+    {
+      path: '/:department/inventoryDetailV2',
+      name: 'InventoryDetailV2',
+      component: () => import('../views/inventoryV1/InventoryDetailV2.vue'),
+      meta: { title: '库存详情V1.0' }
+    },
+    {
+      path: '/:department/inventory-scan-results',
+      name: 'InventoryScanResults',
+      component: () => import('@/views/inventoryV1/ScanResults.vue'),
+      meta: { title: '库存详情列表V1.0' }
+    },
     // 在 router/index.js 中添加路由
     {
       path: '/:department/inventory-outbound',
@@ -380,6 +398,12 @@ const router = new Router({
       path: '/:department/advanced-search',
       name: 'AdvancedSearch',
       component: () => import('../views/inventoryV1/AdvancedSearch.vue'),
+      meta: { title: '标签索引' }
+    },
+    {
+      path: '/:department/allTagsPage',
+      name: 'AllTagsPage',
+      component: () => import('../views/inventoryV1/AllTagsPage.vue'),
       meta: { title: '标签索引' }
     },
     {
