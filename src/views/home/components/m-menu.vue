@@ -83,7 +83,7 @@ import fileStatIcon from '@/assets/项目类型统计.png'
 import feedbackIcon from '@/assets/评论列表-高亮.png'
 import progressTrackIcon from '@/assets/进度跟踪.png'
 import weeklyReport from '@/assets/周报管理.png'
-import allIcon from '@/assets/省略号.png'
+import allIcon from '@/assets/I导航主页.png'
 import inventoryIcon from '@/assets/库存-库存单据.png'
 import inventoryIconNew from '@/assets/库存业务.png'
 import scanConfigIcon from '@/assets/scan_icon.png'
@@ -97,6 +97,7 @@ import {
 import * as dd from 'dingtalk-jsapi'
 import ExpandableFloatingButton from "../../../components/ExpandableFloatingButton.vue";
 import SensorRequest from '../../../utils/SensorRequest.js';
+import SensorRequestPage from "../../../utils/SensorRequestPage";
 
 export default {
   name: 'MMenu',
@@ -109,52 +110,52 @@ export default {
         {
           icon: taskCalendarIcon,
           title: '任务日历',
-          path: '',
+          path: '/task-calendar',
         },
         {
           icon: projectListIcon,
           title: '项目列表',
-          path: '',
+          path: '/project-list',
         },
         {
           icon: fileStatIcon,
           title: '文件统计',
-          path: '',
+          path: '/file-statistics',
         },
         {
           icon: feedbackIcon,
           title: '知识库',
-          path: '',
+          path: '/knowledge-base',
         },
         // {
         //   icon: progressTrackIcon,
         //   title: '进度跟踪',
-        //   path: '',
+        //   path: '/progress-tracking',
         // },
-        {
-          icon: inventoryIcon,
-          title: '库存管理',
-          path: '',
-        },
+        // {
+        //   icon: inventoryIcon,
+        //   title: '库存管理',
+        //   path: '/inventory',
+        // },
         {
           icon: scanConfigIcon,
           title: '库存扫码',
-          path: '',
+          path: '/inventory-scan',
         },
         {
           icon: inventoryIconNew,
           title: '新库存管理',
-          path: '',
+          path: '/new-inventory',
         },
-        // {
-        //   icon: allIcon,
-        //   title: '查看全部',
-        //   path: '',
-        // }
         {
           icon: weeklyReport,
           title: '周报管理',
-          path: '',
+          path: '/weekly-report',
+        },
+        {
+          icon: allIcon,
+          title: '查看全部',
+          path: '/all-applications', // 新增路径
         },
         {
           icon: uploadIcon,
@@ -337,12 +338,10 @@ export default {
         pureNumberPattern.test(content)) {
         return false;
       }
-
       // 检查内容长度，过短的内容可能无效
       if (content.length < 3) {
         return false;
       }
-
       return true;
     },
     navigateTo(path) {
@@ -393,7 +392,7 @@ export default {
         this.$toast.success('正在开发中 ！');
       }
       if (item.title === '查看全部') {
-        this.$toast.success('已展示全部 ！');
+        this.navigateTo('/all-applications'); // 修改跳转路径
       }
       if (item.title === '周报管理') {
         this.navigateTo('/weeklyReportManagement');
@@ -430,31 +429,73 @@ export default {
         return;
       }
       console.log("开始扫码");
-      // alert("开始扫码")
       dd.ready(() => {
         dd.biz.util.scan({
           type: 'qrCode',
           onSuccess: (data) => {
             const result = data.text; // 获取扫描结果
             if (this.isValidQRCode(result)) {
-              // 存储扫码结果
-              sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, result);
-              // 更新全局变量
-              updateCachedInventoryProductId(result);
-              this.navigateTo('/inventoryDetailV1');
+              // 调用后端接口验证扫描结果
+              this.validateScanResult(result);
             } else {
               alert("扫描的二维码不符合要求，请重新扫描！");
             }
           },
           onFail: (err) => {
             if (err.errorCode !== 300001) {
-              // alert("未扫描到二维码！");
               let errorMessage = '未扫描到二维码 ！';
               this.$toast.fail(errorMessage);
             }
           }
         });
       });
+    },
+
+// 新增验证扫描结果的方法
+    validateScanResult(result) {
+      // 调用后端接口验证扫描结果
+      const params = {
+        Shelf_Location: result
+      };
+
+      SensorRequestPage.InventoryItemGetFun(
+        JSON.stringify(params),
+        (respData) => {
+          try {
+            // 解析响应数据
+            const responseJson = JSON.parse(respData);
+
+            // 从 Data 数组中获取库存项
+            if (responseJson.Data && Array.isArray(responseJson.Data)) {
+              // 如果只有一个物品，存储扫码结果并跳转到详情页
+              sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, result);
+              updateCachedInventoryProductId(result);
+              if (responseJson.Data.length === 1) {
+                this.navigateTo('/inventoryDetailV1');
+              } else if (responseJson.Data.length > 1) {
+                // 如果有多个物品，跳转到结果列表页
+                this.navigateTo('/inventory-scan-results', {
+                  scanResult: result,
+                  inventoryItems: responseJson.Data
+                });
+              } else {
+                // 如果没有找到物品，提示用户
+                this.$toast.fail('未找到相关库存物品');
+                this.navigateTo('/inventoryDetailV1');
+              }
+            } else {
+              this.$toast.fail('数据格式错误');
+            }
+          } catch (parseError) {
+            console.error('解析库存信息响应失败:', parseError);
+            this.$toast.fail('数据解析失败');
+          }
+        },
+        (error) => {
+          console.error('获取库存信息失败:', error);
+          this.$toast.fail('获取库存信息失败');
+        }
+      );
     },
     testScanInventoryQRCode() {
       const result = "1号货架一层01"; // 获取扫描结果
