@@ -10,19 +10,53 @@
             placeholder="请输入物品名称"
             :rules="[{ required: true, message: '请填写物品名称' }]"
           />
-          <van-field
-            v-model="itemForm.Shelf_Location"
-            name="Shelf_Location"
-            label="货架位置"
-            placeholder="请输入货架位置或直接扫码获取"
-            :rules="[{ required: true, message: '请填写货架位置' }]"
-            :right-icon="scanIcon"
-            @click-right-icon="handleScanClick"
-          >
-            <template #label>
-              <span>货架位置</span>
-            </template>
-          </van-field>
+
+          <!-- 货架位置输入框，带实时搜索功能 -->
+          <div class="shelf-location-container">
+            <van-field
+              v-model="itemForm.Shelf_Location"
+              name="Shelf_Location"
+              label="货架位置"
+              placeholder="请输入货架位置或直接扫码获取"
+              :rules="[{ required: true, message: '请填写货架位置' }]"
+              :right-icon="scanIcon"
+              @click-right-icon="handleScanClick"
+              @input="onShelfLocationInput"
+              @blur="onShelfLocationBlur"
+            >
+              <template #label>
+                <span>货架位置</span>
+              </template>
+            </van-field>
+
+            <!-- 下拉建议列表 -->
+            <div
+              v-if="showSuggestionList && suggestionList.length > 0"
+              class="suggestion-dropdown"
+            >
+              <div
+                v-for="(item, index) in suggestionList"
+                :key="index"
+                class="suggestion-item"
+                @click="selectSuggestion(item)"
+              >
+                <div class="suggestion-title">{{ item.Item_Name }}</div>
+                <div class="suggestion-subtitle">
+                  位置: {{ item.Shelf_Location }} |
+                  型号: {{ item.Item_Model || '未知' }} |
+                  库存: {{ item.Current_Stock }}
+                </div>
+              </div>
+            </div>
+
+            <!-- 提示信息 -->
+            <div
+              v-else-if="showSuggestionList && suggestionList.length === 0 && itemForm.Shelf_Location"
+              class="no-result"
+            >
+              该位置不存在可放心添加
+            </div>
+          </div>
 
           <van-field
             v-model="itemForm.Item_Model"
@@ -315,7 +349,12 @@ export default {
       // 标签相关
       userTags: [], // 存储用户添加的标签数组
       systemTags: [], // 存储系统标签（公司和分类）
-      newTag: '' // 输入的新标签
+      newTag: '', // 输入的新标签
+
+      // 货架位置搜索相关数据
+      showSuggestionList: false,
+      suggestionList: [],
+      debounceTimer: null // 防抖定时器
     };
   },
   computed: {
@@ -343,6 +382,115 @@ export default {
     // 添加扫码点击处理函数
     handleScanClick() {
       this.scanQRCode();
+    },
+
+    // 货架位置输入事件处理
+    onShelfLocationInput() {
+      // 清除之前的防抖定时器
+      if (this.debounceTimer) {
+        clearTimeout(this.debounceTimer);
+      }
+
+      // 设置防抖，延迟500ms执行查询
+      this.debounceTimer = setTimeout(() => {
+        this.searchShelfLocation();
+      }, 500);
+    },
+
+    // 货架位置失去焦点时隐藏下拉列表
+    onShelfLocationBlur() {
+      // 延迟隐藏，让用户有机会点击下拉项
+      setTimeout(() => {
+        this.showSuggestionList = false;
+      }, 200);
+    },
+
+    // 搜索货架位置
+    async searchShelfLocation() {
+      const input = this.itemForm.Shelf_Location.trim();
+
+      // 如果输入为空，不执行搜索
+      if (!input) {
+        this.showSuggestionList = false;
+        this.suggestionList = [];
+        return;
+      }
+
+      try {
+        // 调用后端接口验证扫描结果
+        const params = {
+          Shelf_Location: input
+        };
+
+        const respData = await new Promise((resolve, reject) => {
+          SensorRequestPage.InventoryItemGetFun(
+            JSON.stringify(params),
+            (respData) => {
+              resolve(respData);
+            },
+            (error) => {
+              reject(error);
+            }
+          );
+        });
+
+        // 解析响应数据
+        const responseJson = JSON.parse(respData);
+
+        // 从 Data 数组中获取库存项
+        if (responseJson.Data && Array.isArray(responseJson.Data)) {
+          this.suggestionList = responseJson.Data;
+
+          // 如果输入的货架位置完全匹配某个结果，直接显示警告
+          if (responseJson.Data.length > 0) {
+            const exactMatch = responseJson.Data.find(item =>
+              item.Shelf_Location.toLowerCase() === input.toLowerCase()
+            );
+
+            if (exactMatch) {
+              // 直接显示警告信息，而不只是显示下拉列表
+              this.$dialog.alert({
+                title: '警告',
+                message: `该位置已存在物品信息：
+                         \n物品名称：${exactMatch.Item_Name || '未知'}
+                         \n型号：${exactMatch.Item_Model || '未知'}
+                         \n当前位置：${exactMatch.Shelf_Location}
+                         \n当前库存：${exactMatch.Current_Stock || 0}
+                         \n\n建议您谨慎操作，避免重复添加。`
+              });
+            }
+          }
+
+          this.showSuggestionList = true;
+        } else {
+          this.suggestionList = [];
+          this.showSuggestionList = true; // 仍然显示，用于显示"不存在"的消息
+        }
+      } catch (error) {
+        console.error('搜索货架位置失败:', error);
+        this.suggestionList = [];
+        this.showSuggestionList = false;
+      }
+    },
+
+    // 选择下拉建议项
+    selectSuggestion(item) {
+      // 将选中的项填充到表单中
+      this.itemForm.Shelf_Location = item.Shelf_Location;
+
+      // 隐藏下拉列表
+      this.showSuggestionList = false;
+
+      // 显示警告信息
+      this.$dialog.alert({
+        title: '警告',
+        message: `该位置已存在物品信息：
+                 \n物品名称：${item.Item_Name || '未知'}
+                 \n型号：${item.Item_Model || '未知'}
+                 \n当前位置：${item.Shelf_Location}
+                 \n当前库存：${item.Current_Stock || 0}
+                 \n\n建议您谨慎操作，避免重复添加。`
+      });
     },
 
     // 扫码功能实现
@@ -949,6 +1097,12 @@ export default {
         });
       });
     }
+  },
+  // 组件销毁时清理定时器
+  beforeDestroy() {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer);
+    }
   }
 };
 </script>
@@ -971,6 +1125,67 @@ export default {
 .van-radio {
   margin-right: 15px;
   margin-bottom: 5px;
+}
+
+/* 货架位置输入框容器 */
+.shelf-location-container {
+  position: relative;
+}
+
+.suggestion-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #ebedf0;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  max-height: 200px;
+  overflow-y: auto;
+  margin-top: 2px;
+}
+
+.suggestion-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f2f3f5;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.suggestion-item:last-child {
+  border-bottom: none;
+}
+
+.suggestion-item:hover {
+  background-color: #f7f8fa;
+}
+
+.suggestion-title {
+  font-weight: 500;
+  color: #323233;
+  margin-bottom: 4px;
+}
+
+.suggestion-subtitle {
+  font-size: 12px;
+  color: #969799;
+}
+
+.no-result {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: white;
+  border: 1px solid #ebedf0;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  padding: 12px 16px;
+  color: #969799;
+  margin-top: 2px;
 }
 
 .more-fields-container {
