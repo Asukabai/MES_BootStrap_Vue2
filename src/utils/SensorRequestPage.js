@@ -62,6 +62,18 @@ const SensorRequestPage = {
           callSuccess(respData);
         }, callFail);
       },
+      // 按标签搜索库存
+      InventorySearchByTagsFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("InventorySearchByTagsFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 获取库存所有标签及其使用次数
+      InventoryGetCommonTagsFun(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("InventoryGetCommonTagsFun", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
   };
 
   export default SensorRequestPage;
