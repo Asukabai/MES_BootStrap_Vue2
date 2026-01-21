@@ -175,7 +175,6 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
       const errorCodeMap = {
         0: "空响应",
         1: "正常",
-        "-1": "其他错误",
         "-100001": "未找到设备",
         "-100002": "参数错误",
         "-100003": "不支持该指令",
@@ -202,7 +201,7 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
         callSuccess(response.data.respData)
       } else if (callFail) {
         // 根据错误码获取对应的错误信息
-        const errorMsg = errorCodeMap[response.data.result] || response.data.msg || "未知错误";
+        const errorMsg = errorCodeMap[response.data.result] || response.data.msg ;
         console.log(response.data);
         callFail(errorMsg)
       }
@@ -252,7 +251,6 @@ export function PostDataUrlPage(postUrlName, data, isJson, callSuccess, callFail
       const errorCodeMap = {
         0: "空响应",
         1: "正常",
-        "-1": "其他错误",
         "-100001": "未找到设备",
         "-100002": "参数错误",
         "-100003": "不支持该指令",
@@ -279,7 +277,7 @@ export function PostDataUrlPage(postUrlName, data, isJson, callSuccess, callFail
         callSuccess(response.data.respData)
       } else if (callFail) {
         // 根据错误码获取对应的错误信息
-        const errorMsg = errorCodeMap[response.data.result] || response.data.msg || "未知错误";
+        const errorMsg = errorCodeMap[response.data.result] || response.data.msg ;
         console.log(response.data);
         callFail(errorMsg)
       }
