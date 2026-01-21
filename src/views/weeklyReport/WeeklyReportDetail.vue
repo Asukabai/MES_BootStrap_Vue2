@@ -78,6 +78,13 @@
           ></div>
         </div>
       </div>
+      <CustomizableFloatingButton
+        :initial-position="{ bottom: 80, right: 20 }"
+        :icon-src="require('@/assets/返回.png')"
+        :background-size="49"
+        :icon-size="49"
+        :on-click="goBack"
+      />
     </div>
   </div>
 </template>
@@ -85,9 +92,11 @@
 <script>
 import {Toast} from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 export default {
   name: 'WeeklyReportDetail',
+  components: {CustomizableFloatingButton},
   data() {
     return {
       loading: true,
@@ -122,6 +131,19 @@ export default {
     }
   },
   methods: {
+    goBack() {
+      // this.$router.go(-1);
+      this.navigateTo('/weeklyReportManagement');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     loadReportDetail() {
       const reportId = this.$route.params.id;
       console.log('加载周报ID:', reportId);

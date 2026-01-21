@@ -92,10 +92,19 @@
         <div v-if="list.length > 0 && !loading" class="finished-text">没有更多了</div>
       </van-pull-refresh>
     </div>
-    <!-- 添加悬浮按钮 -->
-    <FloatingActionButton
-      @click="onFloatingButtonClick"
-      :initial-position="{ bottom: 80, right: 20 }"
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 150, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBack"
+    />
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 70, right: 20 }"
+      :icon-src="require('@/assets/新增图标.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="onFloatingButtonClick"
     />
   </div>
 </template>
@@ -104,10 +113,11 @@
 import { Toast } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import FloatingActionButton from "../../components/FloatingActionButton.vue";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 export default {
   name: 'WeeklyReportManagement',
-  components: {FloatingActionButton},
+  components: {CustomizableFloatingButton, FloatingActionButton},
   data() {
     return {
       isNavigating: false,
@@ -136,6 +146,10 @@ export default {
     this.onLoad();
   },
   methods: {
+    goBack() {
+      // this.$router.go(-1);
+      this.navigateTo('/index');
+    },
     navigateTo(path) {
       const department = this.$route.params.department;
       if (department) {

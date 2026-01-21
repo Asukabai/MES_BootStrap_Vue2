@@ -52,6 +52,14 @@
       />
     </van-popup>
 
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 90, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBack"
+    />
+
     <!-- 页脚 -->
     <div class="footer">
       <p>本计算器仅供参考，实际税务计算请以税务机关规定为准</p>
@@ -62,9 +70,11 @@
 
 <script>
 import { Toast } from 'vant'
+import CustomizableFloatingButton from "./CustomizableFloatingButton.vue";
 
 export default {
   name: 'VatCalculator',
+  components: {CustomizableFloatingButton},
   data() {
     return {
       amount: '',
@@ -104,7 +114,17 @@ export default {
   },
   methods: {
     goBack() {
-      this.$router.go(-1)
+      // this.$router.go(-1);
+      this.navigateTo('/index');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
     },
     calculateTax() {
       const amount = parseFloat(this.amount)
