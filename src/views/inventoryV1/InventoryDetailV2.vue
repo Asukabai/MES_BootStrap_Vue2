@@ -154,7 +154,7 @@ const icons = {
   in: require('@/assets/入库.png'),
 };
 export default {
-  name: 'InventoryDetail',
+  name: 'InventoryDetailV2',
   components: {
     CustomizableFloatingButton,
     FloatingActionButton,
@@ -175,9 +175,6 @@ export default {
       currentImageFileName: '',
     };
   },
-  // 添加 activated 钩子
-  // this.$router.push(): 创建新组件实例 → 触发 created、mounted
-  // this.$router.go(-1): 返回历史记录 → 如果组件被缓存，则触发 activated
   created() {
     this.loadInventoryData();
   },
@@ -216,7 +213,6 @@ export default {
       }
     },
     // 操作按钮配置
-// 操作按钮配置
     actionButtons() {
       return [
         {
@@ -249,7 +245,8 @@ export default {
   methods: {
     goBack() {
       // this.$router.go(-1);
-      this.navigateTo('/inventoryV1');
+      // alert('点击了返回按钮')
+      this.navigateTo('/inventory-scan-results');
     },
     navigateTo(path) {
       const department = this.$route.params.department;
@@ -351,80 +348,81 @@ export default {
 
     // 在数据加载时预处理图片URL
     loadInventoryData() {
-      // 从 sessionStorage 获取扫码结果
-      const scannedResult = sessionStorage.getItem(key_DingScannedInventoryQRCodeResult);
-
-      if (!scannedResult) {
-        this.$toast.fail('未找到二维码信息');
+      // 从路由参数获取货架位置
+      const shelfLocation = this.$route.query.shelfLocation;
+      // alert('货架位置:' +  shelfLocation)
+      if (!shelfLocation) {
+        this.$toast.fail('未找到货架位置信息');
         this.loading = false;
         return;
       }
-      // 调用后端接口获取库存信息
-      const params = {
-        Shelf_Location: scannedResult
+
+      // 构造请求参数，按照后端接口要求的格式
+      const param = {
+        PageIndex: 0, // 后端可能使用0基索引
+        PageSize: 10,
+        Item_Name: "", // 搜索关键词对应物品名称
+        Shelf_Location: shelfLocation, // 使用传递过来的货架位置
+        Item_Model: "", // 物品型号搜索
+        Item_Brand: "", // 物品品牌搜索
+        Category_Type: "", // 分类筛选
+        Company: "" // 公司筛选
       };
-      console.log('获取库存信息参数：', params);
-      SensorRequestPage.InventoryItemGetFun(
-        JSON.stringify(params),
-        (respData) => {
-          try {
-            // 解析响应数据
-            const responseJson = JSON.parse(respData);
 
-            // 从 Data 数组中获取库存项 （根据后端返回值结构解析）
-            if (responseJson.Data && Array.isArray(responseJson.Data) && responseJson.Data.length > 0) {
-              this.inventoryItems = responseJson.Data;
+      // 调用后端接口获取库存数据
+      SensorRequestPage.InventoryItemGetFun(JSON.stringify(param), (respData) => {
+        try {
+          let parsedData = null;
 
-              // 处理第一个物品，预加载图片URL
-              const item = this.inventoryItems[0];
+          // 解析响应数据 - 新的数据格式是字符串化的JSON
+          if (typeof respData === 'string') {
+            parsedData = JSON.parse(respData);
+          } else {
+            parsedData = respData;
+          }
 
-              // 如果有图片，预加载图片URL
-              if (item.Item_Images && item.Item_Images.length > 0) {
-                item.processedImageUrls = [];
-                let loadedCount = 0;
+          // 提取实际的Data数组
+          let newData = [];
+          if (parsedData && parsedData.Data) {
+            newData = parsedData.Data;
+          }
 
-                item.Item_Images.forEach((img, index) => {
-                  if (img.File_Md5) {
-                    const param = {
-                      remoteLocation: img.File_Md5
-                    };
+          // 从返回的数组中获取第一个物品（因为按货架位置搜索应该只有一个结果）
+          if (newData && newData.length > 0) {
+            const item = newData[0];
 
-                    SensorRequest.Minio_PresignedDownloadUrl5B(
-                      JSON.stringify(param),
-                      (respData) => {
-                        if (respData) {
-                          // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
-                          const modifiedUrl = respData.replace(
-                            'http://127.0.0.1:9000',
-                            'https://api-v2.sensor-smart.cn:22027'
-                          );
-                          // 设置预处理的图片URL
-                          if (!item.processedImageUrls) {
-                            item.processedImageUrls = [];
-                          }
-                          item.processedImageUrls[index] = modifiedUrl;
+            // 如果有图片，预加载图片URL
+            if (item.Item_Images && item.Item_Images.length > 0) {
+              item.processedImageUrls = [];
+              let loadedCount = 0;
 
-                          loadedCount++;
-                          // 如果所有图片都已加载完成，更新currentItem
-                          if (loadedCount === item.Item_Images.length) {
-                            this.currentItem = item;
-                          }
-                        } else {
-                          // 使用默认图片
-                          if (!item.processedImageUrls) {
-                            item.processedImageUrls = [];
-                          }
-                          item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
+              item.Item_Images.forEach((img, index) => {
+                if (img.File_Md5) {
+                  const param = {
+                    remoteLocation: img.File_Md5
+                  };
 
-                          loadedCount++;
-                          // 如果所有图片都已加载完成，更新currentItem
-                          if (loadedCount === item.Item_Images.length) {
-                            this.currentItem = item;
-                          }
+                  SensorRequest.Minio_PresignedDownloadUrl5B(
+                    JSON.stringify(param),
+                    (respData) => {
+                      if (respData) {
+                        // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
+                        const modifiedUrl = respData.replace(
+                          'http://127.0.0.1:9000',
+                          'https://api-v2.sensor-smart.cn:22027'
+                        );
+                        // 设置预处理的图片URL
+                        if (!item.processedImageUrls) {
+                          item.processedImageUrls = [];
                         }
-                      },
-                      (error) => {
-                        console.error('获取图片URL失败:', error);
+                        item.processedImageUrls[index] = modifiedUrl;
+
+                        loadedCount++;
+                        // 如果所有图片都已加载完成，更新currentItem
+                        if (loadedCount === item.Item_Images.length) {
+                          this.currentItem = item;
+                        }
+                      } else {
                         // 使用默认图片
                         if (!item.processedImageUrls) {
                           item.processedImageUrls = [];
@@ -437,52 +435,63 @@ export default {
                           this.currentItem = item;
                         }
                       }
-                    );
-                  } else {
-                    // 如果没有MD5，使用默认图片
-                    if (!item.processedImageUrls) {
-                      item.processedImageUrls = [];
-                    }
-                    item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
+                    },
+                    (error) => {
+                      console.error('获取图片URL失败:', error);
+                      // 使用默认图片
+                      if (!item.processedImageUrls) {
+                        item.processedImageUrls = [];
+                      }
+                      item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
 
-                    loadedCount++;
-                    // 如果所有图片都已加载完成，更新currentItem
-                    if (loadedCount === item.Item_Images.length) {
-                      this.currentItem = item;
+                      loadedCount++;
+                      // 如果所有图片都已加载完成，更新currentItem
+                      if (loadedCount === item.Item_Images.length) {
+                        this.currentItem = item;
+                      }
                     }
+                  );
+                } else {
+                  // 如果没有MD5，使用默认图片
+                  if (!item.processedImageUrls) {
+                    item.processedImageUrls = [];
                   }
-                });
+                  item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
 
-                // 如果没有图片，直接设置currentItem
-                if (item.Item_Images.length === 0) {
-                  this.currentItem = item;
+                  loadedCount++;
+                  // 如果所有图片都已加载完成，更新currentItem
+                  if (loadedCount === item.Item_Images.length) {
+                    this.currentItem = item;
+                  }
                 }
-              } else {
-                // 如果没有图片，直接设置currentItem
+              });
+
+              // 如果没有图片，直接设置currentItem
+              if (item.Item_Images.length === 0) {
                 this.currentItem = item;
               }
-
-              this.$toast.success('数据加载成功');
             } else {
-              this.inventoryItems = [];
-              this.currentItem = null;
-              this.$toast.fail('暂未查询到数据');
+              // 如果没有图片，直接设置currentItem
+              this.currentItem = item;
             }
-          } catch (parseError) {
-            console.error('解析库存信息响应失败:', parseError);
+
+            this.$toast.success('数据加载成功');
+          } else {
             this.inventoryItems = [];
             this.currentItem = null;
-            this.$toast.fail('数据格式错误');
+            this.$toast.fail('暂未查询到数据');
           }
-
-          this.loading = false;
-        },
-        (error) => {
-          console.error('获取库存信息失败:', error);
-          this.$toast.fail('获取库存信息失败');
-          this.loading = false;
+        } catch (error) {
+          console.error('处理库存数据时出错:', error);
+          this.$toast.fail('数据处理失败');
         }
-      );
+
+        this.loading = false;
+      }, (error) => {
+        console.error('获取库存信息失败:', error);
+        this.$toast.fail('获取库存信息失败');
+        this.loading = false;
+      });
     },
 
     // 图片加载失败时的处理
