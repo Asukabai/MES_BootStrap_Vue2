@@ -6,8 +6,8 @@
           <van-field
             v-model="itemForm.Item_Name"
             name="Item_Name"
-            label="物品名称"
-            placeholder="请输入物品名称"
+            label="*物品名称"
+            placeholder="请输入物品名称（必填）"
             :rules="[{ required: true, message: '请填写物品名称' }]"
           />
 
@@ -16,7 +16,7 @@
             <van-field
               v-model="itemForm.Shelf_Location"
               name="Shelf_Location"
-              label="货架位置"
+              label="*货架位置"
               placeholder="请输入货架位置或直接扫码获取"
               :rules="[{ required: true, message: '请填写货架位置' }]"
               :right-icon="scanIcon"
@@ -25,7 +25,7 @@
               @blur="onShelfLocationBlur"
             >
               <template #label>
-                <span>货架位置</span>
+                <span>*货架位置</span>
               </template>
             </van-field>
 
@@ -67,7 +67,7 @@
 
           <van-field
             name="Company"
-            label="所属公司"
+            label="*所属公司"
             :rules="[{ required: true, message: '请选择所属公司' }]"
           >
             <template #input>
@@ -91,7 +91,7 @@
 
           <van-field
             name="Category_Type"
-            label="库存分类"
+            label="*库存分类"
             :rules="[{ required: true, message: '请选择库存分类' }]"
           >
             <template #input>
@@ -122,7 +122,7 @@
             v-if="itemForm.Category_Type === '项目'"
             v-model="selectedProjectName"
             name="Project_Code"
-            label="关联项目"
+            label="*关联项目"
             placeholder="请选择关联项目"
             is-link
             readonly
@@ -350,7 +350,6 @@ export default {
       userTags: [], // 存储用户添加的标签数组
       systemTags: [], // 存储系统标签（公司和分类）
       newTag: '', // 输入的新标签
-
       // 货架位置搜索相关数据
       showSuggestionList: false,
       suggestionList: [],
@@ -368,6 +367,10 @@ export default {
       this.updateSystemTags();
     },
     'itemForm.Category_Type'() {
+      this.updateSystemTags();
+    },
+    // 监听项目名称变化，更新系统标签
+    'selectedProjectName'() {
       this.updateSystemTags();
     }
   },
@@ -791,12 +794,23 @@ export default {
       if (value !== '耗材') {
         this.itemForm.Warning_Threshold = '';
       }
+      // 触发系统标签更新
+      this.updateSystemTags();
     },
-
+// 在 onProjectConfirm 方法中
     onProjectConfirm(value) {
       // 保存选中的项目名称用于显示
       this.selectedProjectName = value;
       this.showProjectPicker = false;
+      // 查找对应的项目代码并更新表单
+      const selectedProject = this.fullProjectList.find(project =>
+        (project.Project_Name || project.name || project.projectName) === value
+      );
+      if (selectedProject) {
+        this.itemForm.Project_Code = selectedProject.Project_Code || '';
+      }
+      // 更新系统标签以包含项目名称
+      this.updateSystemTags();
     },
 
     loadProjectOptions() {
@@ -840,7 +854,7 @@ export default {
       this.moreFields.splice(index, 1);
     },
 
-    // 更新系统标签（公司和分类）
+    // 更新系统标签（公司、分类和项目）
     updateSystemTags() {
       const newSystemTags = [];
       // 添加公司标签（如果已选择）
@@ -851,6 +865,12 @@ export default {
       if (this.itemForm.Category_Type) {
         newSystemTags.push(this.itemForm.Category_Type);
       }
+
+      // 如果是项目分类且已选择项目，添加项目名称作为系统标签
+      if (this.itemForm.Category_Type === '项目' && this.selectedProjectName) {
+        newSystemTags.push(this.selectedProjectName);
+      }
+
       // 保留原有的特殊系统标签（如储物箱）
       const specialSystemTags = ['储物箱']; // 定义特殊标签列表
       specialSystemTags.forEach(tag => {
