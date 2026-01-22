@@ -9,6 +9,8 @@
             label="*物品名称"
             placeholder="请输入物品名称（必填）"
             :rules="[{ required: true, message: '请填写物品名称' }]"
+            :right-icon="loadIcon"
+            @click-right-icon="handleLoadClick"
           />
 
           <!-- 货架位置输入框，带实时搜索功能 -->
@@ -317,6 +319,7 @@ export default {
   data() {
     return {
       scanIcon: require('../../assets/scan_icon.png'), // 添加扫码图标
+      loadIcon: require('../../assets/loadIcon.png'), // 添加扫码图标
       itemForm: {
         Item_Name: '',
         Shelf_Location: '',
@@ -385,6 +388,11 @@ export default {
     // 添加扫码点击处理函数
     handleScanClick() {
       this.scanQRCode();
+    },
+
+    // 点击图标实现（导入上一篇功能）
+    handleLoadClick() {
+      alert('点击了导入上一篇功能')
     },
 
     // 货架位置输入事件处理
