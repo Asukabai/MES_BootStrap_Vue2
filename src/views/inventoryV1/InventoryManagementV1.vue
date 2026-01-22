@@ -546,6 +546,61 @@ export default {
         return;
       }
 
+      // 检查是否为储物箱位置，如果有其他物品则不能删除
+      this.checkStorageBoxStatusAndDelete();
+    },
+
+    // 检查储物箱状态并执行删除
+    checkStorageBoxStatusAndDelete() {
+      // 获取当前物品的货架位置
+      const shelfLocation = this.deletingItem.Shelf_Location;
+
+      // 调用后端接口验证该位置的物品数量
+      const params = {
+        Shelf_Location: shelfLocation
+      };
+
+      SensorRequestPage.InventoryItemGetFun(
+        JSON.stringify(params),
+        (respData) => {
+          try {
+            // 解析响应数据
+            let responseJson = JSON.parse(respData);
+            // 从 Data 数组中获取库存项
+            if (responseJson.Data && Array.isArray(responseJson.Data)) {
+              // 如果该位置只有一个物品，或者该位置没有其他物品，可以执行删除
+              if (responseJson.Data.length === 1) {
+                // 执行删除操作
+                this.executeDelete();
+              } else {
+                // 如果该位置有多个物品，不允许删除
+                Toast(`该位置(${shelfLocation})为储物箱！请将此位置所有物品移出后再执行删除操作！`);
+                this.showDeleteConfirm = false;
+                this.deletingItem = null;
+              }
+            } else {
+              Toast('数据格式错误，无法确认删除');
+              this.showDeleteConfirm = false;
+              this.deletingItem = null;
+            }
+          } catch (error) {
+            console.error('解析库存信息响应失败:', error);
+            Toast('数据解析失败，无法确认删除'+ error);
+            this.showDeleteConfirm = false;
+            this.deletingItem = null;
+          }
+        },
+        (error) => {
+          console.error('获取库存信息失败:', error);
+          Toast('获取库存信息失败，无法确认删除');
+          this.showDeleteConfirm = false;
+          this.deletingItem = null;
+        }
+      );
+    },
+
+    // 执行删除操作
+    executeDelete() {
       // 构造删除请求参数
       const param = {
         "Id": this.deletingItem.Id
