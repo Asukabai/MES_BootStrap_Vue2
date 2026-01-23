@@ -313,6 +313,7 @@ import { Toast } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import * as dd from 'dingtalk-jsapi';
 import SensorRequestPage from "../../utils/SensorRequestPage";
+import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
 
 export default {
   name: 'InventoryAddV1',
@@ -381,6 +382,49 @@ export default {
     this.loadProjectOptions();
   },
   methods: {
+    // 添加新增信息操作日志记录方法
+    addAdditionRecord(itemId, itemName) {
+      // 构造新增操作的事务请求参数
+      const requestData = {
+        PageIndex: 0,
+        PageSize: 10,
+        Inventory_ID: itemId, // 使用新增物品的ID作为库存ID
+        Transaction_Type: "新增", // 操作类型为"新增"
+        Quantity_Change: 0,
+        Current_Quantity: 0,
+        Report_Person: {
+          Person_Name: this.getLocalUserInfo().name,
+          Person_Phone: this.getLocalUserInfo().phone,
+          Person_DingID: this.getLocalUserInfo().dingID
+        },
+        Remark: `${this.getLocalUserInfo().name} 新增了物品: ${itemName}`
+      };
+
+      // 调用事务记录接口
+      SensorRequestPage.InventoryTransactionAddFun(
+        JSON.stringify(requestData),
+        (respData) => {
+          console.log('新增操作记录添加成功:', respData);
+        },
+        (error) => {
+          console.error('新增操作记录添加失败:', error);
+          this.$toast.fail('新增操作记录添加失败: ' + (error.message || '未知错误'));
+        }
+      );
+    },
+
+    // 获取本地用户信息
+    getLocalUserInfo() {
+      const name = localStorage.getItem(key_DingName);
+      const phone = localStorage.getItem(key_DingUserPhone);
+      const dingID = localStorage.getItem(key_DingUserIndex);
+
+      return {
+        name: name || '',
+        phone: phone || '',
+        dingID: dingID || ''
+      };
+    },
     onClickLeft() {
       this.$router.go(-1);
     },
@@ -391,6 +435,7 @@ export default {
     },
 
     // 点击图标实现（导入上一篇功能）
+    // 修改新增物品信息时候的组件页面逻辑-2（新增导入上一片的逻辑）
     handleLoadClick() {
       alert('点击了导入上一篇功能')
     },
@@ -1003,6 +1048,7 @@ export default {
       }
     },
     // 在 methods 中修改 onSubmit 方法
+// 修改 onSubmit 方法
     async onSubmit(values) {
       // 显示确认弹窗，让用户确认信息是否无误
       try {
@@ -1048,21 +1094,29 @@ export default {
             param.Project_Code = '';
           }
         }
-
         // 如果不是耗材分类，清除预警阈值
         if (param.Category_Type !== '耗材') {
           param.Warning_Threshold = 0;
         }
-
         // 如果不是项目分类，清除项目代码
         if (param.Category_Type !== '项目') {
           param.Project_Code = '';
         }
-
         SensorRequestPage.InventoryItemAddFun(JSON.stringify(param), (respData) => {
           Toast.success('新增物品成功');
-          // // 返回上一页
-          // this.$router.go(-1);
+          // 解析返回的响应数据，获取新增物品的ID
+          try {
+            console.log('新增物品ID:', respData);
+            if (respData) {
+              // 记录新增操作日志
+              this.addAdditionRecord(respData, this.itemForm.Item_Name);
+            } else {
+              console.error('新增物品成功但未获取到物品ID:', respData);
+            }
+          } catch (parseError) {
+            console.error('解析新增物品响应失败:', parseError);
+          }
+          // 返回上一页
           this.navigateTo('/inventoryV1');
         }, (error) => {
           console.error('新增物品失败:', error);
