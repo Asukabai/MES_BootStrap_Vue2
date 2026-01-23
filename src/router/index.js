@@ -183,43 +183,43 @@ const router = new Router({
       meta: { title: '证据详情' },
     },
     {
-      path: '/:department/code/codeList',
+      path: '/:department/codeList',
       name: 'CodeList',
       component: () => import('@/views/code/CodeList.vue'),
       meta: { title: '资产扫码记录日志' }
     },
     {
-      path: '/:department/code/config',
+      path: '/:department/config',
       name: 'ScanConfigPage',
       component: () => import('@/views/code/ScanConfigPage.vue'),
       meta: { title: '扫码配置' }
     },
     {
-      path: '/:department/code/configList',
+      path: '/:department/configList',
       name: 'ScanConfigList',
       component: () => import('@/views/code/ScanConfigList.vue'),
       meta: { title: '配置列表' }
     },
     {
-      path: '/:department/code/batch_scan_results',
+      path: '/:department/batch_scan_results',
       name: 'ScanConfigList',
       component: () => import('@/views/code/BatchScanResults.vue'),
       meta: { title: '批量扫码结果' }
     },
     {
-      path: '/:department/code/AddStored',
+      path: '/:department/AddStored',
       name: 'AddStored',
       component: () => import('@/views/code/AddStored.vue'),
       meta: { title: '晟思资产出入库表单' }
     },
     {
-      path: '/:department/code/AddHistory',
+      path: '/:department/AddHistory',
       name: 'AddHistory',
       component: () => import('@/views/code/AddHistory.vue'),
       meta: { title: '资产记录表单' }
     },
     {
-      path: '/:department/code/HistoryView',
+      path: '/:department/HistoryView',
       name: 'HistoryView',
       component: () => import('@/views/code/HistoryView.vue'),
       meta: { title: '资产记录详情' }

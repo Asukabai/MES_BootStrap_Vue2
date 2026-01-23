@@ -45,7 +45,8 @@ export default {
         'InventoryExtendInfoView','InventoryExtendInfoEdit','vat-calculator',
         'excelUpload','InventoryInfoEdit','advanced-search','download','allTagsPage',
         'all-applications','project-manage','task-manage','statistical-report',
-        'inventory-scan-results','config','codeList','AddStored','batch_scan_results']
+        'inventory-scan-results','config','codeList','AddStored',
+        'batch_scan_results','AddHistory','HistoryView']
       return !hiddenPaths.some(path => this.$route.path.includes(path))
     },
     notifications() {
