@@ -38,7 +38,16 @@
           :columns="operationOptions"
           @confirm="onOperationConfirm"
           @cancel="showOperationPicker = false"
-        />
+          :show-toolbar="true"
+        >
+          <template #toolbar>
+            <div class="van-picker__toolbar">
+              <div class="van-picker__cancel" @click="showOperationPicker = false">取消</div>
+              <div class="van-picker__title">请选择操作类型</div>
+              <div class="van-picker__confirm" @click="confirmOperation">确认</div>
+            </div>
+          </template>
+        </van-picker>
       </van-popup>
 
       <van-field
@@ -56,7 +65,16 @@
           :columns="belongContentsForPicker"
           @confirm="onProjectConfirm"
           @cancel="showProjectPicker = false"
-        />
+          :show-toolbar="true"
+        >
+          <template #toolbar>
+            <div class="van-picker__toolbar">
+              <div class="van-picker__cancel" @click="showProjectPicker = false">取消</div>
+              <div class="van-picker__title">请选择归属项目</div>
+              <div class="van-picker__confirm" @click="confirmProject">确认</div>
+            </div>
+          </template>
+        </van-picker>
       </van-popup>
     </van-cell-group>
 
@@ -76,9 +94,16 @@
         style="margin-top: 10px;"
         @click="goBack"
       >
-        返回查看页面
+        查看详情
       </van-button>
     </div>
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 80, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBackHome"
+    />
   </div>
 </template>
 
@@ -99,6 +124,7 @@ import {
 } from "@/utils/Dingding";
 import SensorRequest from "@/utils/SensorRequest";
 import {Toast} from "vant";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 function getLocalUserInfo() {
   const name = localStorage.getItem(key_DingName);
@@ -113,6 +139,7 @@ function getLocalUserInfo() {
 }
 
 export default {
+  components: {CustomizableFloatingButton},
   data() {
     return {
       form: {
@@ -126,9 +153,7 @@ export default {
         belongContentLabel: '' // 添加用于显示的标签
       },
       loading: false,
-      operationOptions: [
-        { text: '入库并领用', value: '入库并领用' }  // 使用 text/value 格式
-      ],
+      operationOptions: ['入库并领用'],  // 修改为字符串数组格式
       belongContents: [], // 获取领用时候的归属项目
       productType: '',
       showOperationPicker: false,
@@ -153,6 +178,19 @@ export default {
     this.fetchAssembleOptions();
   },
   methods: {
+    goBackHome() {
+      // this.$router.go(-1);
+      this.navigateTo('/all-applications');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     getProductId() {
       const storedProductId = sessionStorage.getItem(key_DingScannedResult) || cachedProductId;
       console.log('cachedProductId 是: ', cachedProductId);
@@ -186,6 +224,16 @@ export default {
       }
       this.showProjectPicker = false;
     },
+    confirmOperation() {
+      // 手动触发确认操作
+      const selectedValue = this.operationOptions[0]; // 由于只有一个选项，直接取第一个
+      this.onOperationConfirm(selectedValue);
+    },
+    confirmProject() {
+      // 获取当前选中的项目值
+      const selectedValue = this.form.belongContentLabel;
+      this.onProjectConfirm(selectedValue);
+    },
     cancel() {
       this.form.fileList = [];
       this.form.desc = '';
@@ -209,9 +257,7 @@ export default {
           const list = Array.isArray(data) ? data : [data];
           this.belongContents = list.map(item => {
             let code = item.Project_Code;
-            // alert("code:"+ code)
             let name = item.Project_Name;
-            // alert("name:"+ name)
             return {
               label: `${code} - ${name}`,
               value: JSON.stringify({ Project_Code: code, Project_Name: name })
@@ -230,11 +276,6 @@ export default {
         }
       );
     },
-
-    fetchWeldingOptions() {},
-
-    fetchAssembleOptions() {},
-
     toBase64(file, callback) {
       console.log('开始转换文件为Base64编码');
       const reader = new FileReader();
@@ -282,7 +323,7 @@ export default {
           setTimeout(() => {
             this.resetTestingFields();
             const department = this.$route.params.department;
-            this.$router.push(`/${department}/code/HistoryView`);
+            this.$router.push(`/${department}/HistoryView`);
           }, 500);
         })
         .catch(error => {
@@ -296,7 +337,7 @@ export default {
 
     goBack() {
       const department = this.$route.params.department;
-      this.$router.push(`/${department}/code/HistoryView`);
+      this.$router.push(`/${department}/HistoryView`);
     }
   },
 };
@@ -321,5 +362,29 @@ export default {
   background-color: white;
   margin-bottom: 10px;
   border-radius: 8px;
+}
+
+.van-picker__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  height: 44px;
+  padding: 0 16px;
+  border-bottom: 1px solid #ebedf0;
+}
+
+.van-picker__cancel,
+.van-picker__confirm {
+  color: #1989fa;
+  font-size: 14px;
+  line-height: 44px;
+  cursor: pointer;
+}
+
+.van-picker__title {
+  font-size: 16px;
+  font-weight: 500;
+  max-width: 50%;
+  text-align: center;
 }
 </style>
