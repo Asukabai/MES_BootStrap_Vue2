@@ -30,8 +30,6 @@
           <VerificationCode />
         </div>
       </van-cell-group>
-
-
       <!-- 其他功能入口 -->
       <van-cell-group style="margin-top: 15px;">
         <van-cell title="个人资料" is-link @click="$router.push(`/${$route.params.department}/profile`)"  />
@@ -59,7 +57,6 @@ export default {
     VerificationCode,
     VanCell: Cell,
     VanCellGroup: CellGroup,
-
   },
   data() {
     return {
@@ -73,7 +70,7 @@ export default {
         name: ''
       },
       // 添加版本号
-      version: 'V1.1.18'
+      version: 'V1.1.19'
     };
   },
   mounted() {

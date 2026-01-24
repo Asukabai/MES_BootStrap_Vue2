@@ -70,6 +70,13 @@
         </van-tab>
       </van-tabs>
     </div>
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 70, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBack"
+    />
   </div>
 </template>
 
@@ -79,6 +86,7 @@ import CustomCalendar from '@/components/CustomCalendar.vue';
 import SensorRequest from "@/utils/SensorRequest";
 import {key_DingUserPhone} from "@/utils/Dingding";
 import {GetDingUserToken} from "../../utils/Dingding";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 
 function getLocalUserInfo() {
@@ -89,6 +97,7 @@ function getLocalUserInfo() {
 }
 export default {
   components: {
+    CustomizableFloatingButton,
     CustomCalendar
   },
   data() {
@@ -120,6 +129,19 @@ export default {
     this.loadResponsibleTasks();
   },
   methods: {
+    goBack() {
+      // this.$router.go(-1);
+      this.navigateTo('/index');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     // 加载 "我参与的" 任务（调用 GetTaskInfoWithMeFun 接口）
     async loadParticipatedTasks() {
       this.participatedLoading = true;

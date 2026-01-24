@@ -85,15 +85,24 @@
     <van-cell-group title="用户统计">
       <van-cell title="当前在线人数" :value="onlineUsers" />
     </van-cell-group>
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 40, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBack"
+    />
   </div>
 </template>
 
 <script>
 import SensorRequest from '@/utils/SensorRequest';
 import {GetDingUserToken} from "../../utils/Dingding";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 export default {
   name: 'StatisticalReport',
+  components: {CustomizableFloatingButton},
   computed: {
   },
   data() {
@@ -122,6 +131,19 @@ export default {
     this.showLoadingAndFetch();
   },
   methods: {
+    goBack() {
+      // this.$router.go(-1);
+      this.navigateTo('/index');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     getCircleColor(percent) {
       if (percent < 60) return '#07c160'; // 绿色
       if (percent < 90) return '#ff9900'; // 橙色
