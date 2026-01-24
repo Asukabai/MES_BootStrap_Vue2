@@ -324,6 +324,19 @@
 <script>
 import SensorRequest from "../../utils/SensorRequest";
 import SensorRequestPage from "../../utils/SensorRequestPage";
+import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
+
+function getLocalUserInfo() {
+  const name = localStorage.getItem(key_DingName);
+  const phone = localStorage.getItem(key_DingUserPhone);
+  const dingID = localStorage.getItem(key_DingUserIndex); // 使用 key_DingUserIndex 作为 DingID
+
+  return {
+    name: name || '',
+    phone: phone || '',
+    dingID: dingID || ''
+  };
+}
 
 export default {
   name: 'InventoryExtendInfoEdit',
@@ -884,6 +897,8 @@ export default {
             }
           );
         });
+        // 编辑成功后，调用事务记录接口
+        await this.addModificationRecord();
         this.$toast.success('修改成功');
         // 清空表单
         this.resetForm();
@@ -907,11 +922,46 @@ export default {
         }, 1000);
       } catch (error) {
         this.$toast.fail('修改失败：' + error.message);
+        console.error('修改失败：', error);
       } finally {
         this.isSubmitting = false;
       }
     },
 
+    // 添加修改记录的方法
+    async addModificationRecord() {
+      return new Promise((resolve, reject) => {
+        // 构造修改信息的事务请求参数
+        const requestData = {
+          PageIndex: 0,
+          PageSize: 10,
+          Inventory_ID: this.inventoryId, // 确保是字符串类型
+          Transaction_Type: "修改", // 操作类型为"修改信息"
+          Quantity_Change: 0,
+          Current_Quantity: 0,
+          Report_Person: {
+            Person_Name: getLocalUserInfo().name,
+            Person_Phone: getLocalUserInfo().phone,
+            Person_DingID: getLocalUserInfo().dingID
+          },
+          Remark: this.remark || `${getLocalUserInfo().name} 修改了物品信息: ${this.itemForm.Item_Name}`
+        };
+
+        // 调用事务记录接口
+        SensorRequestPage.InventoryTransactionAddFun(
+          JSON.stringify(requestData),
+          (respData) => {
+            console.log('修改信息记录添加成功:', respData);
+            resolve(respData);
+          },
+          (error) => {
+            console.error('修改信息记录添加失败:', error);
+            this.$toast.fail('修改信息记录添加失败: ' + (error.message || '未知错误'));
+            reject(error);
+          }
+        );
+      });
+    },
     // 重置表单
     resetForm() {
       this.itemForm = {

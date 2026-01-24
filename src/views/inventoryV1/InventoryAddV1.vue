@@ -314,7 +314,6 @@ import SensorRequest from '../../utils/SensorRequest.js';
 import * as dd from 'dingtalk-jsapi';
 import SensorRequestPage from "../../utils/SensorRequestPage";
 import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
-
 export default {
   name: 'InventoryAddV1',
   data() {
@@ -434,10 +433,127 @@ export default {
       this.scanQRCode();
     },
 
-    // 点击图标实现（导入上一篇功能）
-    // 修改新增物品信息时候的组件页面逻辑-2（新增导入上一片的逻辑）
-    handleLoadClick() {
-      alert('点击了导入上一篇功能')
+// 点击图标实现（导入上一篇功能）
+// 修改新增物品信息时候的组件页面逻辑-2（新增导入上一篇的逻辑）
+    async handleLoadClick() {
+      try {
+        // 弹窗提示用户确认是否导入上一篇操作信息记录
+        await this.$dialog.confirm({
+          title: '确认导入',
+          message: '是否确认导入上一篇操作信息记录（位置，图片信息除外）',
+          confirmButtonText: '确定',
+          cancelButtonText: '取消'
+        });
+
+        // 构造请求参数
+        const userInfo = this.getLocalUserInfo();
+        const param = {
+          "Report_Person": {
+            "Person_Phone": userInfo.phone,
+            "Person_ID": userInfo.dingID
+          }
+        };
+
+        // 调用后端接口获取上一篇操作记录
+        const respData = await new Promise((resolve, reject) => {
+          SensorRequestPage.InventoryItemLastGetFunWithPerson(
+            JSON.stringify(param),
+            (respData) => {
+              console.log('上一篇操作记录 respData:', respData);
+              resolve(respData);
+            },
+            (error) => {
+              reject(error);
+            }
+          );
+        });
+
+        // 解析响应数据
+        const responseJson = JSON.parse(respData);
+        console.log('上一篇操作记录 responseJson:', responseJson);
+
+        // 检查是否有返回数据（对象）
+        if (responseJson && typeof responseJson === 'object') {
+          const lastRecord = responseJson; // 直接使用返回的对象
+          // 保存原有的位置信息和图片信息
+          const originalShelfLocation = this.itemForm.Shelf_Location;
+          const originalImages = this.imageList;
+
+          // 覆盖表单项（除了位置信息和图片）
+          this.itemForm.Item_Name = lastRecord.Item_Name || '';
+          this.itemForm.Item_Model = lastRecord.Item_Model || '';
+          this.itemForm.Item_Brand = lastRecord.Item_Brand || '';
+          this.itemForm.Category_Type = lastRecord.Category_Type || '';
+          this.itemForm.Project_Code = lastRecord.Project_Code || '';
+          this.itemForm.Warning_Threshold = lastRecord.Warning_Threshold || '';
+          this.itemForm.Is_Low_Stock = lastRecord.Is_Low_Stock || '';
+          this.itemForm.Remark = lastRecord.Remark || '';
+          this.itemForm.Company = lastRecord.Company || '';
+
+          // 扩展信息字段
+          this.itemForm.Item_Color = lastRecord.Item_Color || '';
+          this.itemForm.Item_Size = lastRecord.Item_Size || '';
+          this.itemForm.Item_Unit = lastRecord.Item_Unit || '';
+          this.itemForm.Item_Material = lastRecord.Item_Material || '';
+
+          // 标签信息
+          if (lastRecord.Item_Tags && Array.isArray(lastRecord.Item_Tags)) {
+            // 保留系统标签，更新用户标签
+            const systemTagNames = ['晟思', '大钧', '星移', '耗材', '公用', '项目', '其他', '储物箱'];
+            const newSystemTags = lastRecord.Item_Tags.filter(tag => systemTagNames.includes(tag));
+            const newUserTags = lastRecord.Item_Tags.filter(tag => !systemTagNames.includes(tag));
+
+            this.systemTags = newSystemTags;
+            this.userTags = newUserTags;
+          }
+
+          // 更多信息字段
+          if (lastRecord.Item_Mores) {
+            try {
+              const moreFieldsObj = JSON.parse(lastRecord.Item_Mores);
+              this.moreFields = Object.keys(moreFieldsObj).map(key => ({
+                key: key,
+                value: moreFieldsObj[key]
+              }));
+            } catch (e) {
+              console.error('解析更多信息字段失败:', e);
+              this.moreFields = [];
+            }
+          } else {
+            this.moreFields = [];
+          }
+
+          // 项目名称
+          if (lastRecord.Project_Code) {
+            const project = this.fullProjectList.find(p => p.Project_Code === lastRecord.Project_Code);
+            if (project) {
+              this.selectedProjectName = project.Project_Name || project.name || project.projectName || '';
+            }
+          }
+
+          // 恢复原有的位置信息和图片信息
+          this.itemForm.Shelf_Location = originalShelfLocation;
+          this.imageList = originalImages;
+
+          // 更新系统标签
+          this.updateSystemTags();
+
+          // 显示成功消息
+          this.$toast.success('已导入上一篇操作记录信息');
+        } else {
+          // 返回的是空内容
+          this.$toast('暂未查询到上一篇操作记录');
+        }
+      } catch (error) {
+        // 用户点击取消或其他错误
+        if (error.message && error.message.includes('cancel')) {
+          // 用户取消操作，不做任何处理
+          console.log('用户取消导入');
+        } else {
+          console.error('导入上一篇记录失败:', error);
+          this.$toast.fail('导入失败: ' + (error.message || '未知错误'));
+        }
+      }
     },
 
     // 货架位置输入事件处理

@@ -140,7 +140,7 @@
 <script>
 // 在 script 部分导入图片
 import SensorRequest from '../../utils/SensorRequest';
-import {key_DingScannedInventoryQRCodeResult} from '../../utils/Dingding';
+import {key_DingScannedInventoryQRCodeResult, key_DingName, key_DingUserIndex, key_DingUserPhone} from '../../utils/Dingding';
 import FloatingActionButton from "../../components/FloatingActionButton.vue";
 import ExpandableFloatingButton from "../../components/ExpandableFloatingButton.vue"; // 新增导入
 import SensorRequestPage from "../../utils/SensorRequestPage";
@@ -349,6 +349,54 @@ export default {
       event.target.src = require('@/assets/暂无图片1.png');
     },
 
+    // 记录查看操作
+    addViewRecord() {
+      if (!this.currentItem) {
+        console.warn('当前没有物品信息，无法记录查看操作');
+        return;
+      }
+      // 构造查看操作的事务请求参数
+      const requestData = {
+        PageIndex: 0,
+        PageSize: 10,
+        Inventory_ID: this.currentItem.Id, // 使用当前物品的ID作为库存ID
+        Transaction_Type: "查看", // 操作类型为"查看"
+        Quantity_Change: 0,
+        Current_Quantity: 0,
+        Report_Person: {
+          Person_Name: this.getLocalUserInfo().name,
+          Person_Phone: this.getLocalUserInfo().phone,
+          Person_DingID: this.getLocalUserInfo().dingID
+        },
+        Remark: `${this.getLocalUserInfo().name} 查看了物品: ${this.currentItem.Item_Name}`
+      };
+
+      // 调用事务记录接口
+      SensorRequestPage.InventoryTransactionAddFun(
+        JSON.stringify(requestData),
+        (respData) => {
+          console.log('查看操作记录添加成功:', respData);
+        },
+        (error) => {
+          console.error('查看操作记录添加失败:', error);
+          this.$toast.fail('查看操作记录添加失败: ' + (error.message || '未知错误'));
+        }
+      );
+    },
+
+    // 获取本地用户信息
+    getLocalUserInfo() {
+      const name = localStorage.getItem(key_DingName);
+      const phone = localStorage.getItem(key_DingUserPhone);
+      const dingID = localStorage.getItem(key_DingUserIndex);
+
+      return {
+        name: name || '',
+        phone: phone || '',
+        dingID: dingID || ''
+      };
+    },
+
     // 在数据加载时预处理图片URL
     loadInventoryData() {
       // 从 sessionStorage 获取扫码结果
@@ -405,9 +453,11 @@ export default {
                           item.processedImageUrls[index] = modifiedUrl;
 
                           loadedCount++;
-                          // 如果所有图片都已加载完成，更新currentItem
+                          // 如果所有图片都已加载完成，更新currentItem并记录查看操作
                           if (loadedCount === item.Item_Images.length) {
                             this.currentItem = item;
+                            // 记录查看操作
+                            this.addViewRecord();
                           }
                         } else {
                           // 使用默认图片
@@ -417,9 +467,11 @@ export default {
                           item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
 
                           loadedCount++;
-                          // 如果所有图片都已加载完成，更新currentItem
+                          // 如果所有图片都已加载完成，更新currentItem并记录查看操作
                           if (loadedCount === item.Item_Images.length) {
                             this.currentItem = item;
+                            // 记录查看操作
+                            this.addViewRecord();
                           }
                         }
                       },
@@ -432,9 +484,11 @@ export default {
                         item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
 
                         loadedCount++;
-                        // 如果所有图片都已加载完成，更新currentItem
+                        // 如果所有图片都已加载完成，更新currentItem并记录查看操作
                         if (loadedCount === item.Item_Images.length) {
                           this.currentItem = item;
+                          // 记录查看操作
+                          this.addViewRecord();
                         }
                       }
                     );
@@ -444,22 +498,26 @@ export default {
                       item.processedImageUrls = [];
                     }
                     item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
-
                     loadedCount++;
-                    // 如果所有图片都已加载完成，更新currentItem
+                    // 如果所有图片都已加载完成，更新currentItem并记录查看操作
                     if (loadedCount === item.Item_Images.length) {
                       this.currentItem = item;
+                      // 记录查看操作
+                      this.addViewRecord();
                     }
                   }
                 });
-
-                // 如果没有图片，直接设置currentItem
+                // 如果没有图片，直接设置currentItem并记录查看操作
                 if (item.Item_Images.length === 0) {
                   this.currentItem = item;
+                  // 记录查看操作
+                  this.addViewRecord();
                 }
               } else {
-                // 如果没有图片，直接设置currentItem
+                // 如果没有图片，直接设置currentItem并记录查看操作
                 this.currentItem = item;
+                // 记录查看操作
+                this.addViewRecord();
               }
 
               this.$toast.success('数据加载成功');

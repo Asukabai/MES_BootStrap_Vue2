@@ -140,7 +140,12 @@
 <script>
 // 在 script 部分导入图片
 import SensorRequest from '../../utils/SensorRequest';
-import {key_DingScannedInventoryQRCodeResult} from '../../utils/Dingding';
+import {
+  key_DingName,
+  key_DingScannedInventoryQRCodeResult,
+  key_DingUserIndex,
+  key_DingUserPhone
+} from '../../utils/Dingding';
 import FloatingActionButton from "../../components/FloatingActionButton.vue";
 import ExpandableFloatingButton from "../../components/ExpandableFloatingButton.vue"; // 新增导入
 import SensorRequestPage from "../../utils/SensorRequestPage";
@@ -319,6 +324,54 @@ export default {
       }
     },
 
+    // 记录查看操作
+    addViewRecord() {
+      if (!this.currentItem) {
+        console.warn('当前没有物品信息，无法记录查看操作');
+        return;
+      }
+      // 构造查看操作的事务请求参数
+      const requestData = {
+        PageIndex: 0,
+        PageSize: 10,
+        Inventory_ID: this.currentItem.Id, // 使用当前物品的ID作为库存ID
+        Transaction_Type: "查看", // 操作类型为"查看"
+        Quantity_Change: 0,
+        Current_Quantity: 0,
+        Report_Person: {
+          Person_Name: this.getLocalUserInfo().name,
+          Person_Phone: this.getLocalUserInfo().phone,
+          Person_DingID: this.getLocalUserInfo().dingID
+        },
+        Remark: `${this.getLocalUserInfo().name} 查看了物品: ${this.currentItem.Item_Name}`
+      };
+
+      // 调用事务记录接口
+      SensorRequestPage.InventoryTransactionAddFun(
+        JSON.stringify(requestData),
+        (respData) => {
+          console.log('查看操作记录添加成功:', respData);
+        },
+        (error) => {
+          console.error('查看操作记录添加失败:', error);
+          this.$toast.fail('查看操作记录添加失败: ' + (error.message || '未知错误'));
+        }
+      );
+    },
+
+    // 获取本地用户信息
+    getLocalUserInfo() {
+      const name = localStorage.getItem(key_DingName);
+      const phone = localStorage.getItem(key_DingUserPhone);
+      const dingID = localStorage.getItem(key_DingUserIndex);
+
+      return {
+        name: name || '',
+        phone: phone || '',
+        dingID: dingID || ''
+      };
+    },
+
     // 打开图片预览
     openImagePreview(imageUrl, fileName) {
       if (imageUrl && fileName) {
@@ -356,7 +409,6 @@ export default {
         this.loading = false;
         return;
       }
-
       // 构造请求参数，按照后端接口要求的格式
       const param = {
         PageIndex: 0, // 后端可能使用0基索引
@@ -368,40 +420,33 @@ export default {
         Category_Type: "", // 分类筛选
         Company: "" // 公司筛选
       };
-
       // 调用后端接口获取库存数据
       SensorRequestPage.InventoryItemGetFun(JSON.stringify(param), (respData) => {
         try {
           let parsedData = null;
-
           // 解析响应数据 - 新的数据格式是字符串化的JSON
           if (typeof respData === 'string') {
             parsedData = JSON.parse(respData);
           } else {
             parsedData = respData;
           }
-
           // 提取实际的Data数组
           let newData = [];
           if (parsedData && parsedData.Data) {
             newData = parsedData.Data;
           }
-
           // 从返回的数组中获取第一个物品（因为按货架位置搜索应该只有一个结果）
           if (newData && newData.length > 0) {
             const item = newData[0];
-
             // 如果有图片，预加载图片URL
             if (item.Item_Images && item.Item_Images.length > 0) {
               item.processedImageUrls = [];
               let loadedCount = 0;
-
               item.Item_Images.forEach((img, index) => {
                 if (img.File_Md5) {
                   const param = {
                     remoteLocation: img.File_Md5
                   };
-
                   SensorRequest.Minio_PresignedDownloadUrl5B(
                     JSON.stringify(param),
                     (respData) => {
@@ -416,11 +461,11 @@ export default {
                           item.processedImageUrls = [];
                         }
                         item.processedImageUrls[index] = modifiedUrl;
-
                         loadedCount++;
-                        // 如果所有图片都已加载完成，更新currentItem
+                        // 如果所有图片都已加载完成，更新currentItem并记录查看操作
                         if (loadedCount === item.Item_Images.length) {
                           this.currentItem = item;
+                          this.addViewRecord(); // 数据加载完成后记录查看操作
                         }
                       } else {
                         // 使用默认图片
@@ -428,11 +473,11 @@ export default {
                           item.processedImageUrls = [];
                         }
                         item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
-
                         loadedCount++;
-                        // 如果所有图片都已加载完成，更新currentItem
+                        // 如果所有图片都已加载完成，更新currentItem并记录查看操作
                         if (loadedCount === item.Item_Images.length) {
                           this.currentItem = item;
+                          this.addViewRecord(); // 数据加载完成后记录查看操作
                         }
                       }
                     },
@@ -445,9 +490,10 @@ export default {
                       item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
 
                       loadedCount++;
-                      // 如果所有图片都已加载完成，更新currentItem
+                      // 如果所有图片都已加载完成，更新currentItem并记录查看操作
                       if (loadedCount === item.Item_Images.length) {
                         this.currentItem = item;
+                        this.addViewRecord(); // 数据加载完成后记录查看操作
                       }
                     }
                   );
@@ -457,24 +503,24 @@ export default {
                     item.processedImageUrls = [];
                   }
                   item.processedImageUrls[index] = require('@/assets/暂无图片1.png');
-
                   loadedCount++;
-                  // 如果所有图片都已加载完成，更新currentItem
+                  // 如果所有图片都已加载完成，更新currentItem并记录查看操作
                   if (loadedCount === item.Item_Images.length) {
                     this.currentItem = item;
+                    this.addViewRecord(); // 数据加载完成后记录查看操作
                   }
                 }
               });
-
-              // 如果没有图片，直接设置currentItem
+              // 如果没有图片，直接设置currentItem并记录查看操作
               if (item.Item_Images.length === 0) {
                 this.currentItem = item;
+                this.addViewRecord(); // 数据加载完成后记录查看操作
               }
             } else {
-              // 如果没有图片，直接设置currentItem
+              // 如果没有图片，直接设置currentItem并记录查看操作
               this.currentItem = item;
+              this.addViewRecord(); // 数据加载完成后记录查看操作
             }
-
             this.$toast.success('数据加载成功');
           } else {
             this.inventoryItems = [];
@@ -485,7 +531,6 @@ export default {
           console.error('处理库存数据时出错:', error);
           this.$toast.fail('数据处理失败');
         }
-
         this.loading = false;
       }, (error) => {
         console.error('获取库存信息失败:', error);
