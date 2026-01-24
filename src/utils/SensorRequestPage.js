@@ -74,6 +74,12 @@ const SensorRequestPage = {
           callSuccess(respData);
         }, callFail);
       },
+      // 获取当前人库存最后一次记录的库存信息（实现“导入上一篇记录”功能）
+      InventoryItemLastGetFunWithPerson(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("InventoryItemLastGetFunWithPerson", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
   };
 
   export default SensorRequestPage;
