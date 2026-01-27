@@ -187,6 +187,13 @@
 <!--        </van-pull-refresh>-->
 <!--      </van-tab>-->
     </van-tabs>
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 90, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBack"
+    />
   </div>
 </template>
 
@@ -195,6 +202,7 @@ import SensorRequest from '../../utils/SensorRequest';
 import {key_DingName, key_DingUserIndex, key_DingUserPhone} from '../../utils/Dingding';
 import { GetDingUserToken } from "../../utils/Dingding";
 import SensorRequestPage from "../../utils/SensorRequestPage";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 function getLocalUserInfo() {
   const name = localStorage.getItem(key_DingName);
@@ -210,6 +218,7 @@ function getLocalUserInfo() {
 
 export default {
   name: 'InventoryLog',
+  components: {CustomizableFloatingButton},
   data() {
     return {
       activeTab: 0, // 当前选中的 tab index
@@ -267,6 +276,18 @@ export default {
   },
 
   methods: {
+    goBack() {
+      this.navigateTo('/inventoryDetailV1');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     // 格式化数量变化显示
     formatQuantityChange(item) {
       const quantity = item.Quantity_Change || 0;
