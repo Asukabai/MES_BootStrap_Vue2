@@ -117,7 +117,7 @@ export default {
       Toast('正在下载模板文件(含示例数据)...');
       const file = {
         "File_Name": "导入模版_带示例数据.xlsx",
-        "File_Md5": "7891a612a62cd9debaf895d4f2e1a616",
+        "File_Md5": "b3a4d397dd7886def36e4fbe9da89354",
         "Person_Name": "张学进"
       };
       // 调用下载文件方法，使用固定的部门名称或者从当前路由获取
@@ -282,10 +282,10 @@ export default {
               validationErrors.push(`第${i + 2}行B列(物品名称)不能为空`);
             }
             if (colE === null || colE === undefined || String(colE).trim() === '') {
-              validationErrors.push(`第${i + 2}行E列(当前库存)不能为空`);
+              validationErrors.push(`第${i + 2}行E列(当前库存数量)不能为空`);
             }
             if (colF === null || colF === undefined || String(colF).trim() === '') {
-              validationErrors.push(`第${i + 2}行F列(品牌)不能为空`);
+              validationErrors.push(`第${i + 2}行F列(库存分类)不能为空`);
             }
             if (colH === null || colH === undefined || String(colH).trim() === '') {
               validationErrors.push(`第${i + 2}行H列(预警阈值)不能为空`);
@@ -338,7 +338,7 @@ export default {
         if (duplicateCombinations.length > 0) {
           Dialog.alert({
             title: '提示',
-            message: `检测到重复的A列和J列组合：${duplicateCombinations.join(', ')}。请确保A列与J列的组合内容不重复后再上传。`
+            message: `检测到重复的货架编号组合：${duplicateCombinations.join(', ')}。请确保货架编号与公司列的组合内容不重复后再上传。`
           }).then(() => {
             // 验证失败后清空已选择的文件
             this.selectedFile = null;
@@ -438,7 +438,7 @@ export default {
         SensorRequestPage.InventoryFileUploadAnalysisFun(
           JSON.stringify(uploadParams),
           (respData) => {
-            Toast.success('文件上传成功');
+            Toast.success('文件解析成功');
             // 解析后端返回的数据并跳转到预览页面
             if (respData) {
               this.$router.push({
