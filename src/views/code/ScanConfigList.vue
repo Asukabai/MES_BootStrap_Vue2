@@ -57,7 +57,7 @@ export default {
   methods: {
     goBack() {
       // this.$router.go(-1);
-      this.navigateTo('/code/config');
+      this.navigateTo('/config');
     },
     navigateTo(path) {
       const department = this.$route.params.department;

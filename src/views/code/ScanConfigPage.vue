@@ -218,7 +218,7 @@ export default {
             this.$toast.success('配置提交成功 ！');
             setTimeout(() => {
               const department = this.$route.params.department;
-              this.$router.push(`/${department}/code/configList`);
+              this.$router.push(`/${department}/configList`);
             }, 1000);
           },
           (error) => {
@@ -234,7 +234,7 @@ export default {
     },
     goToConfigList() {
       const department = this.$route.params.department;
-      this.$router.push(`/${department}/code/configList`);
+      this.$router.push(`/${department}/configList`);
     },
   },
 };
