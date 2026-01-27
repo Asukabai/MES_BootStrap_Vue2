@@ -46,6 +46,38 @@
         </van-dropdown-menu>
       </div>
     </div>
+
+    <!-- 批量操作栏 -->
+    <div v-if="selectedItems.length > 0" class="batch-operation-bar">
+      <div class="batch-info">
+        已选择 {{ selectedItems.length }} 个物品
+      </div>
+      <div class="batch-actions">
+        <van-button
+          size="small"
+          type="primary"
+          @click="showBatchInbound"
+          :disabled="selectedItems.length === 0"
+        >
+          批量入库
+        </van-button>
+        <van-button
+          size="small"
+          type="danger"
+          @click="showBatchOutbound"
+          :disabled="selectedItems.length === 0"
+        >
+          批量出库
+        </van-button>
+        <van-button
+          size="small"
+          @click="clearSelection"
+        >
+          取消选择
+        </van-button>
+      </div>
+    </div>
+
     <!-- 结果列表 -->
     <div class="results-section">
       <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
@@ -61,6 +93,17 @@
             class="inventory-cell"
           >
             <div class="cell-content" @click="viewDetail(item.Shelf_Location)">
+              <!-- 选择复选框 - 放在左上角，不影响布局 -->
+              <div
+                class="select-checkbox-corner"
+                @click.stop="toggleItemSelection(item)"
+              >
+                <van-icon
+                  :name="isItemSelected(item) ? 'success' : 'circle'"
+                  :color="isItemSelected(item) ? '#1989fa' : '#c8c9cc'"
+                />
+              </div>
+
               <!-- 左侧图片区域（30%） -->
               <div class="image-section">
                 <img
@@ -80,16 +123,26 @@
 
                 <div class="cell-header">
                   <div class="item-title">物品名称：{{ item.Item_Name }}</div>
-                  <div class="item-subtitle">
-                    型号：<span class="model-value">{{ item.Item_Model }}</span> |
-                    库存：<span class="stock-value">{{ item.Current_Stock }}</span>
+
+                  <!-- 型号和库存信息分行显示 -->
+                  <div class="item-subtitle-line">
+                    <span class="model-label">型号：</span>
+                    <span class="model-value">{{ item.Item_Model && item.Item_Model.trim() !== '' ? item.Item_Model : '用户暂未填写' }}</span>
+                  </div>
+                  <div class="item-subtitle-line">
+                    <span class="stock-label">库存：</span>
+                    <span class="stock-value">{{ item.Current_Stock !== null && item.Current_Stock !== undefined && item.Current_Stock !== '' ? item.Current_Stock : '用户暂未填写' }}</span>
                   </div>
                 </div>
+
+                <!-- 公司和位置信息分行显示 -->
                 <div class="cell-body">
                   <div class="item-info">
                     <div class="info-row">
                       <span class="label">公司:</span>
                       <span class="value">{{ item.Company }}</span>
+                    </div>
+                    <div class="info-row">
                       <span class="label">位置:</span>
                       <span class="value">{{ item.Shelf_Location }}</span>
                     </div>
@@ -129,6 +182,106 @@
       @cancel="cancelDelete"
       :cancel-button-text="'关闭'"
     />
+
+    <!-- 批量入库弹窗 -->
+    <van-popup v-model="showBatchInboundPopup" position="bottom" :style="{ height: '80%' }">
+      <div class="batch-operation-popup">
+        <div class="popup-header">
+          <h3>批量入库</h3>
+          <van-icon name="cross" @click="closeBatchInboundPopup" />
+        </div>
+
+        <div class="selected-items-summary">
+          <p>已选择 {{ selectedItems.length }} 个物品</p>
+          <div class="selected-list">
+            <div v-for="item in selectedItems" :key="item.Id" class="selected-item">
+              <span>{{ item.Item_Name }}</span>
+              <span class="current-stock">当前库存: {{ item.Current_Stock }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="operation-form">
+          <van-field
+            v-model="batchInboundQuantity"
+            type="number"
+            label="入库数量"
+            placeholder="请输入入库数量"
+            :rules="[{ required: true, message: '请输入入库数量' }]"
+          />
+
+          <van-field
+            v-model="batchInboundRemark"
+            type="textarea"
+            label="备注"
+            placeholder="请输入备注信息"
+            rows="2"
+            autosize
+          />
+
+          <div class="action-buttons">
+            <van-button
+              block
+              type="primary"
+              @click="confirmBatchInbound"
+              :loading="batchOperationLoading"
+            >
+              确认入库
+            </van-button>
+          </div>
+        </div>
+      </div>
+    </van-popup>
+
+    <!-- 批量出库弹窗 -->
+    <van-popup v-model="showBatchOutboundPopup" position="bottom" :style="{ height: '80%' }">
+      <div class="batch-operation-popup">
+        <div class="popup-header">
+          <h3>批量出库</h3>
+          <van-icon name="cross" @click="closeBatchOutboundPopup" />
+        </div>
+
+        <div class="selected-items-summary">
+          <p>已选择 {{ selectedItems.length }} 个物品</p>
+          <div class="selected-list">
+            <div v-for="item in selectedItems" :key="item.Id" class="selected-item">
+              <span>{{ item.Item_Name }}</span>
+              <span class="current-stock">当前库存: {{ item.Current_Stock }}</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="operation-form">
+          <van-field
+            v-model="batchOutboundQuantity"
+            type="number"
+            label="出库数量"
+            placeholder="请输入出库数量"
+            :rules="[{ required: true, message: '请输入出库数量' }]"
+          />
+
+          <van-field
+            v-model="batchOutboundRemark"
+            type="textarea"
+            label="备注"
+            placeholder="请输入备注信息"
+            rows="2"
+            autosize
+          />
+
+          <div class="action-buttons">
+            <van-button
+              block
+              type="danger"
+              @click="confirmBatchOutbound"
+              :loading="batchOperationLoading"
+            >
+              确认出库
+            </van-button>
+          </div>
+        </div>
+      </div>
+    </van-popup>
 
     <CustomizableFloatingButton
       :initial-position="{ bottom: 200, right: 10 }"
@@ -229,7 +382,18 @@ export default {
       outboundError: '',
       showDeleteConfirm: false, // 控制删除确认弹窗显示
       showStockCheckDialog: false, // 控制库存检查弹窗显示
-      deletingItem: null // 正在删除的项目
+      deletingItem: null, // 正在删除的项目
+
+      // 新增：批量操作相关
+      selectedItems: [], // 选中的物品列表
+      isSelectMode: false, // 是否处于选择模式
+      showBatchInboundPopup: false, // 批量入库弹窗
+      showBatchOutboundPopup: false, // 批量出库弹窗
+      batchInboundQuantity: 1, // 批量入库数量
+      batchOutboundQuantity: 1, // 批量出库数量
+      batchInboundRemark: '', // 批量入库备注
+      batchOutboundRemark: '', // 批量出库备注
+      batchOperationLoading: false // 批量操作加载状态
     };
   },
   created() {
@@ -288,6 +452,7 @@ export default {
         this.currentPage = 1;
         this.list = [];
         this.finished = false;
+        this.clearSelection(); // 清除选择状态
         this.onLoad();
       } else {
         Toast('请输入搜索关键词或选择筛选条件');
@@ -305,6 +470,9 @@ export default {
     onFilterChange() {
       if (this.searchValue || this.filter.category || this.filter.status) {
         this.onSearch();
+      } else {
+        // 如果只是清除筛选，也要重置选择状态
+        this.clearSelection();
       }
     },
 
@@ -325,6 +493,9 @@ export default {
       this.finished = false;
       this.hasSearched = false;
 
+      // 重置选择状态
+      this.clearSelection();
+
       // 重新加载数据
       this.onLoad();
     },
@@ -340,7 +511,7 @@ export default {
       });
     },
 
-// 修改 onLoad 方法以预加载图片 URL
+    // 修改 onLoad 方法以预加载图片 URL
     onLoad() {
       return new Promise((resolve) => {
         this.loading = true;
@@ -479,6 +650,7 @@ export default {
       this.currentPage = 1;
       this.list = [];
       this.finished = false;
+      this.clearSelection(); // 清除选择状态
       this.onLoad().then(() => {
         this.refreshing = false;
       }).catch(() => {
@@ -681,6 +853,181 @@ export default {
     // 图片加载失败时的处理
     onImageError(event) {
       event.target.src = require('@/assets/暂无图片1.png');
+    },
+
+    // 新增：选择物品相关方法
+    toggleItemSelection(item) {
+      const index = this.selectedItems.findIndex(selectedItem => selectedItem.Id === item.Id);
+      if (index > -1) {
+        // 如果已选择，取消选择
+        this.selectedItems.splice(index, 1);
+      } else {
+        // 如果未选择，添加到选择列表
+        this.selectedItems.push(item);
+      }
+
+      // 如果没有选择任何项目，退出选择模式
+      if (this.selectedItems.length === 0) {
+        this.isSelectMode = false;
+      } else {
+        this.isSelectMode = true;
+      }
+    },
+
+    isItemSelected(item) {
+      return this.selectedItems.some(selectedItem => selectedItem.Id === item.Id);
+    },
+
+    clearSelection() {
+      this.selectedItems = [];
+      this.isSelectMode = false;
+    },
+
+    // 显示批量入库弹窗
+    showBatchInbound() {
+      if (this.selectedItems.length === 0) {
+        Toast('请至少选择一个物品');
+        return;
+      }
+      this.showBatchInboundPopup = true;
+    },
+
+    // 显示批量出库弹窗
+    showBatchOutbound() {
+      if (this.selectedItems.length === 0) {
+        Toast('请至少选择一个物品');
+        return;
+      }
+      this.showBatchOutboundPopup = true;
+    },
+
+    // 关闭批量入库弹窗
+    closeBatchInboundPopup() {
+      this.showBatchInboundPopup = false;
+      this.batchInboundQuantity = 1;
+      this.batchInboundRemark = '';
+    },
+
+    // 关闭批量出库弹窗
+    closeBatchOutboundPopup() {
+      this.showBatchOutboundPopup = false;
+      this.batchOutboundQuantity = 1;
+      this.batchOutboundRemark = '';
+    },
+
+    // 确认批量入库
+    async confirmBatchInbound() {
+      if (!this.batchInboundQuantity || parseInt(this.batchInboundQuantity) <= 0) {
+        Toast('请输入有效的入库数量');
+        return;
+      }
+
+      this.batchOperationLoading = true;
+
+      try {
+        // 对每个选中的物品执行入库操作
+        for (const item of this.selectedItems) {
+          await this.performInbound(item, parseInt(this.batchInboundQuantity));
+        }
+
+        Toast.success(`成功对${this.selectedItems.length}个物品进行批量入库`);
+        this.closeBatchInboundPopup();
+        this.clearSelection();
+        // 刷新列表
+        this.onRefresh();
+      } catch (error) {
+        console.error('批量入库失败:', error);
+        Toast.fail('批量入库失败');
+      } finally {
+        this.batchOperationLoading = false;
+      }
+    },
+
+    // 确认批量出库
+    async confirmBatchOutbound() {
+      if (!this.batchOutboundQuantity || parseInt(this.batchOutboundQuantity) <= 0) {
+        Toast('请输入有效的出库数量');
+        return;
+      }
+
+      this.batchOperationLoading = true;
+
+      try {
+        // 对每个选中的物品执行出库操作
+        for (const item of this.selectedItems) {
+          await this.performOutbound(item, parseInt(this.batchOutboundQuantity));
+        }
+
+        Toast.success(`成功对${this.selectedItems.length}个物品进行批量出库`);
+        this.closeBatchOutboundPopup();
+        this.clearSelection();
+        // 刷新列表
+        this.onRefresh();
+      } catch (error) {
+        console.error('批量出库失败:', error);
+        Toast.fail('批量出库失败');
+      } finally {
+        this.batchOperationLoading = false;
+      }
+    },
+
+    // 执行单个物品入库
+    performInbound(item, quantity) {
+      return new Promise((resolve, reject) => {
+        // 构造入库请求参数
+        const param = {
+          Id: item.Id,
+          Quantity_Change: quantity,
+          Transaction_Type: "入库",
+          Remark: `批量入库: ${quantity}, ${this.batchInboundRemark}`
+        };
+
+        // 调用入库接口
+        SensorRequestPage.InventoryItemUpdateQuantityFun(
+          JSON.stringify(param),
+          (respData) => {
+            console.log(`物品 ${item.Item_Name} 入库成功`);
+            resolve(respData);
+          },
+          (error) => {
+            console.error(`物品 ${item.Item_Name} 入库失败:`, error);
+            reject(error);
+          }
+        );
+      });
+    },
+
+    // 执行单个物品出库
+    performOutbound(item, quantity) {
+      return new Promise((resolve, reject) => {
+        // 检查库存是否足够
+        if (item.Current_Stock < quantity) {
+          Toast.fail(`物品 ${item.Item_Name} 库存不足，当前库存: ${item.Current_Stock}`);
+          reject(new Error(`库存不足`));
+          return;
+        }
+
+        // 构造出库请求参数
+        const param = {
+          Id: item.Id,
+          Quantity_Change: -quantity, // 出库为负数
+          Transaction_Type: "出库",
+          Remark: `批量出库: ${quantity}, ${this.batchOutboundRemark}`
+        };
+
+        // 调用出库接口
+        SensorRequestPage.InventoryItemUpdateQuantityFun(
+          JSON.stringify(param),
+          (respData) => {
+            console.log(`物品 ${item.Item_Name} 出库成功`);
+            resolve(respData);
+          },
+          (error) => {
+            console.error(`物品 ${item.Item_Name} 出库失败:`, error);
+            reject(error);
+          }
+        );
+      });
     }
   }
 };
@@ -752,6 +1099,30 @@ export default {
   padding: 8px 12px;
 }
 
+/* 批量操作栏样式 */
+.batch-operation-bar {
+  position: sticky;
+  top: 0;
+  z-index: 999;
+  background: #fff;
+  padding: 10px 15px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid #eee;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.batch-info {
+  font-weight: bold;
+  color: #1989fa;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 8px;
+}
+
 .results-section {
   padding: 10px;
 }
@@ -767,8 +1138,25 @@ export default {
 .cell-content {
   display: flex;
   padding: 8px;
-  position: relative; /* 为删除按钮定位做准备 */
+  position: relative; /* 为删除按钮和复选框定位做准备 */
   cursor: pointer; /* 表示这是一个可点击的卡片 */
+}
+
+/* 角落选择复选框样式 - 放在左上角，不影响布局 */
+.select-checkbox-corner {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  z-index: 2;
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
 }
 
 .cell-content:hover {
@@ -792,8 +1180,11 @@ export default {
 }
 
 .info-section {
-  width: 70%;
+  width: 70%; /* 恢复原始宽度，不再减去复选框的宽度 */
   position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .delete-btn {
@@ -835,25 +1226,44 @@ export default {
   flex: 1;
   margin-right: 4px;
   line-height: 1.3;
+  margin-bottom: 4px;
 }
-.item-subtitle {
+
+/* 型号和库存信息分行显示 */
+.item-subtitle-line {
+  display: flex;
   font-size: 12px;
   color: #666;
+  margin-bottom: 2px;
+  width: 100%;
+}
+
+.item-subtitle-line:last-child {
   margin-bottom: 4px;
-  font-weight: 500; /* 整体加粗 */
 }
 
-.item-subtitle .model-value {
-  font-weight: 500; /* 型号加粗 */
+.model-label, .stock-label {
+  font-weight: 500;
+  margin-right: 4px;
+  color: #333;
 }
 
-.item-subtitle .stock-value {
-  font-weight: 600; /* 库存加粗 */
-  color: orange;    /* 库存橙色 */
+.model-value, .stock-value {
+  font-weight: 500;
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
+
+.stock-value {
+  color: orange;
+  font-weight: 600;
+}
+
 .cell-body {
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
   margin-bottom: 4px;
 }
 
@@ -863,32 +1273,32 @@ export default {
 
 .info-row {
   display: flex;
-  flex-wrap: wrap; /* 允许换行 */
-  font-size: 12px; /* 减小字体 */
+  font-size: 12px;
   align-items: baseline;
-  gap: 8px; /* 添加间隙 */
+  margin-bottom: 2px;
+  width: 100%;
 }
 
-/* 确保所有 info-row 内的文本统一 */
-.info-row {
-  display: flex;
-  margin-bottom: 4px;
-  font-size: 14px;
-  align-items: baseline; /* 确保文本基线对齐 */
+.info-row:last-child {
+  margin-bottom: 0;
 }
 
 .label {
   color: #999;
-  margin-right: 2px; /* 减少间距 */
+  margin-right: 4px;
   flex-shrink: 0;
-  font-size: 11px; /* 减小标签字体 */
+  font-size: 11px;
+  width: 40px;
 }
 
 .value {
   color: #666;
   flex: 1;
   word-break: break-all;
-  font-size: 12px; /* 减小值字体 */
+  font-size: 12px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 隐藏原有的按钮区域 */
@@ -966,5 +1376,57 @@ export default {
   width: 30px;
   height: 30px;
   padding: 0;
+}
+
+/* 批量操作弹窗样式 */
+.batch-operation-popup {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.batch-operation-popup .popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.selected-items-summary {
+  margin-bottom: 16px;
+}
+
+.selected-items-summary p {
+  font-weight: bold;
+  margin-bottom: 8px;
+}
+
+.selected-list {
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.selected-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 8px;
+  border-bottom: 1px solid #eee;
+}
+
+.selected-item .current-stock {
+  color: #999;
+  font-size: 12px;
+}
+
+.operation-form {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.action-buttons {
+  margin-top: 16px;
 }
 </style>
