@@ -163,6 +163,7 @@ import FloatingActionButton from '../../components/FloatingActionButton.vue';
 import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding";
 import SensorRequestPage from "../../utils/SensorRequestPage";
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue"; // 引入组件
+import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
 export default {
   name: 'InventoryManagementV1',
   components: {
@@ -613,6 +614,8 @@ export default {
           Toast('删除成功');
           // 从列表中移除已删除的项目
           this.list = this.list.filter(item => item.Id !== this.deletingItem.Id);
+          // 在重置状态前先记录删除操作（否则会出现ID不存在的情况）
+          this.addDeletionRecord();
           // 重置状态
           this.showDeleteConfirm = false;
           this.deletingItem = null;
@@ -624,6 +627,49 @@ export default {
           this.deletingItem = null;
         }
       );
+    },
+    // 添加删除记录的方法
+    addDeletionRecord() {
+      // 构造删除操作的事务请求参数
+      const requestData = {
+        PageIndex: 0,
+        PageSize: 10,
+        Inventory_ID: this.deletingItem.Id, // 使用删除项目的ID作为库存ID
+        Transaction_Type: "删除", // 操作类型为"删除"
+        Quantity_Change: 0,
+        Current_Quantity: 0,
+        Report_Person: {
+          Person_Name: this.getLocalUserInfo().name,
+          Person_Phone: this.getLocalUserInfo().phone,
+          Person_DingID: this.getLocalUserInfo().dingID
+        },
+        Remark: `${this.getLocalUserInfo().name} 删除了物品: ${this.deletingItem.Item_Name}`
+      };
+
+      // 调用事务记录接口
+      SensorRequestPage.InventoryTransactionAddFun(
+        JSON.stringify(requestData),
+        (respData) => {
+          console.log('删除操作记录添加成功:', respData);
+        },
+        (error) => {
+          console.error('删除操作记录添加失败:', error);
+          this.$toast.fail('删除操作记录添加失败: ' + (error.message || '未知错误'));
+        }
+      );
+    },
+
+    // 获取本地用户信息
+    getLocalUserInfo() {
+      const name = localStorage.getItem(key_DingName);
+      const phone = localStorage.getItem(key_DingUserPhone);
+      const dingID = localStorage.getItem(key_DingUserIndex);
+
+      return {
+        name: name || '',
+        phone: phone || '',
+        dingID: dingID || ''
+      };
     },
 
     // 取消删除
