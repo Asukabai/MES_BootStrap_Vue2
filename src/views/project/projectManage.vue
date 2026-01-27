@@ -91,16 +91,25 @@
           @update:page-size="handlePageSizeChange"
       />
     </div>
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 90, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBack"
+    />
   </div>
 </template>
 
 <script>import SensorRequest from '../../utils/SensorRequest';
 import BasePagination from '@/components/BasePagination.vue';
 import {GetDingUserToken} from "../../utils/Dingding";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 export default {
   name: 'ProjectManage',
   components: {
+    CustomizableFloatingButton,
     BasePagination
   },
   data() {
@@ -120,6 +129,19 @@ export default {
     window.vueApp = this; // 挂载到 window，供 HTML 调用
   },
   methods: {
+    goBack() {
+      // this.$router.go(-1);
+      this.navigateTo('/index');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     downloadFile(fileMd5) {
       if (!fileMd5) {
         this.$toast.fail('无法获取文件标识，请联系管理员');
