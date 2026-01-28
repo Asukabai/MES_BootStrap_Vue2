@@ -48,32 +48,24 @@
     </div>
 
     <!-- 批量操作栏 -->
-    <div v-if="selectedItems.length > 0" class="batch-operation-bar">
+    <div v-if="selectedOperations.length > 0" class="batch-operation-bar">
       <div class="batch-info">
-        已选择 {{ selectedItems.length }} 个物品
+        已选择 {{ selectedOperations.length }} 个操作
       </div>
       <div class="batch-actions">
         <van-button
           size="small"
-          type="primary"
-          @click="showBatchInbound"
-          :disabled="selectedItems.length === 0"
+          type="warning"
+          @click="showBatchConfirmation"
+          :disabled="selectedOperations.length === 0"
         >
-          批量入库
-        </van-button>
-        <van-button
-          size="small"
-          type="danger"
-          @click="showBatchOutbound"
-          :disabled="selectedItems.length === 0"
-        >
-          批量出库
+          执行操作
         </van-button>
         <van-button
           size="small"
           @click="clearSelection"
         >
-          取消选择
+          清空选择
         </van-button>
       </div>
     </div>
@@ -183,35 +175,69 @@
       :cancel-button-text="'关闭'"
     />
 
-    <!-- 批量入库弹窗 -->
-    <van-popup v-model="showBatchInboundPopup" position="bottom" :style="{ height: '80%' }">
-      <div class="batch-operation-popup">
+    <!-- 单个物品操作弹窗 -->
+    <van-popup v-model="showSingleOperationPopup" position="bottom" :style="{ height: '60%' }">
+      <div class="single-operation-popup">
         <div class="popup-header">
-          <h3>批量入库</h3>
-          <van-icon name="cross" @click="closeBatchInboundPopup" />
+          <h3>选择操作</h3>
+          <van-icon name="cross" @click="closeSingleOperationPopup" />
         </div>
 
-        <div class="selected-items-summary">
-          <p>已选择 {{ selectedItems.length }} 个物品</p>
-          <div class="selected-list">
-            <div v-for="item in selectedItems" :key="item.Id" class="selected-item">
-              <span>{{ item.Item_Name }}</span>
-              <span class="current-stock">当前库存: {{ item.Current_Stock }}</span>
+        <div class="selected-item-info">
+          <h4>{{ currentSelectedItem ? currentSelectedItem.Item_Name : '' }}</h4>
+          <p>当前库存: {{ currentSelectedItem ? currentSelectedItem.Current_Stock : 0 }}</p>
+        </div>
+
+        <!-- 操作类型选择 -->
+        <div class="operation-type-selection" v-if="!currentOperationType">
+          <h4>请选择操作类型</h4>
+          <div class="type-options">
+            <div
+              class="type-option"
+              :class="{ active: currentOperationType === 'inbound' }"
+              @click="selectOperationType('inbound')"
+            >
+              <van-icon name="plus" color="#4CAF50" />
+              <span>入库</span>
+            </div>
+            <div
+              class="type-option"
+              :class="{ active: currentOperationType === 'outbound' }"
+              @click="selectOperationType('outbound')"
+            >
+              <van-icon name="minus" color="#F44336" />
+              <span>出库</span>
             </div>
           </div>
         </div>
 
-        <div class="operation-form">
-          <van-field
-            v-model="batchInboundQuantity"
-            type="number"
-            label="入库数量"
-            placeholder="请输入入库数量"
-            :rules="[{ required: true, message: '请输入入库数量' }]"
-          />
+        <!-- 数量输入 -->
+        <div class="quantity-section" v-if="currentOperationType">
+          <h4>{{ currentOperationType === 'inbound' ? '入库' : '出库' }}数量</h4>
+
+          <div class="quantity-input">
+            <van-stepper
+              v-model="singleOperationQuantity"
+              :min="1"
+              :max="currentOperationType === 'outbound' ? (currentSelectedItem ? currentSelectedItem.Current_Stock : 0) : 999999"
+              :step="1"
+              theme="round"
+              button-size="28"
+              disable-input
+            />
+            <span class="quantity-text">{{ singleOperationQuantity }}</span>
+          </div>
+
+          <div class="quantity-preview">
+            <p>操作后库存:
+              <span :class="currentOperationType === 'inbound' ? 'inbound-preview' : 'outbound-preview'">
+                {{ postOperationStock }}
+              </span>
+            </p>
+          </div>
 
           <van-field
-            v-model="batchInboundRemark"
+            v-model="singleOperationRemark"
             type="textarea"
             label="备注"
             placeholder="请输入备注信息"
@@ -222,63 +248,62 @@
           <div class="action-buttons">
             <van-button
               block
-              type="primary"
-              @click="confirmBatchInbound"
-              :loading="batchOperationLoading"
+              :type="currentOperationType === 'inbound' ? 'primary' : 'danger'"
+              @click="confirmSingleOperation"
             >
-              确认入库
+              确认{{ currentOperationType === 'inbound' ? '入库' : '出库' }}
             </van-button>
           </div>
         </div>
       </div>
     </van-popup>
 
-    <!-- 批量出库弹窗 -->
-    <van-popup v-model="showBatchOutboundPopup" position="bottom" :style="{ height: '80%' }">
-      <div class="batch-operation-popup">
+    <!-- 批量操作确认弹窗 -->
+    <van-popup v-model="showBatchConfirmPopup" position="bottom" :style="{ height: '80%' }">
+      <div class="batch-confirmation-popup">
         <div class="popup-header">
-          <h3>批量出库</h3>
-          <van-icon name="cross" @click="closeBatchOutboundPopup" />
+          <h3>批量操作确认</h3>
+          <van-icon name="cross" @click="closeBatchConfirmation" />
         </div>
 
-        <div class="selected-items-summary">
-          <p>已选择 {{ selectedItems.length }} 个物品</p>
-          <div class="selected-list">
-            <div v-for="item in selectedItems" :key="item.Id" class="selected-item">
-              <span>{{ item.Item_Name }}</span>
-              <span class="current-stock">当前库存: {{ item.Current_Stock }}</span>
+        <div class="confirmation-summary">
+          <p>总共选择 {{ getSelectedStats().total }} 个操作</p>
+          <p>入库操作: {{ getSelectedStats().inbound }} 个</p>
+          <p>出库操作: {{ getSelectedStats().outbound }} 个</p>
+        </div>
+
+        <div class="operations-list">
+          <h4>操作明细</h4>
+          <div
+            v-for="(op, index) in selectedOperations"
+            :key="`${op.item.Id}-${index}`"
+            class="operation-item"
+          >
+            <div class="item-info">
+              <span class="item-name">{{ op.item.Item_Name }}</span>
+              <span class="operation-type" :class="op.operationType">
+                {{ op.operationType === 'inbound' ? '入库' : '出库' }}
+              </span>
+            </div>
+            <div class="operation-details">
+              <span class="quantity">数量: {{ op.quantity }}</span>
+              <span class="current-stock">当前库存: {{ op.item.Current_Stock }}</span>
+            </div>
+            <div class="operation-remark" v-if="op.remark">
+              备注: {{ op.remark }}
             </div>
           </div>
         </div>
 
-        <div class="operation-form">
-          <van-field
-            v-model="batchOutboundQuantity"
-            type="number"
-            label="出库数量"
-            placeholder="请输入出库数量"
-            :rules="[{ required: true, message: '请输入出库数量' }]"
-          />
-
-          <van-field
-            v-model="batchOutboundRemark"
-            type="textarea"
-            label="备注"
-            placeholder="请输入备注信息"
-            rows="2"
-            autosize
-          />
-
-          <div class="action-buttons">
-            <van-button
-              block
-              type="danger"
-              @click="confirmBatchOutbound"
-              :loading="batchOperationLoading"
-            >
-              确认出库
-            </van-button>
-          </div>
+        <div class="confirmation-actions">
+          <van-button
+            block
+            type="primary"
+            @click="executeBatchOperations"
+            :loading="batchOperationLoading"
+          >
+            确认执行
+          </van-button>
         </div>
       </div>
     </van-popup>
@@ -317,6 +342,22 @@ import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding";
 import SensorRequestPage from "../../utils/SensorRequestPage";
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue"; // 引入组件
 import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
+
+// 添加 Promise.allSettled 的 polyfill
+if (!Promise.allSettled) {
+  Promise.allSettled = function(promises) {
+    return Promise.all(promises.map(p =>
+      Promise.resolve(p).then(value => ({
+        status: 'fulfilled',
+        value
+      }), reason => ({
+        status: 'rejected',
+        reason
+      }))
+    ));
+  };
+}
+
 export default {
   name: 'InventoryManagementV1',
   components: {
@@ -384,16 +425,20 @@ export default {
       showStockCheckDialog: false, // 控制库存检查弹窗显示
       deletingItem: null, // 正在删除的项目
 
-      // 新增：批量操作相关
-      selectedItems: [], // 选中的物品列表
+      // 修改：操作记录改为对象数组，包含操作类型
+      selectedOperations: [], // 选中的操作列表 [{item, operationType, quantity, remark}]
       isSelectMode: false, // 是否处于选择模式
-      showBatchInboundPopup: false, // 批量入库弹窗
-      showBatchOutboundPopup: false, // 批量出库弹窗
-      batchInboundQuantity: 1, // 批量入库数量
-      batchOutboundQuantity: 1, // 批量出库数量
-      batchInboundRemark: '', // 批量入库备注
-      batchOutboundRemark: '', // 批量出库备注
-      batchOperationLoading: false // 批量操作加载状态
+
+      // 新增：单个物品操作相关
+      showSingleOperationPopup: false,     // 单个物品操作弹窗
+      currentSelectedItem: null,           // 当前选中的物品
+      currentOperationType: null,          // 当前操作类型（inbound/outbound）
+      singleOperationQuantity: 1,          // 单个物品操作数量
+      singleOperationRemark: '',           // 单个物品操作备注
+
+      // 修改：批量操作相关
+      showBatchConfirmPopup: false,        // 批量确认弹窗
+      batchOperationLoading: false         // 批量操作加载状态
     };
   },
   created() {
@@ -409,6 +454,33 @@ export default {
       return this.deletingItem ?
         `物品 "${this.deletingItem.Item_Name}" 当前库存为 ${this.deletingItem.Current_Stock}，请先将库存清零后再删除。` :
         '当前物品库存不为零，请先清空库存后再删除。';
+    },
+    // 批量操作统计
+    batchOperationStats() {
+      const inboundCount = this.selectedOperations.filter(op => op.operationType === 'inbound').length;
+      const outboundCount = this.selectedOperations.filter(op => op.operationType === 'outbound').length;
+      return {
+        total: this.selectedOperations.length,
+        inbound: inboundCount,
+        outbound: outboundCount
+      };
+    },
+    // 计算操作后库存 - 修复模板编译错误
+    postOperationStock() {
+      if (!this.currentOperationType || !this.currentSelectedItem) {
+        return 0;
+      }
+
+      const currentStock = this.currentSelectedItem.Current_Stock || 0;
+      const quantity = this.singleOperationQuantity || 0;
+
+      if (this.currentOperationType === 'inbound') {
+        return currentStock + quantity;
+      } else if (this.currentOperationType === 'outbound') {
+        return currentStock - quantity;
+      }
+
+      return currentStock;
     }
   },
   methods: {
@@ -855,175 +927,181 @@ export default {
       event.target.src = require('@/assets/暂无图片1.png');
     },
 
-    // 新增：选择物品相关方法
+    // 修改：选择物品相关方法 - 实现单个物品操作
     toggleItemSelection(item) {
-      const index = this.selectedItems.findIndex(selectedItem => selectedItem.Id === item.Id);
-      if (index > -1) {
-        // 如果已选择，取消选择
-        this.selectedItems.splice(index, 1);
-      } else {
-        // 如果未选择，添加到选择列表
-        this.selectedItems.push(item);
-      }
+      // 检查该物品是否已有操作记录
+      const existingOpIndex = this.selectedOperations.findIndex(op => op.item.Id === item.Id);
 
-      // 如果没有选择任何项目，退出选择模式
-      if (this.selectedItems.length === 0) {
-        this.isSelectMode = false;
+      if (existingOpIndex > -1) {
+        // 如果已存在操作记录，移除它
+        this.selectedOperations.splice(existingOpIndex, 1);
       } else {
-        this.isSelectMode = true;
+        // 如果不存在，显示操作选择弹窗
+        this.currentSelectedItem = item;
+        this.showSingleOperationPopup = true;
+        this.currentOperationType = null;
+        this.singleOperationQuantity = 1;
+        this.singleOperationRemark = '';
       }
     },
 
+    // 检查物品是否已被选中进行操作
     isItemSelected(item) {
-      return this.selectedItems.some(selectedItem => selectedItem.Id === item.Id);
+      return this.selectedOperations.some(op => op.item.Id === item.Id);
     },
 
+    // 清除选择（修改为清除操作列表）
     clearSelection() {
-      this.selectedItems = [];
+      this.selectedOperations = [];
       this.isSelectMode = false;
     },
 
-    // 显示批量入库弹窗
-    showBatchInbound() {
-      if (this.selectedItems.length === 0) {
-        Toast('请至少选择一个物品');
-        return;
-      }
-      this.showBatchInboundPopup = true;
+    // 选择操作类型（入库/出库）
+    selectOperationType(type) {
+      this.currentOperationType = type;
+      // 重置数量为1
+      this.singleOperationQuantity = 1;
     },
 
-    // 显示批量出库弹窗
-    showBatchOutbound() {
-      if (this.selectedItems.length === 0) {
-        Toast('请至少选择一个物品');
-        return;
-      }
-      this.showBatchOutboundPopup = true;
-    },
-
-    // 关闭批量入库弹窗
-    closeBatchInboundPopup() {
-      this.showBatchInboundPopup = false;
-      this.batchInboundQuantity = 1;
-      this.batchInboundRemark = '';
-    },
-
-    // 关闭批量出库弹窗
-    closeBatchOutboundPopup() {
-      this.showBatchOutboundPopup = false;
-      this.batchOutboundQuantity = 1;
-      this.batchOutboundRemark = '';
-    },
-
-    // 确认批量入库
-    async confirmBatchInbound() {
-      if (!this.batchInboundQuantity || parseInt(this.batchInboundQuantity) <= 0) {
-        Toast('请输入有效的入库数量');
+    // 确认单个物品操作
+    confirmSingleOperation() {
+      if (!this.currentOperationType) {
+        Toast('请选择操作类型');
         return;
       }
 
-      this.batchOperationLoading = true;
-
-      try {
-        // 对每个选中的物品执行入库操作
-        for (const item of this.selectedItems) {
-          await this.performInbound(item, parseInt(this.batchInboundQuantity));
-        }
-
-        Toast.success(`成功对${this.selectedItems.length}个物品进行批量入库`);
-        this.closeBatchInboundPopup();
-        this.clearSelection();
-        // 刷新列表
-        this.onRefresh();
-      } catch (error) {
-        console.error('批量入库失败:', error);
-        Toast.fail('批量入库失败');
-      } finally {
-        this.batchOperationLoading = false;
-      }
-    },
-
-    // 确认批量出库
-    async confirmBatchOutbound() {
-      if (!this.batchOutboundQuantity || parseInt(this.batchOutboundQuantity) <= 0) {
-        Toast('请输入有效的出库数量');
+      if (!this.singleOperationQuantity || this.singleOperationQuantity <= 0) {
+        Toast('请输入有效数量');
         return;
       }
 
-      this.batchOperationLoading = true;
-
-      try {
-        // 对每个选中的物品执行出库操作
-        for (const item of this.selectedItems) {
-          await this.performOutbound(item, parseInt(this.batchOutboundQuantity));
-        }
-
-        Toast.success(`成功对${this.selectedItems.length}个物品进行批量出库`);
-        this.closeBatchOutboundPopup();
-        this.clearSelection();
-        // 刷新列表
-        this.onRefresh();
-      } catch (error) {
-        console.error('批量出库失败:', error);
-        Toast.fail('批量出库失败');
-      } finally {
-        this.batchOperationLoading = false;
+      // 对于出库操作，验证库存
+      if (this.currentOperationType === 'outbound' &&
+        this.singleOperationQuantity > (this.currentSelectedItem ? this.currentSelectedItem.Current_Stock : 0)) {
+        Toast(`出库数量不能超过当前库存 ${(this.currentSelectedItem ? this.currentSelectedItem.Current_Stock : 0)}`);
+        return;
       }
-    },
 
-    // 执行单个物品入库
-    performInbound(item, quantity) {
-      return new Promise((resolve, reject) => {
-        // 构造入库请求参数
-        const param = {
-          Id: item.Id,
-          Quantity_Change: quantity,
-          Transaction_Type: "入库",
-          Remark: `批量入库: ${quantity}, ${this.batchInboundRemark}`
-        };
-
-        // 调用入库接口
-        SensorRequestPage.InventoryItemUpdateQuantityFun(
-          JSON.stringify(param),
-          (respData) => {
-            console.log(`物品 ${item.Item_Name} 入库成功`);
-            resolve(respData);
-          },
-          (error) => {
-            console.error(`物品 ${item.Item_Name} 入库失败:`, error);
-            reject(error);
-          }
-        );
+      // 添加到操作列表
+      this.selectedOperations.push({
+        item: this.currentSelectedItem,
+        operationType: this.currentOperationType,
+        quantity: this.singleOperationQuantity,
+        remark: this.singleOperationRemark
       });
+
+      // 关闭弹窗
+      this.closeSingleOperationPopup();
     },
 
-    // 执行单个物品出库
-    performOutbound(item, quantity) {
-      return new Promise((resolve, reject) => {
-        // 检查库存是否足够
-        if (item.Current_Stock < quantity) {
-          Toast.fail(`物品 ${item.Item_Name} 库存不足，当前库存: ${item.Current_Stock}`);
-          reject(new Error(`库存不足`));
-          return;
+    // 关闭单个物品操作弹窗
+    closeSingleOperationPopup() {
+      this.showSingleOperationPopup = false;
+      this.currentSelectedItem = null;
+      this.currentOperationType = null;
+      this.singleOperationQuantity = 1;
+      this.singleOperationRemark = '';
+    },
+
+    // 计算选中统计信息
+    getSelectedStats() {
+      const inboundOps = this.selectedOperations.filter(op => op.operationType === 'inbound');
+      const outboundOps = this.selectedOperations.filter(op => op.operationType === 'outbound');
+
+      return {
+        total: this.selectedOperations.length,
+        inbound: inboundOps.length,
+        outbound: outboundOps.length
+      };
+    },
+
+    // 显示批量确认弹窗
+    showBatchConfirmation() {
+      if (this.selectedOperations.length === 0) {
+        Toast('请至少选择一个物品进行操作');
+        return;
+      }
+
+      this.showBatchConfirmPopup = true;
+    },
+
+    // 关闭批量确认弹窗
+    closeBatchConfirmation() {
+      this.showBatchConfirmPopup = false;
+    },
+
+    // 执行批量操作
+    async executeBatchOperations() {
+      if (this.selectedOperations.length === 0) {
+        Toast('没有待处理的操作');
+        return;
+      }
+
+      this.batchOperationLoading = true;
+
+      try {
+        // 并行执行所有操作
+        const promises = this.selectedOperations.map(operation =>
+          this.executeSingleOperation(operation)
+        );
+
+        const results = await Promise.allSettled(promises);
+
+        // 统计成功和失败数量
+        const successful = results.filter(result => result.status === 'fulfilled').length;
+        const failed = results.filter(result => result.status === 'rejected').length;
+
+        if (failed > 0) {
+          Toast(`操作完成！成功: ${successful}，失败: ${failed}`);
+        } else {
+          Toast.success(`全部 ${successful} 个操作执行成功！`);
         }
 
-        // 构造出库请求参数
-        const param = {
-          Id: item.Id,
-          Quantity_Change: -quantity, // 出库为负数
-          Transaction_Type: "出库",
-          Remark: `批量出库: ${quantity}, ${this.batchOutboundRemark}`
+        // 清空操作列表并刷新
+        this.clearSelection();
+        this.closeBatchConfirmation();
+        this.onRefresh();
+
+      } catch (error) {
+        console.error('批量操作失败:', error);
+        Toast.fail('批量操作失败');
+      } finally {
+        this.batchOperationLoading = false;
+      }
+    },
+
+    // 执行单个操作
+    executeSingleOperation(operation) {
+      return new Promise((resolve, reject) => {
+        const { item, operationType, quantity, remark } = operation;
+
+        // 构造请求参数
+        const requestData = {
+          PageIndex: 0,
+          PageSize: 10,
+          Inventory_ID: item.Id.toString(),
+          Transaction_Type: operationType === 'inbound' ? '入库' : '出库',
+          Quantity_Change: operationType === 'inbound' ? quantity : -quantity,
+          Current_Quantity: operationType === 'inbound'
+            ? item.Current_Stock + quantity
+            : item.Current_Stock - quantity,
+          Report_Person: {
+            Person_Name: this.getLocalUserInfo().name,
+            Person_Phone: this.getLocalUserInfo().phone,
+            Person_DingID: this.getLocalUserInfo().dingID
+          },
+          Remark: `${operationType === 'inbound' ? '批量入库' : '批量出库'}: ${quantity}, ${remark || '无备注'}`
         };
 
-        // 调用出库接口
-        SensorRequestPage.InventoryItemUpdateQuantityFun(
-          JSON.stringify(param),
+        // 调用接口
+        SensorRequestPage.InventoryTransactionAddFun(
+          JSON.stringify(requestData),
           (respData) => {
-            console.log(`物品 ${item.Item_Name} 出库成功`);
+            console.log(`${item.Item_Name} ${operationType === 'inbound' ? '入库' : '出库'}成功`);
             resolve(respData);
           },
           (error) => {
-            console.error(`物品 ${item.Item_Name} 出库失败:`, error);
+            console.error(`${item.Item_Name} ${operationType === 'inbound' ? '入库' : '出库'}失败:`, error);
             reject(error);
           }
         );
@@ -1428,5 +1506,217 @@ export default {
 
 .action-buttons {
   margin-top: 16px;
+}
+
+/* 单个物品操作弹窗样式 */
+.single-operation-popup {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.single-operation-popup .popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.selected-item-info {
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f8f8f8;
+  border-radius: 8px;
+}
+
+.selected-item-info h4 {
+  margin: 0 0 4px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.selected-item-info p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.operation-type-selection {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+
+.operation-type-selection h4 {
+  margin-bottom: 24px;
+  font-size: 16px;
+  color: #333;
+}
+
+.type-options {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  justify-content: center;
+}
+
+.type-option {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+  width: 100px;
+}
+
+.type-option.active {
+  border-color: #3f83f8;
+  background-color: #f0f7ff;
+}
+
+.type-option span {
+  margin-top: 8px;
+  font-size: 14px;
+  color: #333;
+}
+
+.quantity-section {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.quantity-section h4 {
+  margin-bottom: 12px;
+  font-size: 16px;
+  color: #333;
+}
+
+.quantity-input {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 16px 0;
+}
+
+.quantity-text {
+  margin: 0 16px;
+  font-size: 18px;
+  font-weight: bold;
+  min-width: 40px;
+  text-align: center;
+}
+
+.quantity-preview {
+  margin: 16px 0;
+  padding: 12px;
+  background-color: #f8f8f8;
+  border-radius: 8px;
+  text-align: center;
+}
+
+.quantity-preview p {
+  margin: 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.inbound-preview {
+  color: #4CAF50;
+  font-weight: bold;
+}
+
+.outbound-preview {
+  color: #F44336;
+  font-weight: bold;
+}
+
+/* 批量确认弹窗样式 */
+.batch-confirmation-popup {
+  padding: 16px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.confirmation-summary {
+  margin-bottom: 16px;
+  padding: 12px;
+  background-color: #f0f7ff;
+  border-radius: 8px;
+}
+
+.confirmation-summary p {
+  margin: 4px 0;
+  font-size: 14px;
+  color: #333;
+}
+
+.operations-list h4 {
+  margin: 16px 0 8px 0;
+  font-size: 16px;
+  color: #333;
+}
+
+.operation-item {
+  padding: 12px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 8px;
+}
+
+.item-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 4px;
+}
+
+.item-name {
+  font-weight: 500;
+  color: #333;
+}
+
+.operation-type {
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  color: white;
+}
+
+.operation-type.inbound {
+  background-color: #4CAF50;
+}
+
+.operation-type.outbound {
+  background-color: #F44336;
+}
+
+.operation-details {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: #666;
+  margin-bottom: 4px;
+}
+
+.operation-remark {
+  font-size: 12px;
+  color: #888;
+  font-style: italic;
+}
+
+.confirmation-actions {
+  margin-top: auto;
+  padding-top: 16px;
 }
 </style>
