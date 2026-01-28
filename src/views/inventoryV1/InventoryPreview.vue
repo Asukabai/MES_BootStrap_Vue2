@@ -51,7 +51,14 @@
 
     <div class="preview-actions">
       <van-button type="default" @click="goBack">返回</van-button>
-      <van-button type="info" @click="confirmImport">确认导入</van-button>
+      <van-button
+        type="info"
+        @click="confirmImport"
+        :loading="isLoading"
+        :disabled="isLoading"
+      >
+        {{ isLoading ? '导入中...' : '确认导入' }}
+      </van-button>
     </div>
   </div>
 </template>
@@ -67,7 +74,8 @@ export default {
       successCount: 0,
       failCount: 0,
       successList: [],
-      department: ''
+      department: '',
+      isLoading: false  // 添加加载状态控制
     }
   },
   created() {
@@ -155,39 +163,79 @@ export default {
     },
 
     confirmImport() {
+      console.log('开始执行确认导入操作');
+      console.log('点击确认导入按钮，当前isLoading状态:', this.isLoading);
+
+      // 防止重复点击
+      if (this.isLoading) {
+        console.log('按钮已被禁用，无法重复点击');
+        return;
+      }
+
       // 确认导入操作
       if (this.successList.length === 0) {
+        console.log('没有可导入的数据');
         Toast.fail('没有可导入的数据');
         return;
       }
 
-      // 构造请求体
-      const requestPayload = {
-        "Inventory_ItemList": this.successList,
-        "Report_Person": this.loadUserInfo()
-      };
+      // 设置加载状态，防止重复点击
+      console.log('设置isLoading为true');
+      this.isLoading = true;
+      console.log('当前isLoading值:', this.isLoading);
 
-      // 调用后端接口进行批量保存
-      SensorRequestPage.InventoryItemBatchAddFun(
-        JSON.stringify(requestPayload),
-        (respData) => {
-          try {
-            const result = JSON.parse(respData);
-            if (result) {
-              Toast.success('导入成功！');
-            } else {
-              Toast.fail('导入失败');
+      // 使用 $nextTick 确保 DOM 更新
+      this.$nextTick(() => {
+        console.log('DOM 更新后，isLoading状态:', this.isLoading);
+
+        // 构造请求体
+        const requestPayload = {
+          "Inventory_ItemList": this.successList,
+          "Report_Person": this.loadUserInfo()
+        };
+
+        console.log('开始调用后端接口进行批量保存');
+
+        // 调用后端接口进行批量保存
+        SensorRequestPage.InventoryItemBatchAddFun(
+          JSON.stringify(requestPayload),
+          (respData) => {
+            console.log('接口调用成功，收到响应:', respData);
+            try {
+              const result = JSON.parse(respData);
+              console.log('解析响应结果:', result);
+              if (result) {
+                console.log('导入成功，准备跳转页面');
+                Toast.success('导入成功！3秒后自动跳转到存管理页面');
+                // 延迟三秒后跳转到库存管理V1.0页面
+                setTimeout(() => {
+                  console.log('跳转到库存管理页面');
+                  this.$router.push(`/${this.department}/inventoryV1`);
+                }, 3000);
+              } else {
+                console.log('导入失败');
+                Toast.fail('导入失败');
+              }
+            } catch (error) {
+              console.error('处理响应失败:', error);
+              Toast.fail('导入失败: ' + (error.message || '数据解析失败'));
+            } finally {
+              // 无论成功或失败都要重置加载状态
+              console.log('finally块中重置isLoading为false');
+              this.isLoading = false;
+              console.log('重置后isLoading值:', this.isLoading);
             }
-          } catch (error) {
-            console.error('处理响应失败:', error);
-            Toast.fail('导入失败: ' + (error.message || '数据解析失败'));
+          },
+          (error) => {
+            console.error('接口调用失败:', error);
+            Toast.fail('导入失败: ' + (error.message || '网络请求失败'));
+            // 请求失败时也要重置加载状态
+            console.log('错误回调中重置isLoading为false');
+            this.isLoading = false;
+            console.log('重置后isLoading值:', this.isLoading);
           }
-        },
-        (error) => {
-          console.error('导入失败:', error);
-          Toast.fail('导入失败: ' + (error.message || '网络请求失败'));
-        }
-      );
+        );
+      });
     },
 
     goBack() {
