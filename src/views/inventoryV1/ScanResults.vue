@@ -4,7 +4,6 @@
     <div class="search-section search-top">
       <div class="search-container">
         <div class="scan-result-info">
-<!--          储物箱位置编号: {{ scanResult }}-->
           储物箱物品列表
         </div>
       </div>
@@ -12,56 +11,58 @@
 
     <!-- 结果列表 -->
     <div class="results-section">
-      <div class="inventory-list">
-        <div
-          v-for="item in inventoryItems"
-          :key="item.Id"
-          class="inventory-cell"
+      <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
+        <van-list
+          v-model="loading"
+          :finished="finished"
+          finished-text="没有更多了"
+          @load="onLoad"
         >
-          <div class="cell-content" @click="viewDetail(item)">
-            <!-- 左侧图片区域（30%） -->
-            <div class="image-section">
-              <img
-                :src="getImageUrl(item)"
-                alt="物品图片"
-                class="item-image"
-                @error="onImageError"
-              />
-            </div>
-
-            <!-- 右侧信息区域（70%） -->
-            <div class="info-section">
-              <div class="cell-header">
-                <div class="item-title">物品名称：{{ item.Item_Name }}</div>
-                <div class="item-subtitle">
-                  型号：<span class="model-value">{{ item.Item_Model }}</span> |
-                  库存：<span class="stock-value">{{ item.Current_Stock }}</span>
-                </div>
+          <div
+            v-for="item in inventoryItems"
+            :key="item.Id"
+            class="inventory-cell"
+          >
+            <div class="cell-content" @click="viewDetail(item)">
+              <!-- 左侧图片区域（30%） -->
+              <div class="image-section">
+                <img
+                  :src="getImageUrl(item)"
+                  alt="物品图片"
+                  class="item-image"
+                  @error="onImageError"
+                />
               </div>
-              <div class="cell-body">
-                <div class="item-info">
-                  <div class="info-row">
-                    <span class="label">公司:</span>
-                    <span class="value">{{ item.Company }}</span>
-                    <span class="label">位置:</span>
-                    <span class="value">{{ item.Shelf_Location }}</span>
+
+              <!-- 右侧信息区域（70%） -->
+              <div class="info-section">
+                <div class="cell-header">
+                  <div class="item-title">物品名称：{{ item.Item_Name }}</div>
+                  <div class="item-subtitle">
+                    型号：<span class="model-value">{{ item.Item_Model }}</span> |
+                    库存：<span class="stock-value">{{ item.Current_Stock }}</span>
+                  </div>
+                </div>
+                <div class="cell-body">
+                  <div class="item-info">
+                    <div class="info-row">
+                      <span class="label">公司:</span>
+                      <span class="value">{{ item.Company }}</span>
+                      <span class="label">位置:</span>
+                      <span class="value">{{ item.Shelf_Location }}</span>
+                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-        </div>
-      </div>
+        </van-list>
+      </van-pull-refresh>
     </div>
 
     <!-- 空状态 -->
-    <div v-if="inventoryItems.length === 0 && !loading" class="empty-state">
+    <div v-if="inventoryItems.length === 0 && !loading && !refreshing" class="empty-state">
       <van-empty description="暂无相关库存信息" />
-    </div>
-
-    <!-- 加载状态 -->
-    <div v-if="loading" class="loading-state">
-      <van-loading size="24px">加载中...</van-loading>
     </div>
 
     <CustomizableFloatingButton
@@ -79,17 +80,24 @@ import SensorRequest from '../../utils/SensorRequest.js';
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding";
 import SensorRequestPage from "../../utils/SensorRequestPage";
+import { PullRefresh, List } from 'vant';
 
 export default {
   name: 'InventoryScanResults',
   components: {
-    CustomizableFloatingButton
+    CustomizableFloatingButton,
+    [PullRefresh.name]: PullRefresh,
+    [List.name]: List
   },
   data() {
     return {
       scanResult: '',
       inventoryItems: [],
-      loading: false
+      loading: false,
+      finished: false,
+      refreshing: false,
+      currentPage: 1,
+      pageSize: 10
     };
   },
   created() {
@@ -109,87 +117,146 @@ export default {
       this.scanResult = scannedResult;
 
       // 调用接口获取库存数据
-      this.fetchInventoryData(scannedResult);
+      this.onLoad();
     },
 
-    // 获取库存数据
-    fetchInventoryData(scanResult) {
-      this.loading = true;
+    // 加载数据
+    onLoad() {
+      return new Promise((resolve) => {
+        this.loading = true;
 
-      // 调用后端接口获取库存信息
-      const params = {
-        Shelf_Location: scanResult
-      };
+        // 调用后端接口获取库存信息
+        const params = {
+          Shelf_Location: this.scanResult,
+          PageIndex: this.refreshing ? 0 : this.currentPage - 1, // 如果是刷新则从第一页开始
+          PageSize: this.pageSize
+        };
 
-      SensorRequestPage.InventoryItemGetFun(
-        JSON.stringify(params),
-        (respData) => {
-          try {
-            // 解析响应数据
-            const responseJson = JSON.parse(respData);
-
-            // 从 Data 数组中获取库存项
-            if (responseJson.Data && Array.isArray(responseJson.Data)) {
-              this.inventoryItems = responseJson.Data;
-
-              // 预加载所有物品的图片URL
-              this.preloadAllImageUrls();
-            } else {
-              this.inventoryItems = [];
-              this.$toast.fail('数据格式错误');
-            }
-          } catch (parseError) {
-            console.error('解析库存信息响应失败:', parseError);
-            this.inventoryItems = [];
-            this.$toast.fail('数据解析失败');
-          } finally {
-            this.loading = false;
-          }
-        },
-        (error) => {
-          console.error('获取库存信息失败:', error);
-          this.inventoryItems = [];
-          this.$toast.fail('获取库存信息失败');
-          this.loading = false;
-        }
-      );
-    },
-
-    // 预加载所有物品的图片URL
-    preloadAllImageUrls() {
-      this.inventoryItems.forEach((item, index) => {
-        if (item.Item_Images && item.Item_Images.length > 0) {
-          const firstImage = item.Item_Images[0];
-          if (firstImage.File_Md5) {
-            const param = {
-              remoteLocation: firstImage.File_Md5
-            };
-
-            SensorRequest.Minio_PresignedDownloadUrl5B(
-              JSON.stringify(param),
-              (respData) => {
-                if (respData) {
-                  // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
-                  this.$set(item, 'imageUrl', respData.replace(
-                    'http://127.0.0.1:9000',
-                    'https://api-v2.sensor-smart.cn:22027'
-                  ));
-                } else {
-                  this.$set(item, 'imageUrl', require('@/assets/暂无图片1.png'));
-                }
-              },
-              (error) => {
-                console.error('获取图片URL失败:', error);
-                this.$set(item, 'imageUrl', require('@/assets/暂无图片1.png'));
+        SensorRequestPage.InventoryItemGetFun(
+          JSON.stringify(params),
+          (respData) => {
+            try {
+              // 解析响应数据
+              let parsedData = null;
+              if (typeof respData === 'string') {
+                parsedData = JSON.parse(respData);
+              } else {
+                parsedData = respData;
               }
-            );
-          } else {
-            this.$set(item, 'imageUrl', require('@/assets/暂无图片1.png'));
+
+              // 从 Data 数组中获取库存项
+              let newData = [];
+              if (parsedData && parsedData.Data) {
+                newData = parsedData.Data;
+              }
+
+              // 如果正在刷新，则清空原数据
+              if (this.refreshing) {
+                this.inventoryItems = [];
+                this.refreshing = false;
+              }
+
+              // 处理返回的数据格式并预加载图片URL
+              const processedData = newData.map(item => {
+                const processedItem = {
+                  ...item,
+                  id: item.Id,
+                  name: `${item.Item_Name} ${item.Item_Model || ''}`.trim(),
+                  description: item.Remark || '',
+                  category: item.Category_Type || '未知',
+                  status: item.Is_Low_Stock === '是' ? '紧张' : '充足',
+                  company: item.Company || '',
+                  location: item.Shelf_Location || '',
+                  stock: item.Current_Stock || 0,
+                  model: item.Item_Model || '',
+                  brand: item.Item_Brand || '',
+                  // 添加图片信息
+                  Item_Images: item.Item_Images || [],
+                  // 初始化图片URL为空字符串
+                  imageUrl: ''
+                };
+
+                // 预加载图片URL
+                if (processedItem.Item_Images && processedItem.Item_Images.length > 0) {
+                  const firstImage = processedItem.Item_Images[0];
+                  if (firstImage.File_Md5) {
+                    // 调用后端接口获取临时下载URL
+                    const param = {
+                      remoteLocation: firstImage.File_Md5
+                    };
+
+                    SensorRequest.Minio_PresignedDownloadUrl5B(
+                      JSON.stringify(param),
+                      (respData) => {
+                        if (respData) {
+                          // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
+                          processedItem.imageUrl = respData.replace(
+                            'http://127.0.0.1:9000',
+                            'https://api-v2.sensor-smart.cn:22027'
+                          );
+                        } else {
+                          processedItem.imageUrl = require('@/assets/暂无图片1.png');
+                        }
+                      },
+                      (error) => {
+                        console.error('获取图片URL失败:', error);
+                        processedItem.imageUrl = require('@/assets/暂无图片1.png');
+                      }
+                    );
+                  } else {
+                    processedItem.imageUrl = require('@/assets/暂无图片1.png');
+                  }
+                } else {
+                  processedItem.imageUrl = require('@/assets/暂无图片1.png');
+                }
+
+                return processedItem;
+              });
+
+              // 合并新数据
+              if (this.currentPage === 1 && !this.refreshing) {
+                this.inventoryItems = processedData;
+              } else {
+                // 防止重复添加相同ID的项目
+                const newItems = processedData.filter(newItem =>
+                  !this.inventoryItems.some(existingItem => existingItem.Id === newItem.Id)
+                );
+                this.inventoryItems = [...this.inventoryItems, ...newItems];
+              }
+
+              // 判断是否已加载完所有数据
+              this.finished = processedData.length < this.pageSize;
+
+              // 更新页码
+              this.currentPage++;
+
+            } catch (parseError) {
+              console.error('解析库存信息响应失败:', parseError);
+              this.inventoryItems = [];
+              this.$toast.fail('数据解析失败');
+            } finally {
+              this.loading = false;
+              resolve();
+            }
+          },
+          (error) => {
+            console.error('获取库存信息失败:', error);
+            this.inventoryItems = [];
+            this.$toast.fail('获取库存信息失败');
+            this.loading = false;
+            this.finished = true;
+            resolve();
           }
-        } else {
-          this.$set(item, 'imageUrl', require('@/assets/暂无图片1.png'));
-        }
+        );
       });
+    },
+
+    // 下拉刷新
+    async onRefresh() {
+      // 清空列表，重新加载数据
+      this.currentPage = 1;
+      this.finished = false;
+      await this.onLoad();
     },
 
     // 获取图片URL
@@ -199,23 +266,34 @@ export default {
 
     // 查看详情
     viewDetail(item) {
-      // 将当前物品信息保存到sessionStorage中
-      sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, item.Shelf_Location);
-      // 跳转到库存详情页面
+      // 跳转到库存详情页面V2，传递货架位置作为参数
+      // alert('查看详情')
       const department = this.$route.params.department;
       if (department) {
-        this.$router.push(`/${department}/inventoryDetailV1`);
+        this.$router.push({
+          path: `/${department}/inventoryDetailV2`,
+          query: {
+            shelfLocation: item.Shelf_Location
+          }
+        });
       } else {
         console.error('未找到 department 参数');
         this.$toast.fail('路由参数缺失');
       }
     },
-
     // 返回上一页
     goBack() {
-      this.$router.go(-1);
+      this.navigateTo('/index');
     },
-
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     // 图片加载失败时的处理
     onImageError(event) {
       event.target.src = require('@/assets/暂无图片1.png');
@@ -264,6 +342,8 @@ export default {
 
 .results-section {
   padding: 10px;
+  height: calc(100vh - 150px); /* 设置固定高度以支持滚动 */
+  overflow-y: auto;
 }
 
 .inventory-list {
