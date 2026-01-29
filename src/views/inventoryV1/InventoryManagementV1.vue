@@ -1014,39 +1014,34 @@ export default {
         outbound: outboundOps.length
       };
     },
-
     // 显示批量确认弹窗
     showBatchConfirmation() {
       if (this.selectedOperations.length === 0) {
         Toast('请至少选择一个物品进行操作');
         return;
       }
-
       this.showBatchConfirmPopup = true;
     },
-
     // 关闭批量确认弹窗
     closeBatchConfirmation() {
       this.showBatchConfirmPopup = false;
     },
-
     // 执行批量操作
+    // 修改 executeBatchOperations 方法
     async executeBatchOperations() {
       if (this.selectedOperations.length === 0) {
         Toast('没有待处理的操作');
         return;
       }
-
       this.batchOperationLoading = true;
-
       try {
-        // 并行执行所有操作
+        // 使用 Promise.all 和错误捕获替代 allSettled
         const promises = this.selectedOperations.map(operation =>
           this.executeSingleOperation(operation)
+            .then(result => ({ status: 'fulfilled', value: result }))
+            .catch(error => ({ status: 'rejected', reason: error }))
         );
-
-        const results = await Promise.allSettled(promises);
-
+        const results = await Promise.all(promises);
         // 统计成功和失败数量
         const successful = results.filter(result => result.status === 'fulfilled').length;
         const failed = results.filter(result => result.status === 'rejected').length;
@@ -1056,7 +1051,6 @@ export default {
         } else {
           Toast.success(`全部 ${successful} 个操作执行成功！`);
         }
-
         // 清空操作列表并刷新
         this.clearSelection();
         this.closeBatchConfirmation();
