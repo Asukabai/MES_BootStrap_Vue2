@@ -1,22 +1,44 @@
 <template>
-  <el-container>
-    <el-main>
-      <el-card>
-        <div style="margin-bottom: 10px;">
-          <strong>共计: {{ count }} 条</strong>
-        </div>
-        <el-list>
-          <el-list-item v-for="(result, index) in results" :key="index">
-            {{ result }}
-          </el-list-item>
-        </el-list>
-      </el-card>
-      <div style="margin-top: 20px; display: flex; justify-content: space-between;">
-        <el-button type="primary" @click="clearAndRescan" style="flex: 1; margin-right: 10px;">清空列表重新扫码</el-button>
-        <el-button type="primary" @click="navigateToForm" style="flex: 1;">确定</el-button>
+  <div class="batch-scan-results-container">
+    <div class="main-content">
+      <van-cell-group class="result-card">
+        <van-cell :border="false" class="count-cell">
+          <div slot="title" class="count-text">
+            <strong>共计: {{ count }} 条</strong>
+          </div>
+        </van-cell>
+
+        <van-cell
+          v-for="(result, index) in results"
+          :key="index"
+          :title="result"
+          :border="false"
+          class="result-item"
+        />
+      </van-cell-group>
+
+      <div class="button-container">
+        <van-button
+          type="info"
+          size="normal"
+          block
+          @click="clearAndRescan"
+          class="action-button clear-btn"
+        >
+          清空列表重新扫码
+        </van-button>
+        <van-button
+          type="info"
+          size="normal"
+          block
+          @click="navigateToForm"
+          class="action-button confirm-btn"
+        >
+          确定
+        </van-button>
       </div>
-    </el-main>
-  </el-container>
+    </div>
+  </div>
 </template>
 
 <script>
@@ -28,7 +50,6 @@ import {
   updateCachedResponseStored,
   updateCachedResponseUsed
 } from "@/utils/Dingding";
-
 
 export default {
   data() {
@@ -46,8 +67,7 @@ export default {
     clearAndRescan() {
       this.results = []; // 清空结果列表
       const department = this.$route.params.department;
-      this.$router.push(`/${department}/index`);
-
+      this.$router.push(`/${department}/all-applications`);
     },
     navigateToForm() {
       if (this.results.length > 0) {
@@ -55,7 +75,7 @@ export default {
         // 先将所有的扫码内容放到数据库中去查询这些板卡是否是都是属于同一个项目的，如果不是则应该给出提示，并不行页面跳转
         SensorBorderRequest.scanResults(
           { 'results': results },
-            // eslint-disable-next-line no-unused-vars
+          // eslint-disable-next-line no-unused-vars
           (response) => {
             // if (Array.isArray(response) && response.length > 0) {
             // 获取每条数据的 _ 前部分
@@ -80,13 +100,13 @@ export default {
                   if (response[0].isStored === '已入库' && response[0].isUsed === '已领用') {
                     // 跳转到资产操作页面
                     this.$router.push({
-                      path: '/code/add_history_storedBatch', // 目标页面的路径
+                      path: '/add_history_storedBatch', // 目标页面的路径
                       query: { results: JSON.stringify(this.results) } // 传递 results 数据
                     });
                   } else {
                     // 跳转到出入库登记页面
                     this.$router.push({
-                      path: '/code/add_history_batch', // 目标页面的路径
+                      path: '/add_history_batch', // 目标页面的路径
                       query: { results: JSON.stringify(this.results) } // 传递 results 数据
                     });
                   }
@@ -94,30 +114,32 @@ export default {
                 (error) => {
                   // 处理错误
                   // alert(error);
-                  this.$message({
+                  this.$toast({
                     message: error,
-                    type: 'error'
+                    type: 'fail'
                   });
                 }
               );
             } else {
-              this.$message.error('扫描了不同类型的资产，请重新扫描相同的资产类型！');
+              this.$toast({
+                message: '扫描了不同类型的资产，请重新扫描相同的资产类型！',
+                type: 'fail'
+              });
             }
           },
-            // eslint-disable-next-line no-unused-vars
           (error) => {
             // 处理错误
             // alert(error);
-            this.$message({
-              message: '列表中有不同项目板卡，请确保所有扫描板卡都属于同一个项目！' ,
-              type: 'error'
+            this.$toast({
+              message: '列表中有不同项目板卡，请确保所有扫描板卡都属于同一个项目！',
+              type: 'fail'
             });
           }
         )
-      }else{
-        this.$message({
-          message: '二维码信息异常，未查询到，请联系管理员录入！电话：19979900109 ',
-          type: 'error'
+      } else {
+        this.$toast({
+          message: '二维码信息异常，未查询到，请联系管理员录入',
+          type: 'fail'
         });
       }
     }
@@ -126,16 +148,65 @@ export default {
 </script>
 
 <style scoped>
-.el-header {
-  background-color: #409EFF; /* Element UI 默认蓝色 */
-  padding: 20px;
-  text-align: center;
+.batch-scan-results-container {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background-color: #f7f8fa;
 }
-.el-card {
-  margin: 20px;
-  padding: 20px;
+
+.main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  box-sizing: border-box;
 }
-.el-list {
-  padding: 0;
+
+.result-card {
+  background-color: white;
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+
+.count-cell {
+  background-color: #f9f9f9;
+  padding: 12px 16px;
+}
+
+.count-text {
+  font-size: 16px;
+  font-weight: bold;
+  color: #333;
+}
+
+.result-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #eee;
+}
+
+.result-item:last-child {
+  border-bottom: none;
+}
+
+.button-container {
+  display: flex;
+  gap: 10px;
+}
+
+.action-button {
+  flex: 1;
+  height: 44px;
+  border-radius: 8px;
+}
+
+.clear-btn {
+  background-color: #f44336;
+  border: none;
+}
+
+.confirm-btn {
+  background-color: #3f83f8;
+  border: none;
 }
 </style>
