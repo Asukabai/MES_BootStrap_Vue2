@@ -1,57 +1,106 @@
 <template>
-  <div>
-    <!-- 添加加载状态的判断 -->
-    <div v-if="isLoading">
-      <h3 style="text-align: center;">{{ boardID }}记录列表</h3>
-      <div class="loading-message">
+  <div class="history-view-container">
+    <!-- 加载状态 -->
+    <div v-if="isLoading" class="loading-container">
+      <van-loading size="24px" vertical class="loading-message">
         数据加载中...
-      </div>
+      </van-loading>
     </div>
-    <!-- 数据加载完成后显示最近的三条内容，如果点击查看所有历史内容可以另外点击 -->
-    <div v-else>
-      <h3 style="text-align: center;">{{ boardID }}记录列表</h3>
-      <div class="return-button-container">
-        <div class="button-row">
-          <el-button  @click="goBackQR">返回扫码界面</el-button>
-          <el-button  @click="resetForm">重置表单记录</el-button>
+    <!-- 内容区域 -->
+    <div v-else class="content-container">
+      <div class="header-info">
+        <h3 class="board-id-title">{{ boardID }}记录列表</h3>
+        <div class="record-count" v-if="count !== 0">
+          该资产的操作记录数量为：{{ count }} 条
         </div>
-        <div style="height: 5px;"></div>
+        <!-- 资产记录卡片列表 -->
+        <div class="asset-records-list" v-if="cardRecords && cardRecords.length > 0">
+          <div
+            v-for="(record, index) in cardRecords"
+            :key="index"
+            class="custom-card"
+          >
+            <div class="card-header">
+              <div class="card-title">操作类型 </div>
+              <div class="card-tag">{{ record.description || '无描述' }}</div>
+            </div>
+            <div class="card-content">
+<!--              <div class="data-row">-->
+<!--                <span class="data-label">资产编号:</span>-->
+<!--                <span class="data-value">{{ record.assetCode || boardID }}</span>-->
+<!--              </div>-->
+              <div class="data-row">
+                <span class="data-label">操作描述:</span>
+                <span class="data-value">{{ record.description || '无描述' }}</span>
+              </div>
+              <div class="data-row">
+                <span class="data-label">操作人员:</span>
+                <span class="data-value">{{ record.personName || '未知' }}</span>
+              </div>
+              <div class="data-row">
+                <span class="data-label">联系电话:</span>
+                <span class="data-value">{{ record.personPhone || '无' }}</span>
+              </div>
+              <div class="data-row">
+                <span class="data-label">创建时间:</span>
+                <span class="data-value">{{ formatDate(record.createTime) }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div  v-if="count !== 0" class="empty-message" >
-        该资产的操作记录数量为：{{ count }} 条
+
+      <!-- 操作按钮 -->
+      <div class="button-group">
+        <van-button
+          type="default"
+          size="normal"
+          block
+          @click="goBackQR"
+          class="action-button"
+        >
+          返回扫码界面
+        </van-button>
+        <van-button
+          type="default"
+          size="normal"
+          block
+          @click="resetForm"
+          class="action-button"
+        >
+          重置表单记录
+        </van-button>
       </div>
-      <!-- 添加虚线分隔 -->
+      <!-- 分隔线 -->
       <div class="separator"></div>
-      <div class="card-list-container">
-        <CardItem v-for="(record, index) in cardRecords" :key="index" :record="record"/>
-      </div>
-      <!-- 添加条件判断，当数据为空时展示提示信息 -->
-      <div v-if="cardRecords.length === 0" class="empty-message">
-        暂无记录数据，请上传数据后再查看。
-      </div>
-      <!-- 显示所有内容的提示 -->
-      <div v-if="cardRecords.length > 0" style="display: block; font-size: 12px; color: #888; text-align: center; margin-top: 10px;">
+      <!-- 空状态提示 -->
+      <van-empty
+        v-if="cardRecords.length === 0"
+        description="暂无记录数据，请上传数据后再查看。"
+        class="empty-state"
+      />
+
+      <!-- 记录提示 -->
+      <div v-if="cardRecords.length > 0" class="info-message">
         以上为该资产的所有操作记录
       </div>
     </div>
   </div>
 </template>
+
 <script>
-import CardItem from '../../components/CardItem.vue'; // 引入 CardItem 组件
 import systemConfigure, {
-  cachedProductId, departmentPrefix,
+  cachedProductId,
   key_DingScannedResult
 } from "../../utils/Dingding.js";
 import SensorRequest from "@/utils/SensorRequest";
 
 export default {
-  components: {
-    CardItem },
   data() {
     return {
       isLoading: true,
-      cardRecords: [] ,// 记录列表数据
-      boardID: this.getProductId(), // 调用方法获取产品 ID,
+      cardRecords: [], // 记录列表数据
+      boardID: this.getProductId(), // 调用方法获取产品 ID
       selectedCategory: '',
       categories: [
         { value: '入库', label: '入库' },
@@ -63,7 +112,10 @@ export default {
         { value: '问题描述', label: '问题描述' },
         { value: '全部', label: '全部' }
       ],
-      count: 0 };
+      count: 0,
+      loading: false,
+      finished: false
+    };
   },
   created() {
     this.getAllCardRecordsWithImages();
@@ -73,34 +125,42 @@ export default {
       // alert(cachedProductId);
       return sessionStorage.getItem(key_DingScannedResult) || cachedProductId; // 返回存储的产品 ID 或者 cachedProductId
     },
+    // 格式化日期
+    formatDate(dateString) {
+      if (!dateString) return '未知时间';
+
+      const date = new Date(dateString);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const hours = String(date.getHours()).padStart(2, '0');
+      const minutes = String(date.getMinutes()).padStart(2, '0');
+      return `${year}-${month}-${day} ${hours}:${minutes}`;
+    },
     goBackQR() {
       const department = this.$route.params.department;
-      this.$router.push(`/${department}/index`);
+      this.$router.push(`/${department}/all-applications`);
     },
     resetForm(){
       this.count = 0; // 正确重置 count
       this.getAllCardRecordsWithImages();
-      this.$message({
-        message: '重置记录成功 ！',
+      this.$toast({
+        message: '重置记录成功',
         type: 'success',
-        duration: 2000, // 2秒后自动关闭
-        showClose: true // 显示关闭按钮
-      })
+        duration: 2000
+      });
     },
     getAllCardRecordsWithImages() {
       const requestData = {
         Asset_Code: this.boardID
       };
       SensorRequest.GetAssetOperationInfoByAssetCodeFun(JSON.stringify(requestData), response => {
-        if (systemConfigure.isDebugMode) {
-          console.log('Received response data: ' + JSON.stringify(response));
-        }
         console.log('Received response data :', response); // 打印日志
         // alert('Received response data :'+ response); // 打印日志
         let JSON_response = JSON.parse(response);
         if (Array.isArray(JSON_response) && JSON_response.length > 0) {
           // 确保处理所有返回的数据
-          this.cardRecords = JSON_response.map(item => this.parseData(item)).reverse();
+          this.cardRecords = JSON_response.map(item => this.parseFullData(item)).reverse();
           this.count = this.cardRecords.length; // 更新计数
         } else {
           // alert('Error fetching card records: Data is empty')
@@ -117,127 +177,178 @@ export default {
         this.count = 0;
       });
     },
-    parseData(data) {
-      // 修复：正确解析数据格式，特别是Operation_Evidence部分
-      const files = [];
-      // 处理Operation_Evidence可能为null的情况
-      if (data.Operation_Evidence && Array.isArray(data.Operation_Evidence)) {
-        data.Operation_Evidence.forEach((evidence, index) => {
-          // 检查是否有实际的Base64数据
-          if (evidence.File_Base64 && evidence.File_Base64 !== "") {
-            // 根据文件名确定MIME类型，如果没有文件名则默认为image/jpeg
-            let mimeType = 'image/jpeg';
-            if (evidence.File_Name) {
-              if (evidence.File_Name.match(/\.(jpg|jpeg)$/i)) {
-                mimeType = 'image/jpeg';
-              } else if (evidence.File_Name.match(/\.png$/i)) {
-                mimeType = 'image/png';
-              } else if (evidence.File_Name.match(/\.gif$/i)) {
-                mimeType = 'image/gif';
-              } else if (evidence.File_Name.match(/\.(mp4|avi|mov)$/i)) {
-                mimeType = 'video/mp4';
-              }
-            }
-
-            files.push({
-              id: index,
-              fileUrl: evidence.File_Base64,
-              type: mimeType.includes('image') ? 'image' : 'video'
-            });
-          }
-        });
-      }
+    // 解析完整数据 - 根据后端返回的数据结构
+    parseFullData(data) {
+      // 从Operation_User中提取人员信息
+      const operationUser = data.Operation_User || {};
 
       return {
-        // currentLocation: data.Operation_User?.Person_Name || '', // record.currentLocation 对应的是 Person_Name
-        currentLocation: (data.Operation_User || {}).Person_Name || '',
-        createTime: data.Ts_create || '', // record.createTime 对应的是 Ts_create
-        operation: data.Operation_Type || '', // 操作分类 record.operation 对应的是 Operation_Type
-        description: data.Operation_Description || '', // record.description 对应的是 Operation_Description
-        files: files // 正确解析文件数据
+        assetCode: data.Asset_Code || this.boardID,
+        personName: operationUser.Person_Name || '未知',
+        personPhone: operationUser.Person_Phone || '无',
+        personDingID: operationUser.Person_DingID || '',
+        personDepartment: operationUser.Person_Department || '',
+        createTime: data.Ts_create || '', // 创建时间
+        editTime: data.Ts_edit || '', // 最后编辑时间
+        operation: data.Operation_Type || '', // 操作类型
+        description: data.Operation_Description || '', // 操作描述
+        id: data.Id || null, // 记录ID
+        uuid: data.Uuid || null, // UUID
+        operationEvidence: data.Operation_Evidence || [], // 证据信息
+        logicDel: data.Logic_del || 0, // 逻辑删除标记
+        assetStatus: data.Asset_Status || 'N/A', // 资产状态
+        assetRemarks: data.Asset_Remarks || 'N/A' // 资产备注
       };
+    },
+    onLoad() {
+      // 上拉加载更多，由于数据一次性获取，所以直接标记完成
+      this.finished = true;
     }
   }
 };
 </script>
-<style scoped>
-.empty-message {
-  text-align: center;
-  color: #999;
-  margin-top: 20px;
-}
 
-.container {
-  padding: 20px;
+<style scoped>
+.history-view-container {
+  background-color: #f7f8fa;
+  min-height: 100vh;
+  padding-top: 46px;
 }
 
 .loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 200px;
+}
+
+.loading-message {
   text-align: center;
+  color: #969799;
+}
+
+.content-container {
+  padding: 1px;
+}
+
+.header-info {
+  text-align: center;
+  margin-bottom: 6px;
+}
+
+.board-id-title {
+  margin: 0 0 8px 0;
+  font-size: 18px;
+  font-weight: bold;
+  color: #323233;
+}
+
+.record-count {
+  font-size: 14px;
+  color: #64b5fd;
+  margin-bottom: 16px;
+}
+
+.asset-records-list {
+  width: 100%;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+/* 自定义卡片样式 */
+.custom-card {
+  background-color: #fff;
+  border-radius: 8px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  margin-bottom: 12px;
+  overflow: hidden;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid #f5f5f5;
+  background-color: #fafafa;
+}
+
+.card-title {
+  font-weight: 500;
+  color: #323233;
+  font-size: 15px;
+}
+
+.card-tag {
+  background-color: #f44336;
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+.card-content {
+  padding: 12px 16px;
+}
+
+.data-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  padding: 6px 0;
+  font-size: 13px;
+  border-bottom: 1px solid #f5f5f5;
+}
+
+.data-row:last-child {
+  border-bottom: none;
+}
+
+.data-label {
+  color: #969799;
+  font-weight: 400;
+  min-width: 80px;
+  margin-right: 8px;
+  text-align: left;
+}
+
+.data-value {
+  color: #323233;
+  flex: 1;
+  text-align: right;
+  word-break: break-word;
+  white-space: pre-wrap;
+  line-height: 1.4;
+}
+
+.button-group {
+  margin-bottom: 16px;
+  padding: 0 16px;
+  box-sizing: border-box;
+}
+
+.action-button {
+  margin-bottom: 10px;
 }
 
 .separator {
-  border-top: 1px dashed #ccc; /* 虚线分隔 */
-  margin: 20px 0; /* 上下间隔 */
+  height: 1px;
+  background-color: #ebedf0;
+  margin: 16px 0;
 }
 
-.card-list {
-  margin-top: 10px;
-  width: 100%; /* 确保卡片列表占满容器宽度 */
-  box-sizing: border-box; /* 包含内边距和边框 */
-  padding: 0; /* 移除默认内边距 */
+.card-list-container {
+  margin-bottom: 16px;
 }
 
-/* 移动端优化 */
-@media (max-width: 768px) {
-  .card-list {
-    padding: 0 5px; /* 小屏幕上的小内边距 */
-  }
-}
-
-@media (max-width: 480px) {
-  .card-list {
-    padding: 0; /* 超小屏幕上无内边距 */
-  }
+.empty-state {
+  margin-top: 40px;
 }
 
 .info-message {
-  display: block;
+  text-align: center;
   font-size: 12px;
-  color: #888;
+  color: #969799;
   margin-top: 10px;
-}
-
-.return-button-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  width: 100%;
-  box-sizing: border-box; /* 包含内边距和边框 */
-}
-
-.button-row {
-  display: flex;
-  justify-content: center;
-  margin-bottom: 10px;
-  width: 100%; /* 确保按钮行占满容器宽度 */
-  box-sizing: border-box;
-}
-
-.button-row el-button,
-.button-row el-select {
-  margin: 0 5px;
-}
-
-/* 父组件根元素样式 */
-div[style*="text-align: center;"]:first-of-type {
-  width: 100%;
-  box-sizing: border-box;
-  padding: 0 10px;
-}
-
-/* 为整个组件添加响应式容器 */
-div > div:not(.card-list):not(.lightbox) {
-  width: 100%;
-  box-sizing: border-box;
 }
 </style>
