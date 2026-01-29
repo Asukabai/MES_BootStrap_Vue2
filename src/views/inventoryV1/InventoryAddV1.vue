@@ -440,7 +440,7 @@ export default {
         // 弹窗提示用户确认是否导入上一篇操作信息记录
         await this.$dialog.confirm({
           title: '确认导入',
-          message: '是否确认导入上一篇操作信息记录（位置，图片信息除外）',
+          message: '是否确认导入上一篇操作信息记录（位置，图片，标签信息除外）',
           confirmButtonText: '确定',
           cancelButtonText: '取消'
         });
@@ -471,15 +471,13 @@ export default {
         // 解析响应数据
         const responseJson = JSON.parse(respData);
         console.log('上一篇操作记录 responseJson:', responseJson);
-
         // 检查是否有返回数据（对象）
         if (responseJson && typeof responseJson === 'object') {
           const lastRecord = responseJson; // 直接使用返回的对象
           // 保存原有的位置信息和图片信息
           const originalShelfLocation = this.itemForm.Shelf_Location;
           const originalImages = this.imageList;
-
-          // 覆盖表单项（除了位置信息和图片）
+          // 覆盖表单项（除了位置信息、图片信息和标签）
           this.itemForm.Item_Name = lastRecord.Item_Name || '';
           this.itemForm.Item_Model = lastRecord.Item_Model || '';
           this.itemForm.Item_Brand = lastRecord.Item_Brand || '';
@@ -489,24 +487,11 @@ export default {
           this.itemForm.Is_Low_Stock = lastRecord.Is_Low_Stock || '';
           this.itemForm.Remark = lastRecord.Remark || '';
           this.itemForm.Company = lastRecord.Company || '';
-
           // 扩展信息字段
           this.itemForm.Item_Color = lastRecord.Item_Color || '';
           this.itemForm.Item_Size = lastRecord.Item_Size || '';
           this.itemForm.Item_Unit = lastRecord.Item_Unit || '';
           this.itemForm.Item_Material = lastRecord.Item_Material || '';
-
-          // 标签信息
-          if (lastRecord.Item_Tags && Array.isArray(lastRecord.Item_Tags)) {
-            // 保留系统标签，更新用户标签
-            const systemTagNames = ['晟思', '大钧', '星移', '耗材', '公用', '项目', '其他', '储物箱'];
-            const newSystemTags = lastRecord.Item_Tags.filter(tag => systemTagNames.includes(tag));
-            const newUserTags = lastRecord.Item_Tags.filter(tag => !systemTagNames.includes(tag));
-
-            this.systemTags = newSystemTags;
-            this.userTags = newUserTags;
-          }
-
           // 更多信息字段
           if (lastRecord.Item_Mores) {
             try {
@@ -522,7 +507,6 @@ export default {
           } else {
             this.moreFields = [];
           }
-
           // 项目名称
           if (lastRecord.Project_Code) {
             const project = this.fullProjectList.find(p => p.Project_Code === lastRecord.Project_Code);
@@ -530,16 +514,15 @@ export default {
               this.selectedProjectName = project.Project_Name || project.name || project.projectName || '';
             }
           }
-
           // 恢复原有的位置信息和图片信息
           this.itemForm.Shelf_Location = originalShelfLocation;
           this.imageList = originalImages;
-
-          // 更新系统标签
+          // 清空用户标签，只保留系统标签
+          this.userTags = [];
+          // 更新系统标签（根据导入的数据重新生成系统标签）
           this.updateSystemTags();
-
           // 显示成功消息
-          this.$toast.success('已导入上一篇操作记录信息');
+          this.$toast.success('已导入上一篇操作记录信息（标签不导入）');
         } else {
           // 返回的是空内容
           this.$toast('暂未查询到上一篇操作记录');
