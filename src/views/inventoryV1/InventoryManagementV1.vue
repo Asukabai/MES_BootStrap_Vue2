@@ -84,7 +84,7 @@
             :key="item.Id"
             class="inventory-cell"
           >
-            <div class="cell-content" @click="viewDetail(item.Shelf_Location)">
+            <div class="cell-content">
               <!-- 选择复选框 - 放在左上角，不影响布局 -->
               <div
                 class="select-checkbox-corner"
@@ -97,7 +97,10 @@
               </div>
 
               <!-- 左侧图片区域（30%） -->
-              <div class="image-section">
+              <div
+                class="image-section"
+                @click.stop="previewImage(item)"
+              >
                 <img
                   :src="getImageUrl(item)"
                   alt="物品图片"
@@ -107,7 +110,10 @@
               </div>
 
               <!-- 右侧信息区域（70%） -->
-              <div class="info-section">
+              <div
+                class="info-section"
+                @click="viewDetail(item.Shelf_Location)"
+              >
                 <!-- 右上角删除按钮 -->
                 <div class="delete-btn" @click.stop="showDeleteDialog(item)">
                   <van-icon name="delete" />
@@ -146,6 +152,14 @@
         </van-list>
       </van-pull-refresh>
     </div>
+
+    <!-- 图片预览弹窗 -->
+    <van-image-preview
+      v-model="showImagePreview"
+      :images="previewImages"
+      :start-position="previewStartPos"
+      @close="onPreviewClose"
+    />
 
     <!-- 空状态 -->
     <div v-if="hasSearched && list.length === 0 && !loading" class="empty-state">
@@ -335,7 +349,7 @@
 </template>
 
 <script>
-import {Dialog, Toast} from 'vant';
+import {Dialog, Toast, ImagePreview} from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import FloatingActionButton from '../../components/FloatingActionButton.vue';
 import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding";
@@ -438,7 +452,12 @@ export default {
 
       // 修改：批量操作相关
       showBatchConfirmPopup: false,        // 批量确认弹窗
-      batchOperationLoading: false         // 批量操作加载状态
+      batchOperationLoading: false,        // 批量操作加载状态
+
+      // 新增：图片预览相关
+      showImagePreview: false,
+      previewImages: [],
+      previewStartPos: 0
     };
   },
   created() {
@@ -741,6 +760,74 @@ export default {
         console.error('未找到 department 参数');
         this.$toast.fail('路由参数缺失');
       }
+    },
+
+    // 新增：预览图片
+    previewImage(item) {
+      // 获取当前物品的所有图片
+      const images = [];
+      if (item.Item_Images && item.Item_Images.length > 0) {
+        item.Item_Images.forEach(img => {
+          if (img.File_Md5) {
+            // 使用MinIO接口获取预览URL
+            const param = {
+              remoteLocation: img.File_Md5
+            };
+            SensorRequest.Minio_PresignedDownloadUrl5B(
+              JSON.stringify(param),
+              (url) => {
+                if (url) {
+                  // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
+                  const finalUrl = url.replace(
+                    'http://127.0.0.1:9000',
+                    'https://api-v2.sensor-smart.cn:22027'
+                  );
+                  images.push(finalUrl);
+                } else {
+                  images.push(require('@/assets/暂无图片1.png'));
+                }
+
+                // 当收集完所有图片URL后显示预览
+                if (images.length === item.Item_Images.length) {
+                  this.previewImages = images;
+                  this.showImagePreview = true;
+                  this.previewStartPos = 0;
+                }
+              },
+              (error) => {
+                console.error('获取图片URL失败:', error);
+                images.push(require('@/assets/暂无图片1.png'));
+
+                // 当收集完所有图片URL后显示预览
+                if (images.length === item.Item_Images.length) {
+                  this.previewImages = images;
+                  this.showImagePreview = true;
+                  this.previewStartPos = 0;
+                }
+              }
+            );
+          } else {
+            images.push(require('@/assets/暂无图片1.png'));
+
+            // 当收集完所有图片URL后显示预览
+            if (images.length === item.Item_Images.length) {
+              this.previewImages = images;
+              this.showImagePreview = true;
+              this.previewStartPos = 0;
+            }
+          }
+        });
+      } else {
+        // 如果没有图片，显示占位图
+        this.previewImages = [require('@/assets/暂无图片1.png')];
+        this.showImagePreview = true;
+        this.previewStartPos = 0;
+      }
+    },
+
+    // 预览关闭回调
+    onPreviewClose() {
+      this.showImagePreview = false;
     },
 
     // 显示操作菜单（包括删除选项）
@@ -1241,6 +1328,7 @@ export default {
   align-items: center;
   justify-content: center;
   padding-right: 8px;
+  cursor: zoom-in; /* 表示图片可点击预览 */
 }
 
 .item-image {
