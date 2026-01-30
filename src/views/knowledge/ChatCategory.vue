@@ -28,6 +28,13 @@
         />
       </van-list>
     </div>
+    <CustomizableFloatingButton
+      :initial-position="{ bottom: 60, right: 20 }"
+      :icon-src="require('@/assets/返回.png')"
+      :background-size="49"
+      :icon-size="49"
+      :on-click="goBack"
+    />
   </div>
 </template>
 
@@ -39,10 +46,12 @@
 import { List, Cell, Search } from 'vant'
 import SensorRequest from '../../utils/SensorRequest.js'
 import {GetDingUserToken} from "../../utils/Dingding";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 
 export default {
   name: 'KnowledgeBasePage',
   components: {
+    CustomizableFloatingButton,
     VanList: List,
     VanCell: Cell,
     VanSearch: Search,
@@ -73,6 +82,19 @@ export default {
     this.loadData()
   },
   methods: {
+    goBack() {
+      // this.$router.go(-1);
+      this.navigateTo('/index');
+    },
+    navigateTo(path) {
+      const department = this.$route.params.department;
+      if (department) {
+        this.$router.push(`/${department}${path}`);
+      } else {
+        console.error('未找到 department 参数');
+        this.$toast.fail('路由参数缺失');
+      }
+    },
     viewPostDetail(post) {
       const department = this.$route.params.department;
       // 传递整个post对象到详情页
