@@ -381,7 +381,7 @@ export default {
   data() {
     return {
       isNavigating: false, // 添加导航状态标识
-      searchValue: '',
+      searchValue: this.getStoredSearchValue(), // 从本地存储获取搜索值
       hasSearched: false,
       showInboundPopup: false,
       showOutboundPopup: false,
@@ -390,8 +390,8 @@ export default {
       showProjectPicker: false,
       showOutboundProjectPicker: false,
       filter: {
-        category: '',
-        status: ''
+        category: this.getStoredFilterValue('category'), // 从本地存储获取筛选值
+        status: this.getStoredFilterValue('status')
       },
       // 下拉菜单选项
       categoryOptions: [
@@ -462,6 +462,13 @@ export default {
   },
   created() {
     this.loadProjectOptions();
+    // 如果有存储的搜索值或筛选值，自动执行搜索
+    if (this.searchValue || this.filter.category || this.filter.status) {
+      this.$nextTick(() => {
+        this.hasSearched = true;
+        this.onLoad();
+      });
+    }
   },
   computed: {
     deleteConfirmMessage() {
@@ -505,6 +512,8 @@ export default {
   methods: {
     // 返回上一页
     goBack() {
+      // 清除本地存储的搜索状态
+      this.clearStoredSearchState();
       this.navigateTo('/index');
     },
     // 跳转到高级检索页面
@@ -537,8 +546,39 @@ export default {
         this.isNavigating = false;
       }, 10);
     },
+
+    // 获取存储的搜索值
+    getStoredSearchValue() {
+      return localStorage.getItem('inventorySearchValue') || '';
+    },
+
+    // 获取存储的筛选值
+    getStoredFilterValue(key) {
+      return localStorage.getItem(`inventoryFilter_${key}`) || '';
+    },
+
+    // 保存搜索值到本地存储
+    saveSearchValue() {
+      localStorage.setItem('inventorySearchValue', this.searchValue);
+    },
+
+    // 保存筛选值到本地存储
+    saveFilterValue() {
+      localStorage.setItem('inventoryFilter_category', this.filter.category);
+      localStorage.setItem('inventoryFilter_status', this.filter.status);
+    },
+
+    // 清除本地存储的搜索状态
+    clearStoredSearchState() {
+      localStorage.removeItem('inventorySearchValue');
+      localStorage.removeItem('inventoryFilter_category');
+      localStorage.removeItem('inventoryFilter_status');
+    },
+
     onSearch() {
       if (this.searchValue || this.filter.category || this.filter.status) {
+        this.saveSearchValue();
+        this.saveFilterValue();
         this.hasSearched = true;
         this.currentPage = 1;
         this.list = [];
@@ -560,6 +600,7 @@ export default {
     // 新增筛选变化处理方法
     onFilterChange() {
       if (this.searchValue || this.filter.category || this.filter.status) {
+        this.saveFilterValue();
         this.onSearch();
       } else {
         // 如果只是清除筛选，也要重置选择状态
@@ -586,6 +627,9 @@ export default {
 
       // 重置选择状态
       this.clearSelection();
+
+      // 清除本地存储的搜索状态
+      this.clearStoredSearchState();
 
       // 重新加载数据
       this.onLoad();
