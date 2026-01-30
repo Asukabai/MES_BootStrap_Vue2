@@ -159,7 +159,23 @@
       :images="previewImages"
       :start-position="previewStartPos"
       @close="onPreviewClose"
-    />
+      @click-overlay="onPreviewClose"
+    >
+      <!-- 自定义关闭按钮 -->
+<!--      <template #cover>-->
+<!--&lt;!&ndash;        <div style="position: absolute; top: 0; left: 0; width: 100px; height: 100px; background: red;">&ndash;&gt;-->
+<!--&lt;!&ndash;          测试插槽&ndash;&gt;-->
+<!--&lt;!&ndash;        </div>&ndash;&gt;-->
+<!--        <div class="custom-close-button" @click="onPreviewClose">-->
+<!--          <van-icon name="cross" size="24" color="#fff" />-->
+<!--        </div>-->
+<!--      </template>-->
+      <template slot="cover">
+        <div class="custom-close-button" @click="onPreviewClose">
+          <van-icon name="cross" size="30" color="#fff" />
+        </div>
+      </template>
+    </van-image-preview>
 
     <!-- 空状态 -->
     <div v-if="hasSearched && list.length === 0 && !loading" class="empty-state">
@@ -1844,5 +1860,14 @@ export default {
 .confirmation-actions {
   margin-top: auto;
   padding-top: 16px;
+}
+
+/* 自定义全图预览图片-关闭按钮样式 */
+.custom-close-button {
+  background-color: red;
+  width: 35px;
+  height: 35px;
+  top: 15px;
+  right: 15px;
 }
 </style>
