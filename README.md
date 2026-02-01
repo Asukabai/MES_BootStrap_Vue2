@@ -1,6 +1,13 @@
 # MES_BootStrap_Vue2
 MES_BootStrap_Vue2
 
+https://chat.deepseek.com/a/chat/s/39fbe09f-d060-4825-a3b5-0cacf5acb84a
+
+
+
+
+
+
 ┌───────────┐
 │定时任务启动 │
 └─────┬─────┘
