@@ -33,7 +33,7 @@
     <!-- 下载完成 -->
     <div v-if="downloadComplete && isSupportedFileType" class="download-complete">
       <p>✅ 下载已完成</p>
-      <a :href="downloadLink" :download="fileName" target="_blank">点击下载文件</a>
+<!--      <a :href="downloadLink" :download="fileName" target="_blank">点击下载文件</a>-->
     </div>
     <CustomizableFloatingButton
       :initial-position="{ bottom: 100, right: 40 }"
@@ -48,6 +48,7 @@
 <script>
 import axios from 'axios'
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
+import {Toast} from "vant";
 
 export default {
   name: 'FileDownload',
@@ -171,6 +172,8 @@ export default {
         this.downloadComplete = true
         this.downloadProgress = 100
         this.downloadStatus = '下载完成'
+        // 在下载完成后调用
+        Toast.success('文件已经下载完成 ！');
 
         // 安全检查
         if (this.$downloadManager) {
