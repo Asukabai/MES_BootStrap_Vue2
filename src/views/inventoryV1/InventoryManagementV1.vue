@@ -85,42 +85,45 @@
             class="inventory-cell"
           >
             <div class="cell-content">
-              <!-- 选择复选框 - 放在左上角，不影响布局 -->
-              <div
-                class="select-checkbox-corner"
-                @click.stop="toggleItemSelection(item)"
-              >
-                <van-icon
-                  :name="isItemSelected(item) ? 'success' : 'circle'"
-                  :color="isItemSelected(item) ? '#1989fa' : '#c8c9cc'"
-                />
-              </div>
+              <!-- 物品名称独占一行 -->
+              <div class="item-title">物品名称：{{ item.Item_Name || '无名称' }}</div>
 
-              <!-- 左侧图片区域（30%） -->
-              <div
-                class="image-section"
-                @click.stop="previewImage(item)"
-              >
-                <img
-                  :src="getImageUrl(item)"
-                  alt="物品图片"
-                  class="item-image"
-                  @error="onImageError"
-                />
-              </div>
-
-              <!-- 右侧信息区域（70%） -->
-              <div
-                class="info-section"
-                @click="viewDetail(item.Shelf_Location)"
-              >
-                <!-- 右上角删除按钮 -->
-                <div class="delete-btn" @click.stop="showDeleteDialog(item)">
-                  <van-icon name="delete" />
+              <!-- 图片和信息区域横向排列 -->
+              <div class="content-row">
+                <!-- 左侧图片区域（30%） -->
+                <div
+                  class="image-section"
+                  @click.stop="previewImage(item)"
+                >
+                  <img
+                    :src="getImageUrl(item)"
+                    alt="物品图片"
+                    class="item-image"
+                    @error="onImageError"
+                  />
                 </div>
 
-                <div class="cell-header">
-                  <div class="item-title">物品名称：{{ item.Item_Name }}</div>
+                <!-- 右侧信息区域（70%） -->
+                <div
+                  class="info-section"
+                  @click="viewDetail(item.Shelf_Location)"
+                >
+                  <div class="action-buttons-container">
+                    <!-- 选择复选框 -->
+                    <div
+                      class="select-checkbox-corner"
+                      @click.stop="toggleItemSelection(item)"
+                    >
+                      <van-icon
+                        :name="isItemSelected(item) ? 'success' : 'circle'"
+                        :color="isItemSelected(item) ? '#1989fa' : '#c8c9cc'"
+                      />
+                    </div>
+                    <!-- 删除按钮 -->
+                    <div class="delete-btn" @click.stop="showDeleteDialog(item)">
+                      <van-icon name="delete" />
+                    </div>
+                  </div>
 
                   <!-- 型号和库存信息分行显示 -->
                   <div class="item-subtitle-line">
@@ -131,18 +134,18 @@
                     <span class="stock-label">库存：</span>
                     <span class="stock-value">{{ item.Current_Stock !== null && item.Current_Stock !== undefined && item.Current_Stock !== '' ? item.Current_Stock : '用户暂未填写' }}</span>
                   </div>
-                </div>
 
-                <!-- 公司和位置信息分行显示 -->
-                <div class="cell-body">
-                  <div class="item-info">
-                    <div class="info-row">
-                      <span class="label">公司:</span>
-                      <span class="value">{{ item.Company }}</span>
-                    </div>
-                    <div class="info-row">
-                      <span class="label">位置:</span>
-                      <span class="value">{{ item.Shelf_Location }}</span>
+                  <!-- 公司和位置信息分行显示 -->
+                  <div class="cell-body">
+                    <div class="item-info">
+                      <div class="info-row">
+                        <span class="label">公司:</span>
+                        <span class="value">{{ item.Company }}</span>
+                      </div>
+                      <div class="info-row">
+                        <span class="label">位置:</span>
+                        <span class="value">{{ item.Shelf_Location }}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -161,15 +164,6 @@
       @close="onPreviewClose"
       @click-overlay="onPreviewClose"
     >
-      <!-- 自定义关闭按钮 -->
-<!--      <template #cover>-->
-<!--&lt;!&ndash;        <div style="position: absolute; top: 0; left: 0; width: 100px; height: 100px; background: red;">&ndash;&gt;-->
-<!--&lt;!&ndash;          测试插槽&ndash;&gt;-->
-<!--&lt;!&ndash;        </div>&ndash;&gt;-->
-<!--        <div class="custom-close-button" @click="onPreviewClose">-->
-<!--          <van-icon name="cross" size="24" color="#fff" />-->
-<!--        </div>-->
-<!--      </template>-->
       <template slot="cover">
         <div class="custom-close-button" @click="onPreviewClose">
           <van-icon name="cross" size="30" color="#fff" />
@@ -341,15 +335,15 @@
     <CustomizableFloatingButton
       :initial-position="{ bottom: 200, right: 10 }"
       :icon-src="require('@/assets/返回.png')"
-      :background-size="53"
-      :icon-size="53"
+      :background-size="46"
+      :icon-size="46"
       :on-click="goBack"
     />
     <!-- 使用自定义图标悬浮按钮 -->
     <CustomizableFloatingButton
       :initial-position="{ bottom: 130, right: 10 }"
       :icon-src="require('@/assets/高级检索.png')"
-      :background-size="55"
+      :background-size="46"
       :icon-size="35"
       :on-click="navigateToAdvancedSearch"
     />
@@ -357,8 +351,8 @@
     <CustomizableFloatingButton
       :initial-position="{ bottom: 60, right: 10 }"
       :icon-src="require('@/assets/新增图标.png')"
-      :background-size="53"
-      :icon-size="53"
+      :background-size="46"
+      :icon-size="46"
       :on-click="onFloatingButtonClick"
     />
   </div>
@@ -1322,7 +1316,7 @@ export default {
 .batch-operation-bar {
   position: sticky;
   top: 0;
-  z-index: 999;
+  z-index: 9999;
   background: #fff;
   padding: 10px 15px;
   display: flex;
@@ -1354,28 +1348,43 @@ export default {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.cell-content {
-  display: flex;
-  padding: 8px;
-  position: relative; /* 为删除按钮和复选框定位做准备 */
-  cursor: pointer; /* 表示这是一个可点击的卡片 */
+/* 新增样式：物品名称独占一行 */
+.item-title {
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  display: block;
+  margin-bottom: 8px;
 }
 
-/* 角落选择复选框样式 - 放在左上角，不影响布局 */
-.select-checkbox-corner {
-  position: absolute;
-  top: 8px;
-  left: 8px;
-  z-index: 2;
-  background-color: rgba(255, 255, 255, 0.9);
-  border-radius: 50%;
-  width: 24px;
-  height: 24px;
+.cell-content {
+  display: flex;
+  flex-direction: column; /* 主轴方向为纵向 */
+  padding: 8px;
+  position: relative;
+  cursor: pointer;
+}
+
+.content-row {
+  display: flex; /* 子元素横向排列 */
+  width: 100%;
+}
+
+.image-section {
+  width: 30%; /* 左侧图片区域占30% */
   display: flex;
   align-items: center;
   justify-content: center;
-  cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  padding-right: 8px;
+  cursor: zoom-in;
+}
+
+.info-section {
+  width: 70%; /* 右侧信息区域占70% */
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
 }
 
 .cell-content:hover {
@@ -1407,19 +1416,32 @@ export default {
   justify-content: space-between;
 }
 
-.delete-btn {
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  z-index: 1;
-  background-color: #f5f5f5;
+/* 角落选择复选框样式 - 放在右上角，与删除按钮并列 */
+.select-checkbox-corner {
+  background-color: rgba(255, 255, 255, 0.9);
   border-radius: 50%;
-  width: 28px;
-  height: 28px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  margin-bottom: 8px; /* 增加底部间距，避免与删除按钮重叠 */
+}
+
+/* 删除按钮样式 */
+.delete-btn {
+  background-color: rgba(255, 255, 255, 0.9); /* 与复选框背景色一致 */
+  border-radius: 50%; /* 圆形按钮 */
+  width: 24px; /* 与复选框尺寸一致 */
+  height: 24px; /* 与复选框尺寸一致 */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); /* 与复选框阴影一致 */
+  margin-bottom: 8px; /* 与复选框间距一致 */
   transition: background-color 0.2s;
 }
 
@@ -1430,6 +1452,14 @@ export default {
 .delete-btn .van-icon {
   font-size: 16px;
   color: #ff6b6b;
+}
+
+.action-buttons-container {
+  position: absolute;
+  right: -10px;
+  display: flex;
+  flex-direction: column; /* 纵向排列 */
+  z-index: 2;
 }
 
 .cell-header {
