@@ -140,22 +140,22 @@ export default {
         {
           icon: scanConfig,
           title: '资产扫码配置',
-          path: '/code/config',
+          path: '/config',
         },
         {
           icon: scanLog,
           title: '资产扫码日志',
-          path: '/code/codeList',
+          path: '/codeList',
         },
         {
           icon: scansingle,
           title: '资产单次扫码',
-          path: '/code/add-stored',
+          path: '/add-stored',
         },
         {
           icon: scanMore,
           title: '资产批量扫码',
-          path: '/code/batch_scan_results',
+          path: '/batch_scan_results',
         },
       ],
       applications: [] // 显示的应用列表
@@ -248,10 +248,10 @@ export default {
       let targetPath = path;
       switch (this.getApplicationByPath(path).title) {
         case '资产扫码配置':
-          targetPath = '/code/config';
+          targetPath = '/config';
           break;
         case '资产扫码日志':
-          targetPath = '/code/codeList';
+          targetPath = '/codeList';
           break;
         case '周报管理':
           targetPath = '/weeklyReportManagement';
@@ -385,68 +385,88 @@ export default {
         return;
       }
       console.log("开始资产扫码");
+
       dd.ready(() => {
         dd.biz.util.scan({
           type: 'qrCode',
           onSuccess: (data) => {
             const result = data.text; // 获取扫描结果
+            console.log("扫描结果:", result);
+
             if (result) {
               const parts = result.split('_');
               if (parts.length < 3) {
                 // 扫描结果中没有 '_'
-                this.$message({
+                this.$toast({
                   message: '二维码的类型不符，请切换板卡重新扫描!',
-                  type: 'info',
-                  duration: 2000, // 2秒后自动关闭
-                  showClose: true // 显示关闭按钮
+                  type: 'fail',
+                  duration: 2000
                 });
                 return;
               }
+
               // 先检查二维码是否存在于数据库中
-              SensorRequest.GetAssetInfoByAssetCodeFun(JSON.stringify({ Asset_Code: result }), (response) => {
-                // alert("response : "+ response)
-                let respone_Object = JSON.parse(response)
-                const department = this.$route.params.department;
-                // console.log(respone_Object.Module_Type)
-                // console.log(respone_Object.Module_Name)
-                // 接受的是一个 对象
-                if (respone_Object.Project_Code === '' && respone_Object.Project_Name === ''){
-                  this.$router.push({
-                    path: `/${department}/code/AddStored`,
-                    query: {
-                      Module_Name: respone_Object.Module_Name,
-                      Module_Type: respone_Object.Module_Type
+              SensorRequest.GetAssetInfoByAssetCodeFun(
+                JSON.stringify({ Asset_Code: result }),
+                (response) => {
+                  try {
+                    const responseObject = JSON.parse(response);
+                    const department = this.$route.params.department;
+
+                    if (!department) {
+                      this.$toast.fail('路由参数缺失');
+                      return;
                     }
-                  });
-                }else{
-                  this.$router.push({
-                    path: `/${department}/code/AddHistory`,
-                    query: {
-                      Module_Name: respone_Object.Module_Name,
-                      Module_Type: respone_Object.Module_Type
+
+                    // 验证响应数据完整性
+                    if (!responseObject || !responseObject.Module_Type || !responseObject.Module_Name) {
+                      this.$toast.fail('资产信息不完整');
+                      return;
                     }
-                  });
+
+                    // 根据项目信息决定跳转路径
+                    if (!responseObject.Project_Code && !responseObject.Project_Name) {
+                      // 无项目信息，跳转到新资产存储页面
+                      this.$router.push({
+                        path: `/${department}/AddStored`,
+                        query: {
+                          Module_Name: responseObject.Module_Name,
+                          Module_Type: responseObject.Module_Type
+                        }
+                      });
+                    } else {
+                      // 有项目信息，跳转到历史记录页面
+                      this.$router.push({
+                        path: `/${department}/AddHistory`,
+                        query: {
+                          Module_Name: responseObject.Module_Name,
+                          Module_Type: responseObject.Module_Type
+                        }
+                      });
+                    }
+
+                    // 存储扫码结果
+                    sessionStorage.setItem(key_DingScannedResult, result);
+                    // 更新全局变量
+                    updateCachedProductId(result);
+
+                  } catch (parseError) {
+                    console.error('解析资产信息失败:', parseError);
+                    this.$toast.fail('资产信息解析失败');
+                  }
+                },
+                (searchError) => {
+                  // 处理搜索错误 - 不跳转，仅提示用户
+                  console.error('查询资产信息失败:', searchError);
+                  this.$toast.fail('二维码未查询到，请联系管理员配置录入！');
                 }
-              }, (searchError) => {
-                // 处理搜索错误
-                console.error(searchError);
-                // alert(searchError);
-                this.$message({
-                  message: '二维码未查询到，请联系管理员配置录入！',
-                  type: 'error'
-                });
-              });
-              // 存储扫码结果
-              sessionStorage.setItem(key_DingScannedResult, result);
-              // 更新全局变量
-              updateCachedProductId(result);
+              );
             } else {
-              alert("扫描的二维码不符合要求，请重新扫描！");
+              this.$toast.fail("扫描的二维码不符合要求，请重新扫描！");
             }
           },
           onFail: (err) => {
             if (err.errorCode !== 300001) {
-              // alert("未扫描到二维码！");
               let errorMessage = '未扫描到二维码 ！';
               this.$toast.fail(errorMessage);
             }
@@ -461,7 +481,6 @@ export default {
         this.$toast.fail('PC端暂不支持扫码功能，请在钉钉移动端使用');
         return;
       }
-
       console.log("开始资产批量扫码");
 
       // 提示用户进入批量扫描模式
@@ -606,7 +625,7 @@ export default {
     navigateToResultsPage(scannedResults) {
       const department = this.$route.params.department;
       this.$router.push({
-        path: `/${department}/code/batch_scan_results`,
+        path: `/${department}/batch_scan_results`,
         query: { scannedResults: JSON.stringify(scannedResults) }
       });
     }
