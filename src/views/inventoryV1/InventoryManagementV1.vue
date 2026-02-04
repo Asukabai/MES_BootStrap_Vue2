@@ -119,10 +119,6 @@
                         :color="isItemSelected(item) ? '#1989fa' : '#c8c9cc'"
                       />
                     </div>
-                    <!-- 删除按钮 -->
-                    <div class="delete-btn" @click.stop="showDeleteDialog(item)">
-                      <van-icon name="delete" />
-                    </div>
                   </div>
 
                   <!-- 型号和库存信息分行显示 -->
@@ -231,6 +227,14 @@
             >
               <van-icon name="minus" color="#F44336" />
               <span>出库</span>
+            </div>
+            <!-- 删除按钮 -->
+            <div
+              class="type-option"
+              @click="handleDeleteClick"
+            >
+              <van-icon name="delete" color="#FF6B6B" />
+              <span>删除</span>
             </div>
           </div>
         </div>
@@ -1241,6 +1245,22 @@ export default {
           }
         );
       });
+    },
+    // 新增删除点击事件
+    handleDeleteClick() {
+      if (!this.currentSelectedItem) {
+        Toast('请选择要删除的物品');
+        return;
+      }
+
+      // 检查库存数量
+      if (this.currentSelectedItem.Current_Stock > 0) {
+        this.showStockCheckDialog = true; // 显示库存检查弹窗
+      } else {
+        this.showDeleteConfirm = true; // 显示删除确认弹窗
+      }
+
+      this.closeSingleOperationPopup(); // 关闭当前弹窗
     }
   }
 };
