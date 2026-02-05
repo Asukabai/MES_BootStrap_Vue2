@@ -379,6 +379,16 @@ export default {
   },
   created() {
     this.loadProjectOptions();
+    // 检查是否有扫码数据传入
+    const scanData = this.$route.query.scanData;
+    if (scanData) {
+      try {
+        const parsedScanData = JSON.parse(scanData);
+        this.populateFormFromScanData(parsedScanData);
+      } catch (e) {
+        console.error('解析扫码数据失败:', e);
+      }
+    }
   },
   methods: {
     // 添加新增信息操作日志记录方法
@@ -1277,6 +1287,22 @@ export default {
           reject(error);
         });
       });
+    },
+    // 新增方法：根据扫码数据填充表单
+    populateFormFromScanData(scanData) {
+      // 映射规则：pc -> Item_Name, pm -> Item_Model, qty -> Current_Stock
+      if (scanData.pc) {
+        this.itemForm.Item_Name = scanData.pc;
+      }
+      if (scanData.pm) {
+        this.itemForm.Item_Model = scanData.pm;
+      }
+      if (scanData.qty) {
+        this.itemForm.Current_Stock = parseInt(scanData.qty, 10) || 0;
+      }
+
+      // 可以在这里添加更多的字段映射逻辑
+      // 例如：on -> Remark, cc -> Company 等
     }
   },
   // 组件销毁时清理定时器
