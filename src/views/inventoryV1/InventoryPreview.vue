@@ -66,7 +66,7 @@
 <script>
 import { Toast } from 'vant';
 import SensorRequestPage from "@/utils/SensorRequestPage";
-import { key_DingName, key_DingUserIndex} from '../../utils/Dingding.js';
+import { key_DingName, key_DingUserIndex,key_DingUserPhone} from '../../utils/Dingding.js';
 export default {
   name: 'InventoryPreview',
   data() {
@@ -154,11 +154,13 @@ export default {
       const name = localStorage.getItem(key_DingName); // 需要替换为实际的键名
       console.log('从localStorage中获取用户信息:', name);
       const dingID = localStorage.getItem(key_DingUserIndex);
+      const Phone = localStorage.getItem(key_DingUserPhone);
 
       // 确保所有字段都有默认值，不能为空字符串
       return {
         Person_Name: name,
-        Person_ID: dingID
+        Person_ID: dingID,
+        Person_Phone: Phone
       };
     },
 
