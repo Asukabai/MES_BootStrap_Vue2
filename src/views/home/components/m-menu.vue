@@ -434,8 +434,35 @@ export default {
           type: 'qrCode',
           onSuccess: (data) => {
             const result = data.text; // 获取扫描结果
+            console.log('原始扫描结果:', result);
+
+            // 手动解析非标准 JSON 格式
+            const parsedResult = this.parseCustomJSON(result);
+            console.log('解析后的对象:', parsedResult);
+
+            const requiredFields = ['on', 'pc', 'pm', 'qty', 'cc', 'pdi'];
+            const optionalFields = ['mc', 'hp'];
+
+            // 检查是否包含所有必需字段
+            if (parsedResult && typeof parsedResult === 'object' &&
+              requiredFields.every(field => field in parsedResult)) {
+              console.log('扫描结果为嘉立创商城物品结构体');
+              this.$toast.success('现在扫描的是嘉立创商城物品，将自动跳转新增页面');
+              // 将解析后的扫码内容作为参数传递
+              this.$router.push({
+                name: 'InventoryAddV1',
+                params: {
+                  department: this.$route.params.department
+                },
+                query: {
+                  scanData: JSON.stringify(parsedResult) // 将解析后的对象序列化为字符串
+                }
+              });
+              return; // 提前返回，不执行后续逻辑
+            }
+            // JSON解析失败或不符合条件，继续执行原有逻辑
+            console.log('不是嘉立创商城物品，继续原有流程');
             if (this.isValidQRCode(result)) {
-              // 调用后端接口验证扫描结果
               this.validateScanResult(result);
             } else {
               alert("扫描的二维码不符合要求，请重新扫描！");
@@ -451,7 +478,25 @@ export default {
       });
     },
 
-// 新增验证扫描结果的方法
+    // 手动解析非标准 JSON 格式
+    parseCustomJSON(str) {
+      try {
+        const regex = /(\w+):([^,}]+)/g;
+        const obj = {};
+        let match;
+        while ((match = regex.exec(str)) !== null) {
+          const key = match[1];
+          const value = match[2].trim();
+          obj[key] = value === '' || value === 'null' ? null : value;
+        }
+        return obj;
+      } catch (e) {
+        console.error('手动解析失败:', e);
+        return null;
+      }
+    },
+
+    // 新增验证扫描结果的方法
     validateScanResult(result) {
       // 调用后端接口验证扫描结果
       const params = {
