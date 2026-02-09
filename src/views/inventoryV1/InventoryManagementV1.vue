@@ -196,7 +196,7 @@
     />
 
     <!-- 单个物品操作弹窗 -->
-    <van-popup v-model="showSingleOperationPopup" position="bottom" :style="{ height: '60%' }">
+    <van-popup v-model="showSingleOperationPopup" position="bottom" :style="{ height: '70%' }">
       <div class="single-operation-popup">
         <div class="popup-header">
           <h3>选择操作</h3>
@@ -243,6 +243,7 @@
         <div class="quantity-section" v-if="currentOperationType">
           <h4>{{ currentOperationType === 'inbound' ? '入库' : '出库' }}数量</h4>
 
+          <!-- 修改：移除 disable-input 属性，允许直接输入 -->
           <div class="quantity-input">
             <van-stepper
               v-model="singleOperationQuantity"
@@ -251,9 +252,38 @@
               :step="1"
               theme="round"
               button-size="28"
-              disable-input
             />
             <span class="quantity-text">{{ singleOperationQuantity }}</span>
+          </div>
+
+          <!-- 新增：自定义输入区域 -->
+          <div class="custom-input-section">
+            <h5>或自定义输入数量</h5>
+            <van-field
+              v-model="customQuantity"
+              type="number"
+              :placeholder="`请输入${currentOperationType === 'inbound' ? '入库' : '出库'}数量`"
+              clearable
+              @blur="onCustomQuantityBlur"
+              @keyup.enter="applyCustomQuantity"
+            >
+              <template #button>
+                <van-button size="small" type="primary" @click="applyCustomQuantity">应用</van-button>
+              </template>
+            </van-field>
+
+            <!-- 快速输入按钮 -->
+            <div class="quick-input-buttons">
+              <van-button
+                v-for="num in quickNumbers"
+                :key="num"
+                size="small"
+                plain
+                @click="quickInput(num)"
+              >
+                {{ num }}
+              </van-button>
+            </div>
           </div>
 
           <div class="quantity-preview">
@@ -463,6 +493,10 @@ export default {
       currentOperationType: null,          // 当前操作类型（inbound/outbound）
       singleOperationQuantity: 1,          // 单个物品操作数量
       singleOperationRemark: '',           // 单个物品操作备注
+
+      // 新增：自定义输入相关
+      customQuantity: '',                   // 自定义输入的数量
+      quickNumbers: [5, 10, 20, 50, 100],   // 快速输入的数字
 
       // 修改：批量操作相关
       showBatchConfirmPopup: false,        // 批量确认弹窗
@@ -1087,6 +1121,7 @@ export default {
         this.currentOperationType = null;
         this.singleOperationQuantity = 1;
         this.singleOperationRemark = '';
+        this.customQuantity = '';
       }
     },
 
@@ -1106,6 +1141,65 @@ export default {
       this.currentOperationType = type;
       // 重置数量为1
       this.singleOperationQuantity = 1;
+      // 清空自定义输入
+      this.customQuantity = '';
+    },
+
+    // 新增：自定义输入框失去焦点时的处理
+    onCustomQuantityBlur() {
+      this.applyCustomQuantity();
+    },
+
+    // 新增：应用自定义输入的数量
+    applyCustomQuantity() {
+      if (!this.customQuantity || this.customQuantity.trim() === '') {
+        return;
+      }
+
+      const numValue = parseInt(this.customQuantity);
+
+      // 验证输入是否有效
+      if (isNaN(numValue) || numValue <= 0) {
+        Toast('请输入有效的正数');
+        return;
+      }
+
+      // 验证出库数量是否超过库存
+      if (this.currentOperationType === 'outbound' &&
+        numValue > (this.currentSelectedItem ? this.currentSelectedItem.Current_Stock : 0)) {
+        Toast(`出库数量不能超过当前库存 ${(this.currentSelectedItem ? this.currentSelectedItem.Current_Stock : 0)}`);
+        return;
+      }
+
+      // 验证入库数量最大值
+      if (this.currentOperationType === 'inbound' && numValue > 999999) {
+        Toast('入库数量不能超过 999999');
+        return;
+      }
+
+      // 应用自定义数量
+      this.singleOperationQuantity = numValue;
+      Toast.success(`已设置数量为 ${numValue}`);
+    },
+
+    // 新增：快速输入
+    quickInput(num) {
+      // 验证出库数量是否超过库存
+      if (this.currentOperationType === 'outbound' &&
+        num > (this.currentSelectedItem ? this.currentSelectedItem.Current_Stock : 0)) {
+        Toast(`出库数量不能超过当前库存 ${(this.currentSelectedItem ? this.currentSelectedItem.Current_Stock : 0)}`);
+        return;
+      }
+
+      // 验证入库数量最大值
+      if (this.currentOperationType === 'inbound' && num > 999999) {
+        Toast('入库数量不能超过 999999');
+        return;
+      }
+
+      this.singleOperationQuantity = num;
+      this.customQuantity = num.toString();
+      Toast.success(`已设置数量为 ${num}`);
     },
 
     // 确认单个物品操作
@@ -1146,6 +1240,7 @@ export default {
       this.currentOperationType = null;
       this.singleOperationQuantity = 1;
       this.singleOperationRemark = '';
+      this.customQuantity = ''; // 清空自定义输入
     },
 
     // 计算选中统计信息
@@ -1252,6 +1347,8 @@ export default {
         Toast('请选择要删除的物品');
         return;
       }
+
+      this.deletingItem = this.currentSelectedItem;
 
       // 检查库存数量
       if (this.currentSelectedItem.Current_Stock > 0) {
@@ -1806,6 +1903,32 @@ export default {
   font-weight: bold;
   min-width: 40px;
   text-align: center;
+}
+
+/* 新增：自定义输入区域样式 */
+.custom-input-section {
+  margin: 16px 0;
+  padding: 12px;
+  background-color: #f8f8f8;
+  border-radius: 8px;
+}
+
+.custom-input-section h5 {
+  margin: 0 0 8px 0;
+  font-size: 14px;
+  color: #666;
+}
+
+.quick-input-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.quick-input-buttons .van-button {
+  flex: 1;
+  min-width: 60px;
 }
 
 .quantity-preview {
