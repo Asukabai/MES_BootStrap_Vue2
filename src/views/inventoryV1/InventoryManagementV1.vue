@@ -1,77 +1,197 @@
 <template>
   <div class="inventory-page">
     <!-- 页面顶部搜索区域 -->
-    <div class="search-section search-top">
-      <div class="search-container">
-        <!-- 标签切换按钮（图标形式） -->
+    <div class="search-section">
+      <!-- 搜索标签切换 -->
+      <div class="search-tags-container">
         <div class="search-tags">
-          <van-icon
+          <div
             v-for="tag in searchTags"
             :key="tag.key"
-            :name="tag.icon"
-            :class="['tag-icon', { active: currentSearchTag === tag.key }]"
+            :class="['tag-item', { active: currentSearchTag === tag.key }]"
             @click="switchSearchTag(tag.key)"
+          >
+            <van-icon :name="tag.icon" class="tag-icon" />
+            <span class="tag-label">{{ tag.label }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 搜索输入区域 -->
+      <div class="search-input-container">
+        <div class="search-input-wrapper">
+          <van-field
+            v-model="searchValue"
+            :placeholder="getPlaceholder()"
+            class="search-input"
+            clearable
+            @keyup.enter="onSearch"
+            @clear="onSearch"
           />
         </div>
 
-        <!-- 搜索输入框 -->
-        <van-field
-          v-model="searchValue"
-          :placeholder="getPlaceholder()"
-          class="compact-search-input"
-          inputmode="search"
-          enterkeyhint="search"
-        >
-          <template #right-icon>
-            <van-icon name="search" @click="onSearch" />
-            <van-icon name="replay" @click="onReset" />
-          </template>
-        </van-field>
+        <!-- 操作按钮 -->
+        <div class="search-actions">
+          <!-- 搜索按钮 -->
+          <van-button
+            class="action-btn search-btn"
+            size="small"
+            round
+            @click="onSearch"
+          >
+            <van-icon name="search" />
+          </van-button>
+          <!-- 重置按钮 -->
+          <van-icon
+            name="replay"
+            class="action-btn reset-icon"
+            @click="onReset"
+          />
+          <!-- 筛选按钮 -->
+          <van-icon
+            name="filter-o"
+            class="action-btn filter-btn"
+            :class="{ active: isFilterActive }"
+            @click="toggleFilterPopup"
+          />
+        </div>
       </div>
 
-      <!-- 筛选下拉框 -->
-<!--      <div class="filter-container">-->
-<!--        <van-dropdown-menu>-->
-<!--          <van-dropdown-item-->
-<!--            v-model="filter.category"-->
-<!--            :options="categoryOptions"-->
-<!--            @change="onFilterChange"-->
-<!--          />-->
-<!--          <van-dropdown-item-->
-<!--            v-model="filter.status"-->
-<!--            :options="statusOptions"-->
-<!--            @change="onFilterChange"-->
-<!--          />-->
-<!--        </van-dropdown-menu>-->
-<!--      </div>-->
-      <!-- 筛选图标按钮 -->
-      <van-icon
-        name="filter-o"
-        class="filter-icon"
-        @click="showFilterPopover = true"
-      />
+      <!-- 当前筛选条件展示 -->
+      <div v-if="activeFilters.length > 0" class="active-filters">
+        <div class="filters-tags">
+          <van-tag
+            v-for="filter in activeFilters"
+            :key="filter.key"
+            type="primary"
+            size="medium"
+            closeable
+            @close="removeFilter(filter.key)"
+          >
+            {{ filter.label }}
+          </van-tag>
+        </div>
+        <van-button
+          type="primary"
+          size="mini"
+          plain
+          @click="clearAllFilters"
+        >
+          清空筛选
+        </van-button>
+      </div>
 
       <!-- 筛选弹出层 -->
-      <van-popup v-model="showFilterPopover" position="bottom" :style="{ height: '40%' }">
+      <van-popup
+        v-model="showFilterPopover"
+        position="bottom"
+        round
+        :style="{ height: '60%' }"
+      >
         <div class="filter-popup">
-          <h3>筛选条件</h3>
-          <van-cell-group>
-            <van-field
-              v-model="filter.category"
-              label="分类"
-              :options="categoryOptions"
-              @change="onFilterChange"
-            />
-            <van-field
-              v-model="filter.status"
-              label="公司"
-              :options="statusOptions"
-              @change="onFilterChange"
-            />
-          </van-cell-group>
-          <div class="filter-actions">
-            <van-button type="primary" @click="applyFilters">应用</van-button>
-            <van-button @click="resetFilters">重置</van-button>
+          <!-- 弹出层头部 -->
+          <div class="filter-popup-header">
+            <h3>筛选条件</h3>
+            <van-icon name="cross" @click="closeFilterPopup" />
+          </div>
+
+          <!-- 筛选内容 -->
+          <div class="filter-content">
+            <!-- 分类筛选 -->
+            <div class="filter-group">
+              <h4 class="filter-group-title">物品分类</h4>
+              <div class="filter-options">
+                <div
+                  v-for="option in categoryOptions"
+                  :key="option.value"
+                  :class="['filter-option', { active: filter.category === option.value }]"
+                  @click="filter.category = option.value"
+                >
+                  <div class="option-content">
+                    <div class="option-icon">
+                      <van-icon :name="getCategoryIcon(option.value)" />
+                    </div>
+                    <span class="option-text">{{ option.text }}</span>
+                  </div>
+                  <van-icon
+                    v-if="filter.category === option.value"
+                    name="success"
+                    class="check-icon"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 公司筛选 -->
+            <div class="filter-group">
+              <h4 class="filter-group-title">所属公司</h4>
+              <div class="filter-options">
+                <div
+                  v-for="option in companyOptions"
+                  :key="option.value"
+                  :class="['filter-option', { active: filter.company === option.value }]"
+                  @click="filter.company = option.value"
+                >
+                  <div class="option-content">
+                    <div class="option-icon">
+                      <van-icon name="building-o" />
+                    </div>
+                    <span class="option-text">{{ option.text }}</span>
+                  </div>
+                  <van-icon
+                    v-if="filter.company === option.value"
+                    name="success"
+                    class="check-icon"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <!-- 库存状态筛选 -->
+            <div class="filter-group">
+              <h4 class="filter-group-title">库存状态</h4>
+              <div class="filter-options">
+                <div
+                  v-for="option in stockStatusOptions"
+                  :key="option.value"
+                  :class="['filter-option', { active: filter.stockStatus === option.value }]"
+                  @click="filter.stockStatus = option.value"
+                >
+                  <div class="option-content">
+                    <div class="option-icon">
+                      <van-icon :name="getStockStatusIcon(option.value)" />
+                    </div>
+                    <span class="option-text">{{ option.text }}</span>
+                  </div>
+                  <van-icon
+                    v-if="filter.stockStatus === option.value"
+                    name="success"
+                    class="check-icon"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="filter-popup-actions">
+            <van-button
+              class="cancel-btn"
+              block
+              round
+              @click="resetFilters"
+            >
+              重置筛选
+            </van-button>
+            <van-button
+              class="confirm-btn"
+              type="primary"
+              block
+              round
+              @click="applyFilters"
+            >
+              应用筛选
+            </van-button>
           </div>
         </div>
       </van-popup>
@@ -396,44 +516,45 @@
       </div>
     </van-popup>
 
-    <CustomizableFloatingButton
-      :initial-position="{ bottom: 200, right: 10 }"
-      :icon-src="require('@/assets/返回.png')"
-      :background-size="46"
-      :icon-size="46"
-      :on-click="goBack"
-    />
-    <!-- 使用自定义图标悬浮按钮 -->
-    <CustomizableFloatingButton
-      :initial-position="{ bottom: 130, right: 10 }"
-      :icon-src="require('@/assets/高级检索.png')"
-      :background-size="46"
-      :icon-size="35"
-      :on-click="navigateToAdvancedSearch"
-    />
-    <!-- 使用自定义图标悬浮按钮 -->
-    <CustomizableFloatingButton
-      :initial-position="{ bottom: 60, right: 10 }"
-      :icon-src="require('@/assets/新增图标.png')"
-      :background-size="46"
-      :icon-size="46"
-      :on-click="onFloatingButtonClick"
-    />
+    <!-- 悬浮按钮区域 -->
+    <div class="floating-buttons">
+      <CustomizableFloatingButton
+        :initial-position="{ bottom: 200, right: 10 }"
+        :icon-src="require('@/assets/返回.png')"
+        :background-size="46"
+        :icon-size="46"
+        :on-click="goBack"
+      />
+      <CustomizableFloatingButton
+        :initial-position="{ bottom: 130, right: 10 }"
+        :icon-src="require('@/assets/高级检索.png')"
+        :background-size="46"
+        :icon-size="35"
+        :on-click="navigateToAdvancedSearch"
+      />
+      <CustomizableFloatingButton
+        :initial-position="{ bottom: 60, right: 10 }"
+        :icon-src="require('@/assets/新增图标.png')"
+        :background-size="46"
+        :icon-size="46"
+        :on-click="onFloatingButtonClick"
+      />
+    </div>
   </div>
 </template>
 
 <script>
-import {Dialog, Toast, ImagePreview} from 'vant';
+import { Dialog, Toast, ImagePreview } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import FloatingActionButton from '../../components/FloatingActionButton.vue';
-import {key_DingScannedInventoryQRCodeResult} from "../../utils/Dingding";
+import { key_DingScannedInventoryQRCodeResult } from "../../utils/Dingding";
 import SensorRequestPage from "../../utils/SensorRequestPage";
-import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue"; // 引入组件
-import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
+import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
+import { key_DingName, key_DingUserIndex, key_DingUserPhone } from "../../utils/Dingding";
 
 // 添加 Promise.allSettled 的 polyfill
 if (!Promise.allSettled) {
-  Promise.allSettled = function(promises) {
+  Promise.allSettled = function (promises) {
     return Promise.all(promises.map(p =>
       Promise.resolve(p).then(value => ({
         status: 'fulfilled',
@@ -450,12 +571,12 @@ export default {
   name: 'InventoryManagementV1',
   components: {
     CustomizableFloatingButton,
-    FloatingActionButton // 注册组件
+    FloatingActionButton
   },
   data() {
     return {
-      isNavigating: false, // 添加导航状态标识
-      searchValue: this.getStoredSearchValue(), // 从本地存储获取搜索值
+      isNavigating: false,
+      searchValue: this.getStoredSearchValue(),
       hasSearched: false,
       showInboundPopup: false,
       showOutboundPopup: false,
@@ -463,31 +584,46 @@ export default {
       showOutboundTypePicker: false,
       showProjectPicker: false,
       showOutboundProjectPicker: false,
+
+      // 筛选相关数据
+      showFilterPopover: false,
       filter: {
-        category: this.getStoredFilterValue('category'), // 从本地存储获取筛选值
-        status: this.getStoredFilterValue('status')
+        category: this.getStoredFilterValue('category'),
+        company: this.getStoredFilterValue('company'),
+        stockStatus: this.getStoredFilterValue('stockStatus')
       },
-      currentSearchTag: 'itemName', // 当前选中的搜索标签，默认为“物品名称”
+
+      currentSearchTag: 'itemName',
       searchTags: [
         { key: 'itemName', label: '物品名称', icon: 'apps-o' },
-        { key: 'itemModel', label: '型号', icon: 'setting-o' },
-        { key: 'company', label: '公司', icon: 'contact' },
+        { key: 'itemModel', label: '物品型号', icon: 'setting-o' },
+        { key: 'company', label: '公司', icon: 'building-o' },
         { key: 'location', label: '位置', icon: 'location-o' }
       ],
-      // 下拉菜单选项
+
+      // 筛选选项
       categoryOptions: [
-        { text: '全部分类', value: '' },
-        { text: '耗材', value: '耗材' },
-        { text: '公用', value: '公用' },
-        { text: '项目', value: '项目' },
-        { text: '其他', value: '其他' }
+        { text: '全部类型', value: '', icon: 'apps-o' },
+        { text: '耗材', value: '耗材', icon: 'send-gift-o' },
+        { text: '公用', value: '公用', icon: 'share-o' },
+        { text: '项目', value: '项目', icon: 'todo-list-o' },
+        { text: '其他', value: '其他', icon: 'ellipsis' }
       ],
-      statusOptions: [
-        { text: '全部公司', value: '' },
-        { text: '晟思', value: '晟思' },
-        { text: '大钧', value: '大钧' },
-        { text: '星移', value: '星移' }
+      companyOptions: [
+        { text: '全部公司', value: '', icon: 'building-o' },
+        { text: '晟思智能', value: '晟思智能', icon: 'home-o' },
+        { text: '大钧科技', value: '大钧科技', icon: 'shop-o' },
+        { text: '星移科技', value: '星移科技', icon: 'star-o' },
+        { text: '总公司', value: '总公司', icon: 'gem-o' }
       ],
+      stockStatusOptions: [
+        { text: '全部状态', value: '', icon: 'bars' },
+        { text: '库存充足', value: '充足', icon: 'good-job-o' },
+        { text: '库存紧张', value: '紧张', icon: 'warning-o' },
+        { text: '库存为零', value: '为零', icon: 'minus-o' },
+        { text: '库存异常', value: '异常', icon: 'clear-o' }
+      ],
+
       inboundTypeColumns: [
         { text: '采购入库', value: 1 },
         { text: '生产入库', value: 2 },
@@ -516,30 +652,25 @@ export default {
       inboundRemark: '',
       outboundRemark: '',
       outboundError: '',
-      showDeleteConfirm: false, // 控制删除确认弹窗显示
-      showStockCheckDialog: false, // 控制库存检查弹窗显示
-      deletingItem: null, // 正在删除的项目
+      showDeleteConfirm: false,
+      showStockCheckDialog: false,
+      deletingItem: null,
 
-      // 修改：操作记录改为对象数组，包含操作类型
-      selectedOperations: [], // 选中的操作列表 [{item, operationType, quantity, remark}]
-      isSelectMode: false, // 是否处于选择模式
+      selectedOperations: [],
+      isSelectMode: false,
 
-      // 新增：单个物品操作相关
-      showSingleOperationPopup: false,     // 单个物品操作弹窗
-      currentSelectedItem: null,           // 当前选中的物品
-      currentOperationType: null,          // 当前操作类型（inbound/outbound）
-      singleOperationQuantity: 1,          // 单个物品操作数量
-      singleOperationRemark: '',           // 单个物品操作备注
+      showSingleOperationPopup: false,
+      currentSelectedItem: null,
+      currentOperationType: null,
+      singleOperationQuantity: 1,
+      singleOperationRemark: '',
 
-      // 新增：自定义输入相关
-      customQuantity: '',                   // 自定义输入的数量
-      quickNumbers: [5, 10, 20, 50, 100],   // 快速输入的数字
+      customQuantity: '',
+      quickNumbers: [5, 10, 20, 50, 100],
 
-      // 修改：批量操作相关
-      showBatchConfirmPopup: false,        // 批量确认弹窗
-      batchOperationLoading: false,        // 批量操作加载状态
+      showBatchConfirmPopup: false,
+      batchOperationLoading: false,
 
-      // 新增：图片预览相关
       showImagePreview: false,
       previewImages: [],
       previewStartPos: 0
@@ -548,7 +679,7 @@ export default {
   created() {
     this.loadProjectOptions();
     // 如果有存储的搜索值或筛选值，自动执行搜索
-    if (this.searchValue || this.filter.category || this.filter.status) {
+    if (this.searchValue || this.filter.category || this.filter.company || this.filter.stockStatus) {
       this.$nextTick(() => {
         this.hasSearched = true;
         this.onLoad();
@@ -566,7 +697,6 @@ export default {
         `物品 "${this.deletingItem.Item_Name}" 当前库存为 ${this.deletingItem.Current_Stock}，请先将库存清零后再删除。` :
         '当前物品库存不为零，请先清空库存后再删除。';
     },
-    // 批量操作统计
     batchOperationStats() {
       const inboundCount = this.selectedOperations.filter(op => op.operationType === 'inbound').length;
       const outboundCount = this.selectedOperations.filter(op => op.operationType === 'outbound').length;
@@ -576,7 +706,6 @@ export default {
         outbound: outboundCount
       };
     },
-    // 计算操作后库存 - 修复模板编译错误
     postOperationStock() {
       if (!this.currentOperationType || !this.currentSelectedItem) {
         return 0;
@@ -592,31 +721,145 @@ export default {
       }
 
       return currentStock;
+    },
+
+    // 新增计算属性：判断是否有激活的筛选条件
+    isFilterActive() {
+      return this.filter.category || this.filter.company || this.filter.stockStatus;
+    },
+
+    // 新增计算属性：当前激活的筛选标签
+    activeFilters() {
+      const filters = [];
+
+      if (this.filter.category) {
+        const option = this.categoryOptions.find(opt => opt.value === this.filter.category);
+        if (option) {
+          filters.push({
+            key: 'category',
+            label: `分类: ${option.text}`,
+            value: this.filter.category
+          });
+        }
+      }
+
+      if (this.filter.company) {
+        const option = this.companyOptions.find(opt => opt.value === this.filter.company);
+        if (option) {
+          filters.push({
+            key: 'company',
+            label: `公司: ${option.text}`,
+            value: this.filter.company
+          });
+        }
+      }
+
+      if (this.filter.stockStatus) {
+        const option = this.stockStatusOptions.find(opt => opt.value === this.filter.stockStatus);
+        if (option) {
+          filters.push({
+            key: 'stockStatus',
+            label: `状态: ${option.text}`,
+            value: this.filter.stockStatus
+          });
+        }
+      }
+
+      return filters;
     }
   },
   methods: {
     // 切换搜索标签
     switchSearchTag(tagKey) {
       this.currentSearchTag = tagKey;
-      this.searchValue = ''; // 切换标签时清空搜索框内容
+      // 切换标签时不清空搜索值，但需要重新执行搜索
+      if (this.searchValue) {
+        this.onSearch();
+      }
     },
 
-    // 动态生成 placeholder
+    // 获取占位符文本
     getPlaceholder() {
-      const tagMap = {
-        itemName: '请输入库存物品关键词',
-        itemModel: '请输入物品型号',
-        company: '请输入公司名称',
-        location: '请输入位置信息'
+      const placeholderMap = {
+        itemName: '搜索物品名称...',
+        itemModel: '搜索物品型号...',
+        company: '搜索公司名称...',
+        location: '搜索位置信息...'
       };
-      return tagMap[this.currentSearchTag] || '请输入搜索内容';
+      return placeholderMap[this.currentSearchTag] || '搜索...';
     },
+
+    // 获取分类图标
+    getCategoryIcon(value) {
+      const iconMap = {
+        '': 'apps-o',
+        '耗材': 'send-gift-o',
+        '公用': 'share-o',
+        '项目': 'todo-list-o',
+        '其他': 'ellipsis'
+      };
+      return iconMap[value] || 'apps-o';
+    },
+
+    // 获取库存状态图标
+    getStockStatusIcon(value) {
+      const iconMap = {
+        '': 'bars',
+        '充足': 'good-job-o',
+        '紧张': 'warning-o',
+        '为零': 'minus-o',
+        '异常': 'clear-o'
+      };
+      return iconMap[value] || 'bars';
+    },
+
+    // 切换筛选弹出层
+    toggleFilterPopup() {
+      this.showFilterPopover = !this.showFilterPopover;
+    },
+
+    // 关闭筛选弹出层
+    closeFilterPopup() {
+      this.showFilterPopover = false;
+    },
+
+    // 应用筛选
+    applyFilters() {
+      this.saveFilterValue();
+      this.showFilterPopover = false;
+      this.onSearch();
+    },
+
+    // 重置筛选
+    resetFilters() {
+      this.filter = {
+        category: '',
+        company: '',
+        stockStatus: ''
+      };
+      this.showFilterPopover = false;
+    },
+
+    // 移除单个筛选条件
+    removeFilter(filterKey) {
+      this.filter[filterKey] = '';
+      this.saveFilterValue();
+      this.onSearch();
+    },
+
+    // 清除所有筛选条件
+    clearAllFilters() {
+      this.resetFilters();
+      this.saveFilterValue();
+      this.onSearch();
+    },
+
     // 返回上一页
     goBack() {
-      // 清除本地存储的搜索状态
       this.clearStoredSearchState();
       this.navigateTo('/index');
     },
+
     // 跳转到高级检索页面
     navigateToAdvancedSearch() {
       const department = this.$route.params.department;
@@ -627,6 +870,7 @@ export default {
         this.$toast.fail('路由参数缺失');
       }
     },
+
     navigateTo(path) {
       const department = this.$route.params.department;
       if (department) {
@@ -636,13 +880,11 @@ export default {
         this.$toast.fail('路由参数缺失');
       }
     },
+
     onFloatingButtonClick() {
-      // 防止重复点击
       if (this.isNavigating) return;
       this.isNavigating = true;
-      // alert('点击了悬浮按钮')
       this.navigateTo('/inventory/addV1');
-      // 延迟重置导航状态
       setTimeout(() => {
         this.isNavigating = false;
       }, 10);
@@ -665,29 +907,31 @@ export default {
 
     // 保存筛选值到本地存储
     saveFilterValue() {
-      localStorage.setItem('inventoryFilter_category', this.filter.category);
-      localStorage.setItem('inventoryFilter_status', this.filter.status);
+      Object.keys(this.filter).forEach(key => {
+        localStorage.setItem(`inventoryFilter_${key}`, this.filter[key]);
+      });
     },
 
     // 清除本地存储的搜索状态
     clearStoredSearchState() {
       localStorage.removeItem('inventorySearchValue');
-      localStorage.removeItem('inventoryFilter_category');
-      localStorage.removeItem('inventoryFilter_status');
+      Object.keys(this.filter).forEach(key => {
+        localStorage.removeItem(`inventoryFilter_${key}`);
+      });
     },
 
-    // 修改 onSearch 方法以支持多类型搜索
+    // 搜索方法
     onSearch() {
-      if (this.searchValue || this.filter.category || this.filter.status) {
+      if (this.searchValue || this.isFilterActive) {
         this.saveSearchValue();
         this.saveFilterValue();
         this.hasSearched = true;
         this.currentPage = 1;
         this.list = [];
         this.finished = false;
-        this.clearSelection(); // 清除选择状态
+        this.clearSelection();
 
-        // 构造请求参数时根据当前搜索标签动态赋值
+        // 构造请求参数
         const param = {
           PageIndex: this.currentPage - 1,
           PageSize: this.pageSize,
@@ -696,57 +940,28 @@ export default {
           Company: this.currentSearchTag === 'company' ? this.searchValue : '',
           Shelf_Location: this.currentSearchTag === 'location' ? this.searchValue : '',
           Category_Type: this.filter.category,
-          Company_Filter: this.filter.status
+          Company_Filter: this.filter.company
+          // 注意：stockStatus 筛选需要后端接口支持
         };
 
-        this.onLoad(param); // 传递动态参数
+        this.onLoad(param);
       } else {
         Toast('请输入搜索关键词或选择筛选条件');
       }
     },
-    resetFilter() {
-      this.filter = {
-        category: '',
-        status: ''
-      };
-    },
 
-    // 新增筛选变化处理方法
-    onFilterChange() {
-      if (this.searchValue || this.filter.category || this.filter.status) {
-        this.saveFilterValue();
-        this.onSearch();
-      } else {
-        // 如果只是清除筛选，也要重置选择状态
-        this.clearSelection();
-      }
-    },
-
-    // 新增重置按钮处理方法
+    // 重置搜索
     onReset() {
-      // 清空搜索关键词
       this.searchValue = '';
-
-      // 重置筛选条件
-      this.filter = {
-        category: '',
-        status: ''
-      };
-
-      // 重置分页和数据状态
+      this.resetFilters();
       this.currentPage = 1;
       this.list = [];
       this.finished = false;
       this.hasSearched = false;
-
-      // 重置选择状态
       this.clearSelection();
-
-      // 清除本地存储的搜索状态
       this.clearStoredSearchState();
-
-      // 重新加载数据
       this.onLoad();
+      Toast('已重置搜索和筛选条件');
     },
 
     loadProjectOptions() {
@@ -760,25 +975,25 @@ export default {
       });
     },
 
-    // 修改 onLoad 方法以预加载图片 URL
-    onLoad() {
+    // 加载数据
+    onLoad(param) {
       return new Promise((resolve) => {
         this.loading = true;
 
         // 构造请求参数，按照后端接口要求的格式
-        const param = {
-          PageIndex: this.currentPage - 1, // 后端可能使用0基索引
+        const requestParam = param || {
+          PageIndex: this.currentPage - 1,
           PageSize: this.pageSize,
-          Item_Name: this.searchValue, // 搜索关键词对应物品名称
-          Shelf_Location: "", // 货架位置搜索
-          Item_Model: "", // 物品型号搜索
-          Item_Brand: "", // 物品品牌搜索
-          Category_Type: this.filter.category, // 分类筛选
-          Company: this.filter.status // 公司筛选
+          Item_Name: this.searchValue,
+          Shelf_Location: "",
+          Item_Model: "",
+          Item_Brand: "",
+          Category_Type: this.filter.category,
+          Company: this.filter.company
         };
 
         // 调用后端接口获取库存数据
-        SensorRequestPage.InventoryItemGetFun(JSON.stringify(param), (respData) => {
+        SensorRequestPage.InventoryItemGetFun(JSON.stringify(requestParam), (respData) => {
           try {
             let parsedData = null;
 
@@ -899,7 +1114,7 @@ export default {
       this.currentPage = 1;
       this.list = [];
       this.finished = false;
-      this.clearSelection(); // 清除选择状态
+      this.clearSelection();
       this.onLoad().then(() => {
         this.refreshing = false;
       }).catch(() => {
@@ -920,7 +1135,7 @@ export default {
       }
     },
 
-    // 新增：预览图片
+    // 预览图片
     previewImage(item) {
       // 获取当前物品的所有图片
       const images = [];
@@ -1075,7 +1290,7 @@ export default {
             }
           } catch (error) {
             console.error('解析库存信息响应失败:', error);
-            Toast('数据解析失败，无法确认删除'+ error);
+            Toast('数据解析失败，无法确认删除' + error);
             this.showDeleteConfirm = false;
             this.deletingItem = null;
           }
@@ -1117,14 +1332,15 @@ export default {
         }
       );
     },
+
     // 添加删除记录的方法
     addDeletionRecord() {
       // 构造删除操作的事务请求参数
       const requestData = {
         PageIndex: 0,
         PageSize: 10,
-        Inventory_ID: this.deletingItem.Id, // 使用删除项目的ID作为库存ID
-        Transaction_Type: "删除", // 操作类型为"删除"
+        Inventory_ID: this.deletingItem.Id,
+        Transaction_Type: "删除",
         Quantity_Change: 0,
         Current_Quantity: 0,
         Report_Person: {
@@ -1167,6 +1383,7 @@ export default {
       this.showStockCheckDialog = false;
       this.deletingItem = null;
     },
+
     // 图片加载失败时的处理
     onImageError(event) {
       event.target.src = require('@/assets/暂无图片1.png');
@@ -1306,7 +1523,7 @@ export default {
       this.currentOperationType = null;
       this.singleOperationQuantity = 1;
       this.singleOperationRemark = '';
-      this.customQuantity = ''; // 清空自定义输入
+      this.customQuantity = '';
     },
 
     // 计算选中统计信息
@@ -1320,6 +1537,7 @@ export default {
         outbound: outboundOps.length
       };
     },
+
     // 显示批量确认弹窗
     showBatchConfirmation() {
       if (this.selectedOperations.length === 0) {
@@ -1328,12 +1546,13 @@ export default {
       }
       this.showBatchConfirmPopup = true;
     },
+
     // 关闭批量确认弹窗
     closeBatchConfirmation() {
       this.showBatchConfirmPopup = false;
     },
+
     // 执行批量操作
-    // 修改 executeBatchOperations 方法
     async executeBatchOperations() {
       if (this.selectedOperations.length === 0) {
         Toast('没有待处理的操作');
@@ -1407,6 +1626,7 @@ export default {
         );
       });
     },
+
     // 新增删除点击事件
     handleDeleteClick() {
       if (!this.currentSelectedItem) {
@@ -1418,185 +1638,328 @@ export default {
 
       // 检查库存数量
       if (this.currentSelectedItem.Current_Stock > 0) {
-        this.showStockCheckDialog = true; // 显示库存检查弹窗
+        this.showStockCheckDialog = true;
       } else {
-        this.showDeleteConfirm = true; // 显示删除确认弹窗
+        this.showDeleteConfirm = true;
       }
 
-      this.closeSingleOperationPopup(); // 关闭当前弹窗
+      this.closeSingleOperationPopup();
     }
   }
 };
 </script>
 
 <style scoped>
-
-.search-tags {
-  display: flex;
-  gap: 12px;
-  justify-content: center;
-  margin-bottom: 12px;
+.inventory-page {
+  min-height: 100vh;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
 }
 
-.tag-icon {
-  font-size: 20px;
-  color: #999;
-  transition: all 0.3s ease;
-}
-
-.tag-icon.active {
-  color: #1989fa;
-  transform: scale(1.2);
-}
-
-
-.filter-icon {
-  font-size: 24px;
-  color: #1989fa;
-  cursor: pointer;
-}
-
-.filter-popup {
-  padding: 16px;
-}
-
-.filter-actions {
-  display: flex;
-  gap: 12px;
-  margin-top: 16px;
-}
-
-
-.compact-search-input {
-  border-radius: 25px;
-  background-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
-}
-
-.compact-search-input .van-field__right-icon {
-  display: flex;
-  gap: 8px;
-}
-
-.search-container {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  align-items: center;
-}
-
-.search-container > * {
-  flex: 1 1 auto;
-  min-width: 100px;
-}
-
-
-.search-tags {
-  display: flex;
-  gap: 8px;
-  margin-bottom: 12px;
-  flex-wrap: wrap;
-}
-
-.search-tags .van-button {
-  flex: 1;
-  min-width: 80px;
-}
-
-
-
-/* 图标按钮通用样式 */
-.icon-button {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
-  transition: all 0.3s ease;
-}
-
-.icon-button:active {
-  transform: scale(0.95);
-}
-
-/* 搜索按钮特殊样式 */
-.search-icon-btn {
-  background: #1989fa;
-  border: none;
-}
-
-/* 重置按钮特殊样式 */
-.reset-icon-btn {
-  background: #f5f5f5;
-  border: 1px solid #ddd;
-}
-
-
+/* 搜索区域样式 */
 .search-section {
   position: sticky;
   top: 0;
   z-index: 1000;
-  background: #3f83f8;
+  background: linear-gradient(135deg, #3f83f8 0%, #2c6be0 100%);
   padding: 16px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  border-bottom-left-radius: 20px;
-  border-bottom-right-radius: 20px;
+  border-bottom-left-radius: 24px;
+  border-bottom-right-radius: 24px;
+  box-shadow: 0 8px 24px rgba(63, 131, 248, 0.2);
 }
 
-.search-container {
+/* 搜索标签容器 */
+.search-tags-container {
+  margin-bottom: 16px;
+}
+
+.search-tags {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.tag-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 20px;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+}
+
+.tag-item:hover {
+  background: rgba(255, 255, 255, 0.25);
+  transform: translateY(-2px);
+}
+
+.tag-item.active {
+  background: #ffffff;
+  color: #3f83f8;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.tag-icon {
+  font-size: 16px;
+}
+
+.tag-label {
+  font-weight: 500;
+}
+
+/* 搜索输入容器 */
+.search-input-container {
   display: flex;
   gap: 12px;
   align-items: center;
+  margin-bottom: 16px;
+}
+
+.search-input-wrapper {
+  flex: 1;
+  position: relative;
+  background: #ffffff;
+  border-radius: 25px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+.search-input-wrapper:focus-within {
+  box-shadow: 0 4px 16px rgba(63, 131, 248, 0.3);
+  transform: translateY(-2px);
+}
+
+.search-icon {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #3f83f8;
+  z-index: 1;
+  font-size: 18px;
 }
 
 .search-input {
-  flex: 1;
-  border: 2px solid #fff;
-  border-radius: 25px;
-  background-color: rgba(255, 255, 255, 0.9);
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding-left: 48px !important;
+  padding-right: 16px !important;
+  background: transparent !important;
+  border: none !important;
+  height: 48px;
+  font-size: 15px;
 }
 
-.search-btn, .reset-btn {
-  border-radius: 25px;
-  padding: 10px 20px;
-  font-weight: 500;
-  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+.search-input::placeholder {
+  color: #a0aec0;
+}
+
+/* 操作按钮 */
+.search-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.action-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #ffffff;
+  color: #3f83f8;
+  font-size: 20px;
+  cursor: pointer;
   transition: all 0.3s ease;
-  border: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
 }
 
-.search-btn {
-  background: white;
-  color: black;
+.action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.12);
+}
+
+.action-btn.active {
+  background: #3f83f8;
+  color: #ffffff;
 }
 
 .reset-btn {
-  background: white;
-  color: black;
+  width: auto;
+  padding: 0 20px;
+  font-size: 14px;
+  font-weight: 500;
+  background: rgba(255, 255, 255, 0.2);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
 }
 
-.search-btn:active, .reset-btn:active {
-  transform: translateY(2px);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+.reset-btn:hover {
+  background: rgba(255, 255, 255, 0.3);
 }
 
-.inventory-page {
-  min-height: 100vh;
-  background-color: #f5f5f5;
+/* 激活的筛选条件展示 */
+.active-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.search-top {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+.filters-tags {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
-.filter-container {
-  padding: 8px 12px;
+/* 筛选弹出层样式 */
+.filter-popup {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.filter-popup-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 16px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.filter-popup-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #333;
+  font-weight: 600;
+}
+
+.filter-popup-header .van-icon {
+  font-size: 20px;
+  color: #999;
+  cursor: pointer;
+}
+
+/* 筛选内容 */
+.filter-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.filter-group {
+  margin-bottom: 24px;
+}
+
+.filter-group-title {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  color: #333;
+  font-weight: 600;
+}
+
+.filter-options {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.filter-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px;
+  background: #f8f9fa;
+  border: 2px solid #e9ecef;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.filter-option:hover {
+  border-color: #3f83f8;
+  background: #f0f7ff;
+}
+
+.filter-option.active {
+  border-color: #3f83f8;
+  background: #f0f7ff;
+}
+
+.option-content {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.option-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  border-radius: 8px;
+  color: #3f83f8;
+}
+
+.filter-option.active .option-icon {
+  background: #3f83f8;
+  color: #ffffff;
+}
+
+.option-text {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.filter-option.active .option-text {
+  color: #3f83f8;
+}
+
+.check-icon {
+  color: #3f83f8;
+  font-size: 16px;
+}
+
+/* 筛选操作按钮 */
+.filter-popup-actions {
+  display: flex;
+  gap: 12px;
+  padding: 16px;
+  border-top: 1px solid #f0f0f0;
+  background: #ffffff;
+}
+
+.filter-popup-actions .van-button {
+  flex: 1;
+  height: 48px;
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.cancel-btn {
+  border: 2px solid #e9ecef;
+  color: #666;
+}
+
+.confirm-btn {
+  background: linear-gradient(135deg, #3f83f8 0%, #2c6be0 100%);
+  border: none;
+}
+
+/* 结果列表区域 */
+.results-section {
+  padding: 16px;
+  background: linear-gradient(135deg, #f5f7fa 0%, #e4edf5 100%);
 }
 
 /* 批量操作栏样式 */
@@ -1623,10 +1986,7 @@ export default {
   gap: 8px;
 }
 
-.results-section {
-  padding: 10px;
-}
-
+/* 单元格样式 */
 .inventory-cell {
   margin-bottom: 12px;
   border-radius: 8px;
@@ -1635,7 +1995,6 @@ export default {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-/* 新增样式：物品名称独占一行 */
 .item-title {
   font-size: 16px;
   font-weight: 500;
@@ -1646,36 +2005,15 @@ export default {
 
 .cell-content {
   display: flex;
-  flex-direction: column; /* 主轴方向为纵向 */
+  flex-direction: column;
   padding: 8px;
   position: relative;
   cursor: pointer;
 }
 
 .content-row {
-  display: flex; /* 子元素横向排列 */
+  display: flex;
   width: 100%;
-}
-
-.image-section {
-  width: 30%; /* 左侧图片区域占30% */
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding-right: 8px;
-  cursor: zoom-in;
-}
-
-.info-section {
-  width: 70%; /* 右侧信息区域占70% */
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.cell-content:hover {
-  background-color: #f8f8f8; /* 鼠标悬停时的视觉反馈 */
 }
 
 .image-section {
@@ -1684,7 +2022,19 @@ export default {
   align-items: center;
   justify-content: center;
   padding-right: 8px;
-  cursor: zoom-in; /* 表示图片可点击预览 */
+  cursor: zoom-in;
+}
+
+.info-section {
+  width: 70%;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.cell-content:hover {
+  background-color: #f8f8f8;
 }
 
 .item-image {
@@ -1695,15 +2045,7 @@ export default {
   border: 1px solid #eee;
 }
 
-.info-section {
-  width: 70%; /* 恢复原始宽度，不再减去复选框的宽度 */
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-/* 角落选择复选框样式 - 放在右上角，与删除按钮并列 */
+/* 角落选择复选框样式 */
 .select-checkbox-corner {
   background-color: rgba(255, 255, 255, 0.9);
   border-radius: 50%;
@@ -1714,21 +2056,21 @@ export default {
   justify-content: center;
   cursor: pointer;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-  margin-bottom: 8px; /* 增加底部间距，避免与删除按钮重叠 */
+  margin-bottom: 8px;
 }
 
 /* 删除按钮样式 */
 .delete-btn {
-  background-color: rgba(255, 255, 255, 0.9); /* 与复选框背景色一致 */
-  border-radius: 50%; /* 圆形按钮 */
-  width: 24px; /* 与复选框尺寸一致 */
-  height: 24px; /* 与复选框尺寸一致 */
+  background-color: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2); /* 与复选框阴影一致 */
-  margin-bottom: 8px; /* 与复选框间距一致 */
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  margin-bottom: 8px;
   transition: background-color 0.2s;
 }
 
@@ -1745,25 +2087,8 @@ export default {
   position: absolute;
   right: -10px;
   display: flex;
-  flex-direction: column; /* 纵向排列 */
-  z-index: 2;
-}
-
-.cell-header {
-  display: flex;
   flex-direction: column;
-  align-items: flex-start;
-  margin-bottom: 4px;
-}
-
-.item-title {
-  font-size: 14px;
-  font-weight: 500;
-  color: #333;
-  flex: 1;
-  margin-right: 4px;
-  line-height: 1.3;
-  margin-bottom: 4px;
+  z-index: 2;
 }
 
 /* 型号和库存信息分行显示 */
@@ -1798,6 +2123,7 @@ export default {
   font-weight: 600;
 }
 
+/* 公司和位置信息 */
 .cell-body {
   display: flex;
   flex-direction: column;
@@ -1838,133 +2164,9 @@ export default {
   white-space: nowrap;
 }
 
-/* 隐藏原有的按钮区域 */
-.cell-footer {
-  display: none;
-}
-
+/* 空状态 */
 .empty-state {
   padding: 50px 16px;
-}
-
-.quick-operation-popup {
-  padding: 16px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.popup-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.item-info {
-  padding: 12px;
-  background-color: #f8f8f8;
-  border-radius: 8px;
-  margin-bottom: 16px;
-}
-
-.item-name {
-  font-size: 16px;
-  font-weight: 500;
-  margin-bottom: 8px;
-}
-
-.item-details {
-  font-size: 14px;
-  color: #666;
-  margin-bottom: 8px;
-}
-
-.stock-info, .max-outbound {
-  font-size: 14px;
-  color: #333;
-}
-
-.popup-actions {
-  margin-top: auto;
-  display: flex;
-  gap: 12px;
-}
-
-.popup-actions .van-button {
-  flex: 1;
-}
-
-.stock-display {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-}
-
-.quick-actions {
-  display: flex;
-  gap: 8px;
-  margin-top: 8px;
-}
-
-.quick-actions .van-button {
-  width: 30px;
-  height: 30px;
-  padding: 0;
-}
-
-/* 批量操作弹窗样式 */
-.batch-operation-popup {
-  padding: 16px;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-}
-
-.batch-operation-popup .popup-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 16px;
-  font-size: 16px;
-  font-weight: 500;
-}
-
-.selected-items-summary {
-  margin-bottom: 16px;
-}
-
-.selected-items-summary p {
-  font-weight: bold;
-  margin-bottom: 8px;
-}
-
-.selected-list {
-  max-height: 150px;
-  overflow-y: auto;
-}
-
-.selected-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px;
-  border-bottom: 1px solid #eee;
-}
-
-.selected-item .current-stock {
-  color: #999;
-  font-size: 12px;
-}
-
-.operation-form {
-  flex: 1;
-  overflow-y: auto;
-}
-
-.action-buttons {
-  margin-top: 16px;
 }
 
 /* 单个物品操作弹窗样式 */
@@ -2075,7 +2277,7 @@ export default {
   text-align: center;
 }
 
-/* 新增：自定义输入区域样式 */
+/* 自定义输入区域样式 */
 .custom-input-section {
   margin: 16px 0;
   padding: 12px;
@@ -2212,5 +2414,44 @@ export default {
   height: 35px;
   top: 15px;
   right: 15px;
+}
+
+/* 悬浮按钮区域 */
+.floating-buttons {
+  position: fixed;
+  bottom: 0;
+  right: 0;
+  z-index: 999;
+}
+
+/* 响应式调整 */
+@media (max-width: 480px) {
+  .search-tags {
+    gap: 6px;
+  }
+
+  .tag-item {
+    padding: 6px 12px;
+    font-size: 12px;
+  }
+
+  .search-input-container {
+    gap: 8px;
+  }
+
+  .action-btn {
+    width: 44px;
+    height: 44px;
+    font-size: 18px;
+  }
+
+  .reset-btn {
+    padding: 0 16px;
+    font-size: 13px;
+  }
+
+  .filter-options {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
