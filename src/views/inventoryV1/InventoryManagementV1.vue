@@ -3,10 +3,23 @@
     <!-- 页面顶部搜索区域 -->
     <div class="search-section search-top">
       <div class="search-container">
+        <!-- 标签切换按钮 -->
+        <div class="search-tags">
+          <van-button
+            v-for="tag in searchTags"
+            :key="tag.key"
+            size="small"
+            :type="currentSearchTag === tag.key ? 'primary' : 'default'"
+            @click="switchSearchTag(tag.key)"
+          >
+            {{ tag.label }}
+          </van-button>
+        </div>
+
         <!-- 搜索输入框 -->
         <van-field
           v-model="searchValue"
-          placeholder="请输入库存物品关键词"
+          :placeholder="getPlaceholder()"
           class="search-input"
           inputmode="search"
           enterkeyhint="search"
@@ -14,19 +27,19 @@
         <!-- 搜索按钮 -->
         <van-button
           type="primary"
-          class="search-btn"
+          class="icon-button search-icon-btn"
           @click="onSearch"
         >
-          搜索
+          <van-icon name="search" size="20" color="#fff" />
         </van-button>
 
         <!-- 重置按钮 -->
         <van-button
           type="default"
-          class="reset-btn"
+          class="icon-button reset-icon-btn"
           @click="onReset"
         >
-          重置
+          <van-icon name="replay" size="20" color="#333" />
         </van-button>
       </div>
 
@@ -437,6 +450,13 @@ export default {
         category: this.getStoredFilterValue('category'), // 从本地存储获取筛选值
         status: this.getStoredFilterValue('status')
       },
+      currentSearchTag: 'itemName', // 当前选中的搜索标签，默认为“物品名称”
+      searchTags: [
+        { key: 'itemName', label: '物品名称' },
+        { key: 'itemModel', label: '型号' },
+        { key: 'company', label: '公司' },
+        { key: 'location', label: '位置' }
+      ],
       // 下拉菜单选项
       categoryOptions: [
         { text: '全部分类', value: '' },
@@ -558,6 +578,22 @@ export default {
     }
   },
   methods: {
+    // 切换搜索标签
+    switchSearchTag(tagKey) {
+      this.currentSearchTag = tagKey;
+      this.searchValue = ''; // 切换标签时清空搜索框内容
+    },
+
+    // 动态生成 placeholder
+    getPlaceholder() {
+      const tagMap = {
+        itemName: '请输入库存物品关键词',
+        itemModel: '请输入物品型号',
+        company: '请输入公司名称',
+        location: '请输入位置信息'
+      };
+      return tagMap[this.currentSearchTag] || '请输入搜索内容';
+    },
     // 返回上一页
     goBack() {
       // 清除本地存储的搜索状态
@@ -623,6 +659,7 @@ export default {
       localStorage.removeItem('inventoryFilter_status');
     },
 
+    // 修改 onSearch 方法以支持多类型搜索
     onSearch() {
       if (this.searchValue || this.filter.category || this.filter.status) {
         this.saveSearchValue();
@@ -632,12 +669,24 @@ export default {
         this.list = [];
         this.finished = false;
         this.clearSelection(); // 清除选择状态
-        this.onLoad();
+
+        // 构造请求参数时根据当前搜索标签动态赋值
+        const param = {
+          PageIndex: this.currentPage - 1,
+          PageSize: this.pageSize,
+          Item_Name: this.currentSearchTag === 'itemName' ? this.searchValue : '',
+          Item_Model: this.currentSearchTag === 'itemModel' ? this.searchValue : '',
+          Company: this.currentSearchTag === 'company' ? this.searchValue : '',
+          Shelf_Location: this.currentSearchTag === 'location' ? this.searchValue : '',
+          Category_Type: this.filter.category,
+          Company_Filter: this.filter.status
+        };
+
+        this.onLoad(param); // 传递动态参数
       } else {
         Toast('请输入搜索关键词或选择筛选条件');
       }
     },
-
     resetFilter() {
       this.filter = {
         category: '',
@@ -1364,6 +1413,50 @@ export default {
 </script>
 
 <style scoped>
+
+.search-tags {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.search-tags .van-button {
+  flex: 1;
+  min-width: 80px;
+}
+
+
+
+/* 图标按钮通用样式 */
+.icon-button {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: all 0.3s ease;
+}
+
+.icon-button:active {
+  transform: scale(0.95);
+}
+
+/* 搜索按钮特殊样式 */
+.search-icon-btn {
+  background: #1989fa;
+  border: none;
+}
+
+/* 重置按钮特殊样式 */
+.reset-icon-btn {
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+}
+
+
 .search-section {
   position: sticky;
   top: 0;
