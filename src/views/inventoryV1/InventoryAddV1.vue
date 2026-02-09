@@ -128,7 +128,7 @@
             placeholder="请选择关联项目"
             is-link
             readonly
-            @click="showProjectPicker = true"
+            @click="onProjectFieldClick"
           />
 
           <van-field
@@ -296,14 +296,56 @@
       </van-form>
     </div>
 
-    <!-- 项目选择器 -->
-    <van-popup v-model="showProjectPicker" position="bottom">
-      <van-picker
-        show-toolbar
-        :columns="projectColumns"
-        @confirm="onProjectConfirm"
-        @cancel="showProjectPicker = false"
-      />
+    <!-- 项目选择器 - 修复版本 -->
+    <van-popup v-model="showProjectPicker" position="bottom" closeable round>
+      <div class="project-picker-container">
+        <!-- 搜索框 -->
+        <van-search
+          v-model="searchKeyword"
+          placeholder="请输入项目名称搜索"
+          @input="filterProjects"
+          class="project-search"
+          show-action
+        >
+          <template #action>
+            <div @click="showProjectPicker = false">取消</div>
+          </template>
+        </van-search>
+
+        <!-- 历史选择区域 -->
+        <div v-if="recentProjects.length > 0" class="recent-projects">
+          <div class="recent-title">最近选择：</div>
+          <div class="recent-list">
+            <van-tag
+              v-for="(project, index) in recentProjects"
+              :key="index"
+              type="primary"
+              size="medium"
+              class="recent-item"
+              @click="selectRecentProject(project)"
+            >
+              {{ project }}
+            </van-tag>
+          </div>
+        </div>
+
+        <!-- 项目列表 -->
+        <div class="project-list">
+          <van-picker
+            show-toolbar
+            :columns="filteredProjectColumns"
+            @confirm="onProjectConfirm"
+            @cancel="showProjectPicker = false"
+          >
+            <template #default>
+              <!-- 如果没有搜索到项目时显示的提示 -->
+              <div v-if="filteredProjectColumns.length === 0 && searchKeyword" class="no-project-result">
+                未找到匹配的项目
+              </div>
+            </template>
+          </van-picker>
+        </div>
+      </div>
     </van-popup>
   </div>
 </template>
@@ -342,8 +384,11 @@ export default {
       },
       showProjectPicker: false,
       projectColumns: [],
+      filteredProjectColumns: [],
       fullProjectList: [], // 保存完整的项目信息
       selectedProjectName: '', // 用于显示选中的项目名称
+      searchKeyword: '', // 搜索关键词
+      recentProjects: [], // 最近选择的项目
       // 更多字段
       moreFields: [],
       // 图片相关
@@ -375,10 +420,19 @@ export default {
     // 监听项目名称变化，更新系统标签
     'selectedProjectName'() {
       this.updateSystemTags();
+    },
+    showProjectPicker(newVal) {
+      if (newVal) {
+        // 当弹出选择器时，重置搜索状态
+        this.searchKeyword = '';
+        this.filterProjects();
+      }
     }
   },
   created() {
     this.loadProjectOptions();
+    this.loadRecentProjects(); // 加载最近选择
+    this.filteredProjectColumns = this.projectColumns; // 初始化为完整列表
     // 检查是否有扫码数据传入
     const scanData = this.$route.query.scanData;
     if (scanData) {
@@ -391,6 +445,13 @@ export default {
     }
   },
   methods: {
+    // 项目字段点击事件
+    onProjectFieldClick() {
+      this.showProjectPicker = true;
+      this.searchKeyword = '';
+      this.filterProjects();
+    },
+
     // 添加新增信息操作日志记录方法
     addAdditionRecord(itemId, itemName) {
       // 构造新增操作的事务请求参数
@@ -973,6 +1034,62 @@ export default {
       }
       // 更新系统标签以包含项目名称
       this.updateSystemTags();
+      // 保存到历史记录
+      this.saveToRecentProjects(value);
+    },
+
+    // 过滤项目列表
+    filterProjects() {
+      if (!this.searchKeyword) {
+        this.filteredProjectColumns = this.projectColumns;
+        return;
+      }
+
+      // 将搜索关键词转换为小写进行比较
+      const keyword = this.searchKeyword.toLowerCase().trim();
+
+      this.filteredProjectColumns = this.projectColumns.filter(project =>
+        project.toLowerCase().includes(keyword)
+      );
+    },
+
+    // 选择最近项目
+    selectRecentProject(projectName) {
+      this.selectedProjectName = projectName;
+      this.showProjectPicker = false;
+      // 更新表单中的项目代码
+      const selectedProject = this.fullProjectList.find(project =>
+        (project.Project_Name || project.name || project.projectName) === projectName
+      );
+      if (selectedProject) {
+        this.itemForm.Project_Code = selectedProject.Project_Code || '';
+      }
+      // 更新系统标签
+      this.updateSystemTags();
+      // 保存到历史记录
+      this.saveToRecentProjects(projectName);
+    },
+
+    // 保存到最近选择
+    saveToRecentProjects(projectName) {
+      // 限制历史记录数量为5条
+      const maxRecentCount = 5;
+      if (!this.recentProjects.includes(projectName)) {
+        this.recentProjects.unshift(projectName); // 添加到开头
+        if (this.recentProjects.length > maxRecentCount) {
+          this.recentProjects.pop(); // 超出限制则移除最后一条
+        }
+        // 保存到本地存储
+        localStorage.setItem('recentProjects', JSON.stringify(this.recentProjects));
+      }
+    },
+
+    // 加载最近选择
+    loadRecentProjects() {
+      const stored = localStorage.getItem('recentProjects');
+      if (stored) {
+        this.recentProjects = JSON.parse(stored);
+      }
     },
 
     loadProjectOptions() {
@@ -996,6 +1113,7 @@ export default {
           this.projectColumns = projectList.map(project =>
             project.Project_Name || project.name || project.projectName || '未知项目'
           );
+          this.filteredProjectColumns = this.projectColumns; // 初始化过滤后的项目列表
         } catch (error) {
           console.error('解析项目数据失败:', error);
           Toast.fail('项目数据解析失败');
@@ -1539,5 +1657,55 @@ export default {
 .tag-input {
   flex: 1;
   min-width: 0; /* 防止输入框溢出 */
+}
+
+/* 项目选择器样式 */
+.project-picker-container {
+  background-color: #fff;
+  border-radius: 16px 16px 0 0;
+  overflow: hidden;
+}
+
+.project-search {
+  background-color: #fff;
+}
+
+.recent-projects {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f2f3f5;
+  background-color: #fafafa;
+}
+
+.recent-title {
+  font-size: 14px;
+  color: #646566;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.recent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recent-item {
+  cursor: pointer;
+}
+
+.recent-item:hover {
+  opacity: 0.8;
+}
+
+.project-list {
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.no-project-result {
+  padding: 20px;
+  text-align: center;
+  color: #969799;
+  font-size: 14px;
 }
 </style>
