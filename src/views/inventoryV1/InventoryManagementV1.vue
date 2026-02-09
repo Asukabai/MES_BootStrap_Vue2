@@ -3,61 +3,78 @@
     <!-- 页面顶部搜索区域 -->
     <div class="search-section search-top">
       <div class="search-container">
-        <!-- 标签切换按钮 -->
+        <!-- 标签切换按钮（图标形式） -->
         <div class="search-tags">
-          <van-button
+          <van-icon
             v-for="tag in searchTags"
             :key="tag.key"
-            size="small"
-            :type="currentSearchTag === tag.key ? 'primary' : 'default'"
+            :name="tag.icon"
+            :class="['tag-icon', { active: currentSearchTag === tag.key }]"
             @click="switchSearchTag(tag.key)"
-          >
-            {{ tag.label }}
-          </van-button>
+          />
         </div>
 
         <!-- 搜索输入框 -->
         <van-field
           v-model="searchValue"
           :placeholder="getPlaceholder()"
-          class="search-input"
+          class="compact-search-input"
           inputmode="search"
           enterkeyhint="search"
-        />
-        <!-- 搜索按钮 -->
-        <van-button
-          type="primary"
-          class="icon-button search-icon-btn"
-          @click="onSearch"
         >
-          <van-icon name="search" size="20" color="#fff" />
-        </van-button>
-
-        <!-- 重置按钮 -->
-        <van-button
-          type="default"
-          class="icon-button reset-icon-btn"
-          @click="onReset"
-        >
-          <van-icon name="replay" size="20" color="#333" />
-        </van-button>
+          <template #right-icon>
+            <van-icon name="search" @click="onSearch" />
+            <van-icon name="replay" @click="onReset" />
+          </template>
+        </van-field>
       </div>
 
       <!-- 筛选下拉框 -->
-      <div class="filter-container">
-        <van-dropdown-menu>
-          <van-dropdown-item
-            v-model="filter.category"
-            :options="categoryOptions"
-            @change="onFilterChange"
-          />
-          <van-dropdown-item
-            v-model="filter.status"
-            :options="statusOptions"
-            @change="onFilterChange"
-          />
-        </van-dropdown-menu>
-      </div>
+<!--      <div class="filter-container">-->
+<!--        <van-dropdown-menu>-->
+<!--          <van-dropdown-item-->
+<!--            v-model="filter.category"-->
+<!--            :options="categoryOptions"-->
+<!--            @change="onFilterChange"-->
+<!--          />-->
+<!--          <van-dropdown-item-->
+<!--            v-model="filter.status"-->
+<!--            :options="statusOptions"-->
+<!--            @change="onFilterChange"-->
+<!--          />-->
+<!--        </van-dropdown-menu>-->
+<!--      </div>-->
+      <!-- 筛选图标按钮 -->
+      <van-icon
+        name="filter-o"
+        class="filter-icon"
+        @click="showFilterPopover = true"
+      />
+
+      <!-- 筛选弹出层 -->
+      <van-popup v-model="showFilterPopover" position="bottom" :style="{ height: '40%' }">
+        <div class="filter-popup">
+          <h3>筛选条件</h3>
+          <van-cell-group>
+            <van-field
+              v-model="filter.category"
+              label="分类"
+              :options="categoryOptions"
+              @change="onFilterChange"
+            />
+            <van-field
+              v-model="filter.status"
+              label="公司"
+              :options="statusOptions"
+              @change="onFilterChange"
+            />
+          </van-cell-group>
+          <div class="filter-actions">
+            <van-button type="primary" @click="applyFilters">应用</van-button>
+            <van-button @click="resetFilters">重置</van-button>
+          </div>
+        </div>
+      </van-popup>
     </div>
 
     <!-- 批量操作栏 -->
@@ -452,10 +469,10 @@ export default {
       },
       currentSearchTag: 'itemName', // 当前选中的搜索标签，默认为“物品名称”
       searchTags: [
-        { key: 'itemName', label: '物品名称' },
-        { key: 'itemModel', label: '型号' },
-        { key: 'company', label: '公司' },
-        { key: 'location', label: '位置' }
+        { key: 'itemName', label: '物品名称', icon: 'apps-o' },
+        { key: 'itemModel', label: '型号', icon: 'setting-o' },
+        { key: 'company', label: '公司', icon: 'contact' },
+        { key: 'location', label: '位置', icon: 'location-o' }
       ],
       // 下拉菜单选项
       categoryOptions: [
@@ -1413,6 +1430,66 @@ export default {
 </script>
 
 <style scoped>
+
+.search-tags {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.tag-icon {
+  font-size: 20px;
+  color: #999;
+  transition: all 0.3s ease;
+}
+
+.tag-icon.active {
+  color: #1989fa;
+  transform: scale(1.2);
+}
+
+
+.filter-icon {
+  font-size: 24px;
+  color: #1989fa;
+  cursor: pointer;
+}
+
+.filter-popup {
+  padding: 16px;
+}
+
+.filter-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+
+.compact-search-input {
+  border-radius: 25px;
+  background-color: rgba(255, 255, 255, 0.9);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.compact-search-input .van-field__right-icon {
+  display: flex;
+  gap: 8px;
+}
+
+.search-container {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.search-container > * {
+  flex: 1 1 auto;
+  min-width: 100px;
+}
+
 
 .search-tags {
   display: flex;
