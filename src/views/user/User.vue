@@ -36,9 +36,9 @@
 <!--        <van-cell title="缓存清理" is-link @click="handleInviteClick" />-->
         <van-cell title="推送通知" is-link @click="handlePushNotification" />
         <van-cell title="在线支持" is-link @click="handleOnlineSupport" />
-        <van-cell title="系统版本" :value="version"  />
+        <!-- 系统版本改为可点击项 -->
+        <van-cell title="系统版本" :value="version" is-link @click="$router.push(`/${$route.params.department}/update-log`)" />
       </van-cell-group>
-
     </div>
   </div>
 </template>
@@ -70,7 +70,7 @@ export default {
         name: ''
       },
       // 添加版本号
-      version: 'V1.1.23'
+      version: 'V1.1.26'
     };
   },
   mounted() {

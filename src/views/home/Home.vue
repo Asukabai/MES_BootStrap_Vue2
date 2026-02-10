@@ -57,7 +57,6 @@ export default {
       const currentY = e.touches[0].pageY;
       const diff = currentY - this.startY;
 
-      // 简单的下拉检测
       if (window.scrollY === 0 && diff > 50) {
         this.isRefreshing = true;
       }
@@ -65,7 +64,6 @@ export default {
 
     handleTouchEnd() {
       if (this.isRefreshing) {
-        // 刷新组件
         this.taskBoardKey += 1;
         this.isRefreshing = false;
       }
