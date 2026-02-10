@@ -358,6 +358,13 @@ const router = new Router({
       component: () => import('../views/inventory/InventoryAdd.vue'),
       meta: { title: '新增物品' }
     },
+    // router/index.js
+    {
+      path: '/:department/batch-scan-results',
+      name: 'BatchScanResults',
+      component: () => import('../views/inventoryV1/BatchScanResults.vue'),
+      meta: { title: '批量扫码结果' }
+    },
     {
       path: '/:department/inventory/addV1',
       name: 'InventoryAddV1',
