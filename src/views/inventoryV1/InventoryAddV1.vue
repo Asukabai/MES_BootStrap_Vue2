@@ -305,11 +305,17 @@
           placeholder="请输入项目名称搜索"
           @input="filterProjects"
           class="project-search"
-          show-action
         >
-          <template #action>
-            <div @click="showProjectPicker = false">取消</div>
-          </template>
+<!--          <van-search-->
+<!--          v-model="searchKeyword"-->
+<!--          placeholder="请输入项目名称搜索"-->
+<!--          @input="filterProjects"-->
+<!--          class="project-search"-->
+<!--          show-action-->
+<!--        >-->
+<!--          <template #action>-->
+<!--            <div @click="showProjectPicker = false">取消</div>-->
+<!--          </template>-->
         </van-search>
 
         <!-- 历史选择区域 -->
