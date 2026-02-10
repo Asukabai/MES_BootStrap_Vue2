@@ -347,6 +347,12 @@ const router = new Router({
       meta: { title: '日志记录V1' }
     },
     {
+      path: '/:department/update-log',
+      name: 'UpdateLog',
+      component: () => import('../views/update-log/UpdateLog.vue'),
+      meta: { title: '更新日志' }
+    },
+    {
       path: '/:department/inventory/add',
       name: 'InventoryAdd',
       component: () => import('../views/inventory/InventoryAdd.vue'),
