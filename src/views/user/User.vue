@@ -32,7 +32,7 @@
       </van-cell-group>
       <!-- 其他功能入口 -->
       <van-cell-group style="margin-top: 15px;">
-        <van-cell title="个人资料" is-link @click="$router.push(`/${$route.params.department}/profile`)"  />
+<!--        <van-cell title="个人资料" is-link @click="$router.push(`/${$route.params.department}/profile`)"  />-->
 <!--        <van-cell title="缓存清理" is-link @click="handleInviteClick" />-->
         <van-cell title="推送通知" is-link @click="handlePushNotification" />
         <van-cell title="在线支持" is-link @click="handleOnlineSupport" />
