@@ -545,6 +545,7 @@
 
 <script>
 import { Dialog, Toast, ImagePreview } from 'vant';
+import * as dd from 'dingtalk-jsapi'
 import SensorRequest from '../../utils/SensorRequest.js';
 import FloatingActionButton from '../../components/FloatingActionButton.vue';
 import { key_DingScannedInventoryQRCodeResult } from "../../utils/Dingding";
@@ -883,13 +884,200 @@ export default {
 
     onFloatingButtonClick() {
       if (this.isNavigating) return;
-      this.isNavigating = true;
-      this.navigateTo('/inventory/addV1');
-      setTimeout(() => {
-        this.isNavigating = false;
-      }, 10);
+
+      // 弹出选择对话框
+      this.$dialog.confirm({
+        title: '请选择添加方式',
+        confirmButtonText: '单次添加',
+        cancelButtonText: '批量添加'
+      }).then(() => {
+        // 用户选择单次添加
+        this.isNavigating = true;
+        this.navigateTo('/inventory/addV1');
+        setTimeout(() => {
+          this.isNavigating = false;
+        }, 10);
+      }).catch(() => {
+        // 用户选择批量扫码添加
+        this.showBatchScanConfirmation();
+      });
     },
 
+    // 新增方法：显示批量扫码确认对话框
+    showBatchScanConfirmation() {
+      this.$dialog.confirm({
+        title: '批量扫码提示',
+        message: '目前仅支持“嘉立创”物品批量扫码快速新增入库，是否继续？',
+        confirmButtonText: '确认',
+        cancelButtonText: '取消'
+      }).then(() => {
+        // 用户确认，调用 startBatchScan 方法
+        this.startBatchScan();
+      }).catch(() => {
+        // 用户取消，退出程序
+        console.log('用户取消批量扫码');
+      });
+    },
+// 修改 startBatchScan 方法
+    startBatchScan() {
+      // 判断是否为PC端（非钉钉环境或钉钉PC端）
+      if (typeof dd === 'undefined' || !dd.env || dd.env.platform === 'pc') {
+        this.$toast.fail('PC端暂不支持扫码功能，请在钉钉移动端使用');
+        return;
+      }
+
+      console.log("开始资产批量扫码");
+
+      // 提示用户进入批量扫描模式
+      this.$toast({
+        message: '已进入批量扫码模式，请扫描相同类型物品！',
+        type: 'info',
+        duration: 2000
+      });
+
+      const scannedResults = []; // 用于存储扫码结果的列表
+
+      // 定义递归扫描函数
+      const startScan = () => {
+        dd.ready(() => {
+          dd.biz.util.scan({
+            type: 'qrCode',
+            onSuccess: (data) => {
+              const result = data.text; // 获取扫描结果
+              console.log("扫描结果:", result);
+
+              // 手动解析非标准 JSON 格式
+              const parsedResult = this.parseCustomJSON(result);
+              console.log('解析后的对象:', parsedResult);
+
+              const requiredFields = ['on', 'pc', 'pm', 'qty', 'cc', 'pdi'];
+              const optionalFields = ['mc', 'hp'];
+
+              // 检查是否包含所有必需字段
+              if (parsedResult && typeof parsedResult === 'object' &&
+                requiredFields.every(field => field in parsedResult)) {
+
+                console.log('扫描结果为嘉立创商城物品结构体');
+                this.$toast.success('扫描成功！');
+
+                // 将扫码结果添加到数组中
+                scannedResults.push(parsedResult);
+
+                // 本次扫码结束，询问是否继续扫码
+                this.$dialog.confirm({
+                  title: `已扫描 ${scannedResults.length} 个物品`,
+                  message: '是否继续扫描其他物品？',
+                  confirmButtonText: '继续扫描',
+                  cancelButtonText: '结束扫码'
+                }).then(() => {
+                  // 用户选择继续扫码，延迟一秒后重新启动扫码
+                  setTimeout(() => {
+                    startScan();
+                  }, 1000);
+                }).catch(() => {
+                  // 用户选择结束扫码
+                  console.log('用户结束批量扫码，准备跳转');
+                  this.stopScan(scannedResults);
+                });
+              } else {
+                // 不符合嘉立创标准，弹窗提示
+                this.$dialog.alert({
+                  title: '扫码失败',
+                  message: '该物品不符合嘉立创标准，请扫描嘉立创商城的物品二维码。',
+                  confirmButtonText: '确定'
+                }).then(() => {
+                  // 提示后继续扫码
+                  setTimeout(() => {
+                    startScan();
+                  }, 1000);
+                });
+              }
+            },
+            onFail: (err) => {
+              console.log('扫码失败:', err);
+              if (err.errorCode !== 300001) {
+                this.$toast.fail("未扫描到二维码，请重新扫描！");
+              }
+              // 继续扫描
+              setTimeout(() => {
+                startScan();
+              }, 1000);
+            },
+            onCancel: () => {
+              console.log('用户取消扫描');
+              // 用户点击取消时，将已扫描的结果传递到跳转页面
+              if (scannedResults.length > 0) {
+                this.stopScan(scannedResults);
+              } else {
+                this.$toast('已取消批量扫码');
+              }
+            }
+          });
+        });
+      };
+
+      // 启动首次扫描
+      startScan();
+    },
+
+// 修改 stopScan 方法
+    stopScan(scannedResults) {
+      this.$toast({
+        message: `批量扫描结束，共扫描到 ${scannedResults.length} 个物品`,
+        type: 'success',
+        duration: 2000
+      });
+      console.log('扫描结果汇总:', scannedResults);
+      this.navigateToBatchResults(scannedResults);
+    },
+
+// 修改 parseCustomJSON 方法（如果还没有这个方法，请添加）
+    parseCustomJSON(str) {
+      try {
+        // 尝试直接解析JSON
+        return JSON.parse(str);
+      } catch (e) {
+        console.log('非标准JSON格式，尝试其他解析方式');
+
+        // 尝试处理可能的格式问题，比如缺失引号的JSON
+        // 示例格式: {on: "物品名称", pc: "型号", pm: "品牌", qty: "数量", cc: "类别", pdi: "描述"}
+
+        // 移除可能的换行符和多余空格
+        let cleanStr = str.trim();
+
+        // 尝试修复缺失引号的情况
+        if (cleanStr.startsWith('{') && cleanStr.endsWith('}')) {
+          cleanStr = cleanStr.slice(1, -1);
+          const pairs = cleanStr.split(',');
+          const result = {};
+
+          pairs.forEach(pair => {
+            const [key, ...valueParts] = pair.split(':');
+            if (key && valueParts.length > 0) {
+              const value = valueParts.join(':').trim();
+              const cleanKey = key.trim();
+              // 移除可能的引号
+              const finalKey = cleanKey.replace(/^['"]|['"]$/g, '');
+              const finalValue = value.replace(/^['"]|['"]$/g, '');
+              result[finalKey] = finalValue;
+            }
+          });
+
+          return result;
+        }
+
+        // 如果以上都失败，返回原始字符串
+        return { raw: str };
+      }
+    },
+
+    navigateToBatchResults(scannedResults) {
+      const department = this.$route.params.department;
+      this.$router.push({
+        path: `/${department}/batch-scan-results`,
+        query: { scannedResults: JSON.stringify(scannedResults) }
+      });
+    },
     // 获取存储的搜索值
     getStoredSearchValue() {
       return localStorage.getItem('inventorySearchValue') || '';
