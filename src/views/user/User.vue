@@ -19,7 +19,7 @@
             <div class="user-details">
               <p v-if="!userInfo.name">正在加载用户信息...</p>
               <p v-else><strong>姓名：</strong>{{ userInfo.name }}</p>
-              <p><strong>手机号：</strong>{{ userInfo.phone }}</p>
+               <p><strong>手机号：</strong>{{ userInfo.phone }}</p>
               <!-- 修改企业信息显示逻辑 -->
               <p><strong>企业：</strong>{{ companyInfo.name }}</p>
             </div>
