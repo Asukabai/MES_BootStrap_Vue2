@@ -209,7 +209,7 @@
           @click="showBatchConfirmation"
           :disabled="selectedOperations.length === 0"
         >
-          执行操作
+          预览操作
         </van-button>
         <van-button
           size="small"
@@ -596,9 +596,9 @@ export default {
 
       currentSearchTag: 'itemName',
       searchTags: [
-        { key: 'itemName', label: '物品名称', icon: 'apps-o' },
-        { key: 'itemModel', label: '物品型号', icon: 'setting-o' },
-        { key: 'company', label: '公司', icon: 'building-o' },
+        { key: 'itemName', label: '名称', icon: 'apps-o' },
+        { key: 'itemModel', label: '型号', icon: 'setting-o' },
+        { key: 'company', label: '公司', icon: 'home-o' },
         { key: 'location', label: '位置', icon: 'location-o' }
       ],
 
@@ -772,7 +772,26 @@ export default {
   methods: {
     // 切换搜索标签
     switchSearchTag(tagKey) {
+      // 如果点击的是当前已选中的标签，不做处理
+      if (this.currentSearchTag === tagKey) {
+        return;
+      }
+
       this.currentSearchTag = tagKey;
+
+      // 获取标签对应的中文名称
+      const tagMap = {
+        itemName: '物品名称',
+        itemModel: '物品型号',
+        company: '公司名称',
+        location: '位置信息'
+      };
+
+      const tagName = tagMap[tagKey] || '搜索';
+
+      // 显示切换提示
+      this.$toast.success(`已切换至按"${tagName}"搜索`);
+
       // 切换标签时不清空搜索值，但需要重新执行搜索
       if (this.searchValue) {
         this.onSearch();
