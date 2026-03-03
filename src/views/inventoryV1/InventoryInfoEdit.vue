@@ -72,6 +72,22 @@
           </template>
         </van-cell>
 
+        <!-- 关联项目字段 -->
+        <van-cell
+          v-if="itemForm.Category_Type === '项目'"
+          title="*关联项目"
+        >
+          <template #default>
+            <van-field
+              v-model="selectedProjectName"
+              name="Project_Code"
+              placeholder="请选择关联项目"
+              is-link
+              @click="onProjectFieldClick"
+            />
+          </template>
+        </van-cell>
+
         <van-cell title="所属公司">
           <template #default>
             <van-radio-group v-model="itemForm.Company" direction="horizontal">
@@ -133,7 +149,7 @@
               autosize
               type="textarea"
               maxlength="100"
-              placeholder="请输入物品材质信息（最多100字）"
+              placeholder="请输入物品材质信息（最多 100 字）"
               show-word-limit
             />
           </template>
@@ -215,9 +231,9 @@
           </van-button>
         </div>
 
-        <van-cell title="上传图片(正视图、左视图、俯视图)">
+        <van-cell title="上传图片 (正视图、左视图、俯视图)">
           <template #label>
-            <span class="upload-note">支持点击图标上传图片，但总大小不得超过10M，总数不得超过5个</span>
+            <span class="upload-note">支持点击图标上传图片，但总大小不得超过 10M，总数不得超过 5 个</span>
           </template>
         </van-cell>
         <van-uploader
@@ -272,8 +288,7 @@
     <!-- 提交按钮组 -->
     <div style="padding: 15px; display: flex; gap: 25px; justify-content: center; margin-top: 5px;">
       <van-button
-        type="info"
-        style="width: 40%; font-size: 14px; padding: 8px 20px; margin-right: 5px;"
+        type="info"        style="width: 40%; font-size: 14px; padding: 8px 20px; margin-right: 5px;"
         @click="submitExtendInfo"
         :disabled="isSubmitting || !recordExists"
       >
@@ -281,8 +296,7 @@
       </van-button>
 
       <van-button
-        type="default"
-        style="width: 40%; font-size: 14px; padding: 8px 20px; margin-left: 5px;"
+        type="default"        style="width: 40%; font-size: 14px; padding: 8px 20px; margin-left: 5px;"
         @click="cancelAndGoBack"
         :disabled="isSubmitting"
       >
@@ -318,6 +332,33 @@
         </div>
       </div>
     </van-popup>
+
+    <!-- 项目选择器弹窗 -->
+    <van-popup v-model="showProjectPicker" position="bottom" :style="{ height: '70%' }">
+      <div class="project-picker-container">
+        <div class="picker-header">
+          <span class="picker-title">选择项目</span>
+          <van-icon name="cross" class="close-icon" @click="cancelProjectSelect" />
+        </div>
+
+        <!-- 搜索框 -->
+        <van-field
+          v-model="searchKeyword"
+          placeholder="搜索项目名称"
+          clearable
+          class="project-search-input"
+          @input="filterProjects"
+        />
+
+        <!-- 项目列表 -->
+        <van-picker
+          :columns="filteredProjectColumns"
+          @confirm="onProjectConfirm"
+          @cancel="cancelProjectSelect"
+          :show-toolbar="false"
+        />
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -342,7 +383,7 @@ export default {
   name: 'InventoryExtendInfoEdit',
   data() {
     return {
-      ID: '', // 记录ID
+      ID: '', // 记录 ID
       inventoryId: this.getInventoryId(),
       // 物品信息表单
       itemForm: {
@@ -387,10 +428,10 @@ export default {
       currentImage: null,
       currentImageUrl: '',
       currentZoom: 1, // 当前缩放比例
-      translateX: 0, // X轴偏移量
-      translateY: 0, // Y轴偏移量
-      lastTranslateX: 0, // 上一次X轴偏移量
-      lastTranslateY: 0, // 上一次Y轴偏移量
+      translateX: 0, // X 轴偏移量
+      translateY: 0, // Y 轴偏移量
+      lastTranslateX: 0, // 上一次 X 轴偏移量
+      lastTranslateY: 0, // 上一次 Y 轴偏移量
       // 手势缩放相关数据
       touchStartDistance: 0,
       touchStartZoom: 1,
@@ -403,7 +444,22 @@ export default {
       lastTouchX: 0,
       lastTouchY: 0,
       isDragging: false,
+      // 项目选择相关数据
+      selectedProjectName: '', // 选中的项目名称（用于显示）
+      showProjectPicker: false, // 项目选择器弹窗显示状态
+      searchKeyword: '', // 搜索关键词
+      allProjects: [], // 所有项目列表
+      filteredProjects: [] // 筛选后的项目列表
     };
+  },
+  computed: {
+    // 计算属性：筛选后的项目列
+    filteredProjectColumns() {
+      return this.filteredProjects.map(project => ({
+        text: project.Project_Name || project.Name || '未命名项目',
+        value: project.Project_Code || project.Code || ''
+      }));
+    }
   },
   mounted() {
     console.log('页面初始化 item 数据：', this.$route.query.item);
@@ -414,13 +470,14 @@ export default {
 
     if (this.inventoryId) {
       this.loadExtendInfo(); // 加载扩展信息
+      this.loadProjects(); // 加载项目列表
     } else {
-      this.$toast.fail('物品ID不能为空');
+      this.$toast.fail('物品 ID 不能为空');
       this.loading = false;
     }
   },
   methods: {
-    // 获取库存ID用于请求体
+    // 获取库存 ID 用于请求体
     getInventoryId() {
       const routeItem = this.$route.query.item;
       if (routeItem) {
@@ -428,7 +485,7 @@ export default {
           const parsedItem = JSON.parse(routeItem);
           return parsedItem.Inventory_ID || parsedItem.Id || parsedItem.id || parsedItem.inventoryId || '';
         } catch (e) {
-          console.error('解析路由参数，获取库存ID失败:', e);
+          console.error('解析路由参数，获取库存 ID 失败:', e);
         }
       }
       return '';
@@ -475,6 +532,81 @@ export default {
       return '';
     },
 
+    // 加载项目列表
+    loadProjects() {
+      const payload = {
+        PageIndex: 0,
+        PageSize: 1000
+      };
+
+      SensorRequestPage.ProjectListGetFun(
+        JSON.stringify(payload),
+        (respData) => {
+          try {
+            const responseJson = JSON.parse(respData);
+            if (responseJson.Data && Array.isArray(responseJson.Data)) {
+              this.allProjects = responseJson.Data;
+              this.filteredProjects = responseJson.Data;
+            } else {
+              this.allProjects = [];
+              this.filteredProjects = [];
+            }
+          } catch (e) {
+            console.error('解析项目列表失败:', e);
+            this.allProjects = [];
+            this.filteredProjects = [];
+          }
+        },
+        (error) => {
+          console.error('获取项目列表失败:', error);
+          this.allProjects = [];
+          this.filteredProjects = [];
+        }
+      );
+    },
+
+    // 点击项目字段
+    onProjectFieldClick() {
+      this.showProjectPicker = true;
+    },
+
+    // 筛选项目
+    filterProjects() {
+      if (!this.searchKeyword) {
+        this.filteredProjects = this.allProjects;
+      } else {
+        const keyword = this.searchKeyword.toLowerCase();
+        this.filteredProjects = this.allProjects.filter(project => {
+          const projectName = (project.Project_Name || project.Name || '').toLowerCase();
+          const projectCode = (project.Project_Code || project.Code || '').toLowerCase();
+          return projectName.includes(keyword) || projectCode.includes(keyword);
+        });
+      }
+    },
+
+    // 确认选择项目
+    onProjectConfirm(value) {
+      const selectedProject = this.allProjects.find(
+        p => (p.Project_Code || p.Code) === value
+      );
+
+      if (selectedProject) {
+        this.itemForm.Project_Code = selectedProject.Project_Code || selectedProject.Code;
+        this.selectedProjectName = selectedProject.Project_Name || selectedProject.Name || '';
+      }
+
+      this.showProjectPicker = false;
+      this.searchKeyword = '';
+      this.filteredProjects = this.allProjects;
+    },
+
+    // 取消选择项目
+    cancelProjectSelect() {
+      this.showProjectPicker = false;
+      this.searchKeyword = '';
+      this.filteredProjects = this.allProjects;
+    },
+
     // 加载物品信息
     loadExtendInfo() {
       // 构造请求体
@@ -515,6 +647,19 @@ export default {
                 Item_Mores: itemData.Item_Mores || '',
                 Item_Tags: itemData.Item_Tags || [] // 加载标签信息
               };
+
+              // 根据 Project_Code 设置显示的项目名称
+              if (itemData.Project_Code) {
+                const project = this.allProjects.find(
+                  p => (p.Project_Code || p.Code) === itemData.Project_Code
+                );
+                if (project) {
+                  this.selectedProjectName = project.Project_Name || project.Name || '';
+                } else {
+                  // 如果项目列表还未加载，暂时显示编码
+                  this.selectedProjectName = itemData.Project_Code;
+                }
+              }
 
               // 初始化标签
               this.itemTags = [...(itemData.Item_Tags || [])];
@@ -591,11 +736,11 @@ export default {
       this.$toast.success('标签已删除');
     },
 
-    // 将文件转换为base64的方法
+    // 将文件转换为 base64 的方法
     processFileToBase64(file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const base64 = e.target.result.split(',')[1]; // 获取base64数据部分
+        const base64 = e.target.result.split(',')[1]; // 获取 base64 数据部分
         const fileInfo = {
           File_Name: file.file ? file.file.name : file.name,
           File_Base64: base64,
@@ -618,12 +763,12 @@ export default {
         }
 
         if (!allowedTypes.includes(f.file.type)) {
-          this.$toast.fail(`不支持的文件类型: ${f.file.type}，请上传图片文件`);
+          this.$toast.fail(`不支持的文件类型：${f.file.type}，请上传图片文件`);
           return;
         }
       }
 
-      // 处理单个文件，将其转换为base64
+      // 处理单个文件，将其转换为 base64
       if (Array.isArray(file)) {
         // 如果是多文件，逐个处理
         file.forEach(f => this.processFileToBase64(f));
@@ -649,7 +794,7 @@ export default {
 
     // 在弹窗中显示图片
     showImageInPopup(img) {
-      // 调用后端接口获取临时下载URL
+      // 调用后端接口获取临时下载 URL
       const param = {
         remoteLocation: img.File_Md5
       };
@@ -658,7 +803,7 @@ export default {
         JSON.stringify(param),
         (respData) => {
           if (respData) {
-            // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
+            // 将 URL 中的 http://127.0.0.1:9000 替换为 https://api-v2.sensor-smart.cn:22027
             const modifiedUrl = respData.replace(
               'http://127.0.0.1:9000',
               'https://api-v2.sensor-smart.cn:22027'
@@ -668,8 +813,8 @@ export default {
             this.currentImage = img;
             this.currentImageUrl = modifiedUrl;
             this.currentZoom = 1; // 重置缩放比例
-            this.translateX = 0; // 重置X轴偏移
-            this.translateY = 0; // 重置Y轴偏移
+            this.translateX = 0; // 重置 X 轴偏移
+            this.translateY = 0; // 重置 Y 轴偏移
             this.lastTranslateX = 0;
             this.lastTranslateY = 0;
             this.showImagePreview = true; // 显示弹窗
@@ -678,7 +823,7 @@ export default {
           }
         },
         (error) => {
-          this.$toast.fail('获取文件预览链接失败: ' + error);
+          this.$toast.fail('获取文件预览链接失败：' + error);
         }
       );
     },
@@ -772,12 +917,12 @@ export default {
     toggleZoom() {
       if (this.currentZoom > 1) {
         this.currentZoom = 1; // 恢复原始大小
-        this.translateX = 0; // 重置X轴偏移
-        this.translateY = 0; // 重置Y轴偏移
+        this.translateX = 0; // 重置 X 轴偏移
+        this.translateY = 0; // 重置 Y 轴偏移
         this.lastTranslateX = 0;
         this.lastTranslateY = 0;
       } else {
-        this.currentZoom = 2; // 放大到2倍
+        this.currentZoom = 2; // 放大到 2 倍
       }
     },
 
@@ -815,7 +960,7 @@ export default {
 
     // 删除原有图片
     removeExistingImage(index) {
-      // 使用splice方法直接修改数组，确保Vue能检测到变化
+      // 使用 splice 方法直接修改数组，确保 Vue 能检测到变化
       this.existingImagesToKeep.splice(index, 1);
       this.$toast.success('图片已删除');
     },
@@ -838,9 +983,9 @@ export default {
         return;
       }
 
-      // 验证ID存在且有效
+      // 验证 ID 存在且有效
       if (!this.ID || this.ID === '' || this.ID === 'undefined' || this.ID === null) {
-        this.$toast.fail('物品ID不能为空，请从物品详情页面进入');
+        this.$toast.fail('物品 ID 不能为空，请从物品详情页面进入');
         return;
       }
 
@@ -849,7 +994,7 @@ export default {
       // 准备提交的数据（只使用用户保留的原有图片和新上传的图片）
       const allImages = [...this.existingImagesToKeep, ...this.imageList];
 
-      // 构造更多信息JSON字符串
+      // 构造更多信息 JSON 字符串
       const moreInfoObj = {};
       this.moreFields.forEach(field => {
         if (field.key && field.value) {
@@ -944,7 +1089,7 @@ export default {
             Person_Phone: getLocalUserInfo().phone,
             Person_DingID: getLocalUserInfo().dingID
           },
-          Remark: this.remark || `${getLocalUserInfo().name} 修改了物品信息: ${this.itemForm.Item_Name}`
+          Remark: this.remark || `${getLocalUserInfo().name} 修改了物品信息：${this.itemForm.Item_Name}`
         };
 
         // 调用事务记录接口
@@ -956,7 +1101,7 @@ export default {
           },
           (error) => {
             console.error('修改信息记录添加失败:', error);
-            this.$toast.fail('修改信息记录添加失败: ' + (error.message || '未知错误'));
+            this.$toast.fail('修改信息记录添加失败：' + (error.message || '未知错误'));
             reject(error);
           }
         );
