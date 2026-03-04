@@ -72,18 +72,18 @@
           </template>
         </van-cell>
 
-        <!-- 关联项目字段 -->
+        <!-- 关联项目字段 - 使用 ProjectPicker 组件 -->
         <van-cell
           v-if="itemForm.Category_Type === '项目'"
           title="*关联项目"
         >
           <template #default>
-            <van-field
+            <ProjectPicker
+              ref="projectPicker"
               v-model="selectedProjectName"
-              name="Project_Code"
               placeholder="请选择关联项目"
-              is-link
-              @click="onProjectFieldClick"
+              :required="false"
+              @change="onProjectChange"
             />
           </template>
         </van-cell>
@@ -332,45 +332,18 @@
         </div>
       </div>
     </van-popup>
-
-    <!-- 项目选择器弹窗 -->
-    <van-popup v-model="showProjectPicker" position="bottom" :style="{ height: '70%' }">
-      <div class="project-picker-container">
-        <div class="picker-header">
-          <span class="picker-title">选择项目</span>
-          <van-icon name="cross" class="close-icon" @click="cancelProjectSelect" />
-        </div>
-
-        <!-- 搜索框 -->
-        <van-field
-          v-model="searchKeyword"
-          placeholder="搜索项目名称"
-          clearable
-          class="project-search-input"
-          @input="filterProjects"
-        />
-
-        <!-- 项目列表 -->
-        <van-picker
-          :columns="filteredProjectColumns"
-          @confirm="onProjectConfirm"
-          @cancel="cancelProjectSelect"
-          :show-toolbar="false"
-        />
-      </div>
-    </van-popup>
   </div>
 </template>
 
-<script>
-import SensorRequest from "../../utils/SensorRequest";
+<script>import SensorRequest from "../../utils/SensorRequest";
 import SensorRequestPage from "../../utils/SensorRequestPage";
 import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
+import ProjectPicker from '../../components/ProjectPicker.vue';
 
 function getLocalUserInfo() {
   const name = localStorage.getItem(key_DingName);
   const phone = localStorage.getItem(key_DingUserPhone);
-  const dingID = localStorage.getItem(key_DingUserIndex); // 使用 key_DingUserIndex 作为 DingID
+  const dingID = localStorage.getItem(key_DingUserIndex);
 
   return {
     name: name || '',
@@ -381,11 +354,13 @@ function getLocalUserInfo() {
 
 export default {
   name: 'InventoryExtendInfoEdit',
+  components: {
+    ProjectPicker
+  },
   data() {
     return {
-      ID: '', // 记录 ID
+      ID: '',
       inventoryId: this.getInventoryId(),
-      // 物品信息表单
       itemForm: {
         Item_Name: '',
         Shelf_Location: '',
@@ -398,86 +373,62 @@ export default {
         Is_Low_Stock: '',
         Remark: '',
         Company: '',
-        // 扩展信息字段
         Item_Color: '',
         Item_Size: '',
         Item_Unit: '',
         Item_Material: '',
         Item_Images: [],
         Item_Mores: '',
-        Item_Tags: [] // 新增标签字段
+        Item_Tags: []
       },
-      // 添加用于显示的字段
       itemName: this.getItemName(),
       shelfLocation: this.getShelfLocation(),
       itemModel: this.getItemModel(),
       fileList: [],
       imageList: [],
-      existingImages: [], // 存储已有的图片（原始数据）
-      existingImagesToKeep: [], // 存储用户选择保留的原有图片
+      existingImages: [],
+      existingImagesToKeep: [],
       isSubmitting: false,
-      recordExists: false, // 记录是否存在
-      loading: true, // 加载状态
-      // 更多字段
+      recordExists: false,
+      loading: true,
       moreFields: [],
-      // 标签相关
-      itemTags: [], // 存储标签数组
-      newTag: '', // 输入的新标签
-      // 新增图片预览相关数据
+      itemTags: [],
+      newTag: '',
       showImagePreview: false,
       currentImage: null,
       currentImageUrl: '',
-      currentZoom: 1, // 当前缩放比例
-      translateX: 0, // X 轴偏移量
-      translateY: 0, // Y 轴偏移量
-      lastTranslateX: 0, // 上一次 X 轴偏移量
-      lastTranslateY: 0, // 上一次 Y 轴偏移量
-      // 手势缩放相关数据
+      currentZoom: 1,
+      translateX: 0,
+      translateY: 0,
+      lastTranslateX: 0,
+      lastTranslateY: 0,
       touchStartDistance: 0,
       touchStartZoom: 1,
       isPinching: false,
-      // 双击缩放相关
       lastTapTime: 0,
-      // 平移相关数据
       touchStartX: 0,
       touchStartY: 0,
       lastTouchX: 0,
       lastTouchY: 0,
       isDragging: false,
-      // 项目选择相关数据
-      selectedProjectName: '', // 选中的项目名称（用于显示）
-      showProjectPicker: false, // 项目选择器弹窗显示状态
-      searchKeyword: '', // 搜索关键词
-      allProjects: [], // 所有项目列表
-      filteredProjects: [] // 筛选后的项目列表
+      selectedProjectName: ''
     };
-  },
-  computed: {
-    // 计算属性：筛选后的项目列
-    filteredProjectColumns() {
-      return this.filteredProjects.map(project => ({
-        text: project.Project_Name || project.Name || '未命名项目',
-        value: project.Project_Code || project.Code || ''
-      }));
-    }
   },
   mounted() {
     console.log('页面初始化 item 数据：', this.$route.query.item);
-    console.log('页面初始化 inventoryId ：', this.inventoryId);
-    console.log('页面初始化 itemName ：', this.itemName);
-    console.log('页面初始化 shelfLocation ：', this.shelfLocation);
-    console.log('页面初始化 itemModel ：', this.itemModel);
+    console.log('页面初始化 inventoryId：', this.inventoryId);
+    console.log('页面初始化 itemName：', this.itemName);
+    console.log('页面初始化 shelfLocation：', this.shelfLocation);
+    console.log('页面初始化 itemModel：', this.itemModel);
 
     if (this.inventoryId) {
-      this.loadExtendInfo(); // 加载扩展信息
-      this.loadProjects(); // 加载项目列表
+      this.loadExtendInfo();
     } else {
       this.$toast.fail('物品 ID 不能为空');
       this.loading = false;
     }
   },
   methods: {
-    // 获取库存 ID 用于请求体
     getInventoryId() {
       const routeItem = this.$route.query.item;
       if (routeItem) {
@@ -490,7 +441,7 @@ export default {
       }
       return '';
     },
-    // 获取物品名称作为显示值
+
     getItemName() {
       const routeItem = this.$route.query.item;
       if (routeItem) {
@@ -504,7 +455,6 @@ export default {
       return '';
     },
 
-    // 获取货架位置作为显示值
     getShelfLocation() {
       const routeItem = this.$route.query.item;
       if (routeItem) {
@@ -518,7 +468,6 @@ export default {
       return '';
     },
 
-    // 获取物品型号作为显示值
     getItemModel() {
       const routeItem = this.$route.query.item;
       if (routeItem) {
@@ -532,86 +481,13 @@ export default {
       return '';
     },
 
-    // 加载项目列表
-    loadProjects() {
-      const payload = {
-        PageIndex: 0,
-        PageSize: 1000
-      };
-
-      SensorRequestPage.ProjectListGetFun(
-        JSON.stringify(payload),
-        (respData) => {
-          try {
-            const responseJson = JSON.parse(respData);
-            if (responseJson.Data && Array.isArray(responseJson.Data)) {
-              this.allProjects = responseJson.Data;
-              this.filteredProjects = responseJson.Data;
-            } else {
-              this.allProjects = [];
-              this.filteredProjects = [];
-            }
-          } catch (e) {
-            console.error('解析项目列表失败:', e);
-            this.allProjects = [];
-            this.filteredProjects = [];
-          }
-        },
-        (error) => {
-          console.error('获取项目列表失败:', error);
-          this.allProjects = [];
-          this.filteredProjects = [];
-        }
-      );
+    onProjectChange({ projectName, projectCode }) {
+      this.itemForm.Project_Code = projectCode;
     },
 
-    // 点击项目字段
-    onProjectFieldClick() {
-      this.showProjectPicker = true;
-    },
-
-    // 筛选项目
-    filterProjects() {
-      if (!this.searchKeyword) {
-        this.filteredProjects = this.allProjects;
-      } else {
-        const keyword = this.searchKeyword.toLowerCase();
-        this.filteredProjects = this.allProjects.filter(project => {
-          const projectName = (project.Project_Name || project.Name || '').toLowerCase();
-          const projectCode = (project.Project_Code || project.Code || '').toLowerCase();
-          return projectName.includes(keyword) || projectCode.includes(keyword);
-        });
-      }
-    },
-
-    // 确认选择项目
-    onProjectConfirm(value) {
-      const selectedProject = this.allProjects.find(
-        p => (p.Project_Code || p.Code) === value
-      );
-
-      if (selectedProject) {
-        this.itemForm.Project_Code = selectedProject.Project_Code || selectedProject.Code;
-        this.selectedProjectName = selectedProject.Project_Name || selectedProject.Name || '';
-      }
-
-      this.showProjectPicker = false;
-      this.searchKeyword = '';
-      this.filteredProjects = this.allProjects;
-    },
-
-    // 取消选择项目
-    cancelProjectSelect() {
-      this.showProjectPicker = false;
-      this.searchKeyword = '';
-      this.filteredProjects = this.allProjects;
-    },
-
-    // 加载物品信息
     loadExtendInfo() {
-      // 构造请求体
       const payload = {
-        Shelf_Location: this.getShelfLocation() // 使用货架位置查询完整信息
+        Shelf_Location: this.getShelfLocation()
       };
 
       SensorRequestPage.InventoryItemGetFun(
@@ -620,11 +496,9 @@ export default {
           try {
             const responseJson = JSON.parse(respData);
             if (responseJson.Data && Array.isArray(responseJson.Data) && responseJson.Data.length > 0) {
-              // 记录存在，加载数据
               this.recordExists = true;
               const itemData = responseJson.Data[0];
 
-              // 从后端响应中获取完整信息
               this.ID = itemData.Id || itemData.id || '';
               this.itemForm = {
                 ...this.itemForm,
@@ -645,26 +519,26 @@ export default {
                 Item_Material: itemData.Item_Material || '',
                 Item_Images: itemData.Item_Images || [],
                 Item_Mores: itemData.Item_Mores || '',
-                Item_Tags: itemData.Item_Tags || [] // 加载标签信息
+                Item_Tags: itemData.Item_Tags || []
               };
 
-              // 根据 Project_Code 设置显示的项目名称
               if (itemData.Project_Code) {
-                const project = this.allProjects.find(
-                  p => (p.Project_Code || p.Code) === itemData.Project_Code
-                );
-                if (project) {
-                  this.selectedProjectName = project.Project_Name || project.Name || '';
-                } else {
-                  // 如果项目列表还未加载，暂时显示编码
+                this.$nextTick(() => {
                   this.selectedProjectName = itemData.Project_Code;
-                }
+                  if (this.$refs.projectPicker) {
+                    const projectList = this.$refs.projectPicker.getFullProjectList();
+                    const project = projectList.find(
+                      p => (p.Project_Code || '') === itemData.Project_Code
+                    );
+                    if (project) {
+                      this.selectedProjectName = project.Project_Name || project.name || project.projectName || '';
+                    }
+                  }
+                });
               }
 
-              // 初始化标签
               this.itemTags = [...(itemData.Item_Tags || [])];
 
-              // 解析更多信息
               if (itemData.Item_Mores) {
                 try {
                   const moreInfo = JSON.parse(itemData.Item_Mores);
@@ -680,11 +554,9 @@ export default {
                 this.moreFields = [];
               }
 
-              // 初始化图片相关
               this.existingImages = itemData.Item_Images || [];
               this.existingImagesToKeep = [...this.existingImages];
             } else {
-              // 记录不存在
               this.recordExists = false;
               this.$toast.info('该物品暂无信息，请先新增物品信息');
             }
@@ -704,23 +576,19 @@ export default {
       );
     },
 
-    // 添加更多字段
     addMoreField() {
       this.moreFields.push({ key: '', value: '' });
     },
 
-    // 移除更多字段
     removeMoreField(index) {
       this.moreFields.splice(index, 1);
     },
 
-    // 添加标签方法
     addTag() {
       if (this.newTag.trim()) {
-        // 检查标签是否已存在，避免重复
         if (!this.itemTags.includes(this.newTag.trim())) {
           this.itemTags.push(this.newTag.trim());
-          this.newTag = ''; // 清空输入框
+          this.newTag = '';
           this.$toast.success('标签添加成功');
         } else {
           this.$toast('标签已存在');
@@ -730,17 +598,15 @@ export default {
       }
     },
 
-    // 删除标签方法
     removeTag(index) {
       this.itemTags.splice(index, 1);
       this.$toast.success('标签已删除');
     },
 
-    // 将文件转换为 base64 的方法
     processFileToBase64(file) {
       const reader = new FileReader();
       reader.onload = (e) => {
-        const base64 = e.target.result.split(',')[1]; // 获取 base64 数据部分
+        const base64 = e.target.result.split(',')[1];
         const fileInfo = {
           File_Name: file.file ? file.file.name : file.name,
           File_Base64: base64,
@@ -752,7 +618,6 @@ export default {
     },
 
     onAfterRead(file) {
-      // 检查文件类型
       const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
       const files = Array.isArray(file) ? file : [file];
 
@@ -768,33 +633,25 @@ export default {
         }
       }
 
-      // 处理单个文件，将其转换为 base64
       if (Array.isArray(file)) {
-        // 如果是多文件，逐个处理
         file.forEach(f => this.processFileToBase64(f));
       } else {
-        // 单个文件处理
         this.processFileToBase64(file);
       }
     },
 
-    // 预览已有图片 - 修改此方法
     previewExistingImage(img) {
-      // 判断是否为图片文件
       const fileExt = this.getFileExtension(img.File_Name).toLowerCase();
       const imageExtensions = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp'];
 
       if (imageExtensions.includes(fileExt)) {
-        // 是图片文件，直接在弹窗中预览
         this.showImageInPopup(img);
       } else {
         this.$toast.fail('该文件并非图片文件，无法预览');
       }
     },
 
-    // 在弹窗中显示图片
     showImageInPopup(img) {
-      // 调用后端接口获取临时下载 URL
       const param = {
         remoteLocation: img.File_Md5
       };
@@ -803,21 +660,19 @@ export default {
         JSON.stringify(param),
         (respData) => {
           if (respData) {
-            // 将 URL 中的 http://127.0.0.1:9000 替换为 https://api-v2.sensor-smart.cn:22027
             const modifiedUrl = respData.replace(
               'http://127.0.0.1:9000',
               'https://api-v2.sensor-smart.cn:22027'
             );
 
-            // 设置当前图片信息
             this.currentImage = img;
             this.currentImageUrl = modifiedUrl;
-            this.currentZoom = 1; // 重置缩放比例
-            this.translateX = 0; // 重置 X 轴偏移
-            this.translateY = 0; // 重置 Y 轴偏移
+            this.currentZoom = 1;
+            this.translateX = 0;
+            this.translateY = 0;
             this.lastTranslateX = 0;
             this.lastTranslateY = 0;
-            this.showImagePreview = true; // 显示弹窗
+            this.showImagePreview = true;
           } else {
             this.$toast.fail('获取文件预览链接失败');
           }
@@ -828,10 +683,8 @@ export default {
       );
     },
 
-    // 触摸开始事件
     handleTouchStart(event) {
       if (event.touches.length === 2) {
-        // 双指触摸开始，记录初始距离
         const touch1 = event.touches[0];
         const touch2 = event.touches[1];
         this.touchStartDistance = Math.sqrt(
@@ -840,20 +693,17 @@ export default {
         );
         this.touchStartZoom = this.currentZoom;
         this.isPinching = true;
-        this.isDragging = false; // 停止平移
+        this.isDragging = false;
       } else if (event.touches.length === 1) {
-        // 单指触摸，记录初始位置
         this.touchStartX = event.touches[0].clientX;
         this.touchStartY = event.touches[0].clientY;
         this.lastTouchX = event.touches[0].clientX;
         this.lastTouchY = event.touches[0].clientY;
         this.isDragging = true;
-        this.isPinching = false; // 停止缩放
+        this.isPinching = false;
 
-        // 检测双击
         const currentTime = new Date().getTime();
         if (currentTime - this.lastTapTime < 300) {
-          // 双击事件，切换缩放状态
           this.toggleZoom();
           event.preventDefault();
         }
@@ -861,10 +711,8 @@ export default {
       }
     },
 
-    // 触摸移动事件
     handleTouchMove(event) {
       if (event.touches.length === 2 && this.isPinching) {
-        // 双指触摸移动，计算缩放
         const touch1 = event.touches[0];
         const touch2 = event.touches[1];
         const currentDistance = Math.sqrt(
@@ -872,19 +720,15 @@ export default {
           Math.pow(touch2.clientY - touch1.clientY, 2)
         );
 
-        // 计算缩放比例
         const scale = currentDistance / this.touchStartDistance;
-        this.currentZoom = Math.max(0.5, Math.min(this.touchStartZoom * scale, 5)); // 限制缩放范围
+        this.currentZoom = Math.max(0.5, Math.min(this.touchStartZoom * scale, 5));
 
-        // 计算新的平移位置，以两指中心为缩放中心
         const centerX = (touch1.clientX + touch2.clientX) / 2;
         const centerY = (touch1.clientY + touch2.clientY) / 2;
 
-        // 更新平移位置
         this.translateX = this.lastTranslateX + (centerX - this.touchStartX) * (this.currentZoom - this.touchStartZoom) / this.touchStartZoom;
         this.translateY = this.lastTranslateY + (centerY - this.touchStartY) * (this.currentZoom - this.touchStartZoom) / this.touchStartZoom;
       } else if (event.touches.length === 1 && this.isDragging && this.currentZoom > 1) {
-        // 单指移动，计算平移
         const touch = event.touches[0];
         const deltaX = touch.clientX - this.lastTouchX;
         const deltaY = touch.clientY - this.lastTouchY;
@@ -897,14 +741,11 @@ export default {
       }
     },
 
-    // 触摸结束事件
     handleTouchEnd() {
       if (this.isPinching) {
-        // 结束缩放时，更新最后的平移值
         this.lastTranslateX = this.translateX;
         this.lastTranslateY = this.translateY;
       } else if (this.isDragging) {
-        // 结束平移时，更新最后的平移值
         this.lastTranslateX = this.translateX;
         this.lastTranslateY = this.translateY;
       }
@@ -913,20 +754,18 @@ export default {
       this.isDragging = false;
     },
 
-    // 双击切换缩放
     toggleZoom() {
       if (this.currentZoom > 1) {
-        this.currentZoom = 1; // 恢复原始大小
-        this.translateX = 0; // 重置 X 轴偏移
-        this.translateY = 0; // 重置 Y 轴偏移
+        this.currentZoom = 1;
+        this.translateX = 0;
+        this.translateY = 0;
         this.lastTranslateX = 0;
         this.lastTranslateY = 0;
       } else {
-        this.currentZoom = 2; // 放大到 2 倍
+        this.currentZoom = 2;
       }
     },
 
-    // 关闭图片预览弹窗
     closeImagePreview() {
       this.showImagePreview = false;
       this.currentImage = null;
@@ -936,7 +775,6 @@ export default {
       this.translateY = 0;
       this.lastTranslateX = 0;
       this.lastTranslateY = 0;
-      // 重置触摸状态
       this.touchStartDistance = 0;
       this.touchStartZoom = 1;
       this.isPinching = false;
@@ -1080,8 +918,8 @@ export default {
         const requestData = {
           PageIndex: 0,
           PageSize: 10,
-          Inventory_ID: this.inventoryId, // 确保是字符串类型
-          Transaction_Type: "修改", // 操作类型为"修改信息"
+          Inventory_ID: this.inventoryId,
+          Transaction_Type: "修改",
           Quantity_Change: 0,
           Current_Quantity: 0,
           Report_Person: {
@@ -1092,7 +930,6 @@ export default {
           Remark: this.remark || `${getLocalUserInfo().name} 修改了物品信息：${this.itemForm.Item_Name}`
         };
 
-        // 调用事务记录接口
         SensorRequestPage.InventoryTransactionAddFun(
           JSON.stringify(requestData),
           (respData) => {
@@ -1107,7 +944,6 @@ export default {
         );
       });
     },
-    // 重置表单
     resetForm() {
       this.itemForm = {
         Item_Name: '',
@@ -1129,8 +965,8 @@ export default {
         Item_Mores: '',
         Item_Tags: []
       };
-      this.itemTags = []; // 清空标签
-      this.newTag = ''; // 清空新标签输入框
+      this.itemTags = [];
+      this.newTag = '';
       this.imageList = [];
       this.fileList = [];
       this.existingImages = [];
@@ -1143,7 +979,6 @@ export default {
         this.$toast('请勿操作，当前正在提交中');
         return;
       }
-      // 清空表单
       this.resetForm();
       this.$router.go(-1);
     }
