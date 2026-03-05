@@ -86,6 +86,7 @@ import weeklyReport from '@/assets/周报管理.png'
 import allIcon from '@/assets/I导航主页.png'
 import inventoryIcon from '@/assets/库存-库存单据.png'
 import inventoryIconNew from '@/assets/库存业务.png'
+import inventoryDownLoad from '@/assets/库存导出.png'
 import scanConfigIcon from '@/assets/scan_icon.png'
 import uploadIcon from '@/assets/跨公司调拨.png'
 import {
@@ -160,6 +161,12 @@ export default {
         {
           icon: uploadIcon,
           title: '库存导入',
+          path: '/excel-upload', // 新增路径
+          hiddenOnMobile: true // 仅在PC端显示
+        },
+        {
+          icon: inventoryDownLoad,
+          title: '库存导出',
           path: '/excel-upload', // 新增路径
           hiddenOnMobile: true // 仅在PC端显示
         },
@@ -412,6 +419,14 @@ export default {
         // 仅在PC端允许跳转
         if (this.isPC) {
           this.navigateTo('/excelUpload');
+        } else {
+          this.$toast.fail('此功能仅在PC端可用');
+        }
+      }
+      if (item.title === '库存导出') {
+        // 仅在PC端允许跳转
+        if (this.isPC) {
+          this.$toast.success('正在开发中 ！');
         } else {
           this.$toast.fail('此功能仅在PC端可用');
         }
