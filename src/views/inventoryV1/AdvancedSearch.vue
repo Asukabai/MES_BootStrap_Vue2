@@ -68,7 +68,7 @@
           class="tag-button"
           @click="toggleTag(tag.name)"
         >
-          {{ tag.name }}
+          <span class="tag-text">{{ truncateTagText(tag.name) }}</span>
         </van-button>
       </div>
     </div>
@@ -137,8 +137,7 @@
     />
   </div>
 </template>
-<script>
-import { Toast } from 'vant';
+<script>import { Toast } from 'vant';
 import SensorRequestPage from '@/utils/SensorRequestPage.js';
 import SensorRequest from '@/utils/SensorRequest.js'; // 添加此导入以获取图片URL
 import {key_DingScannedInventoryQRCodeResult} from "@/utils/Dingding";
@@ -151,7 +150,7 @@ export default {
     return {
       searchKeyword: '', // 搜索关键词
       selectedTags: [], // 已选择的标签
-      commonTags: [], // 常用标签，从API获取
+      commonTags: [], // 常用标签，从 API 获取
       searchResults: [], // 搜索结果
       loading: false,
       finished: false,
@@ -168,6 +167,15 @@ export default {
     goBack() {
       this.navigateTo('/inventoryV1');
     },
+    // 截断文本显示，超过指定长度显示省略号
+    truncateTagText(text) {
+      if (!text) return '';
+      // 如果超过 4 个字，截取前 4 个字并添加省略号
+      if (text.length > 4) {
+        return text.substring(0, 4) + '...';
+      }
+      return text;
+    },
     // 加载常用标签
     loadCommonTags() {
       SensorRequestPage.InventoryGetCommonTagsFun("",
@@ -180,7 +188,7 @@ export default {
               count: item.Usage_Count
             })).sort((a, b) => b.count - a.count);
 
-            // 如果标签数量不足9个，展示所有标签；否则取前9个
+            // 如果标签数量不足 9 个，展示所有标签；否则取前 9 个
             this.commonTags = sortedTags.slice(0, 30);
           } else {
             Toast('获取标签数据失败');
@@ -260,7 +268,7 @@ export default {
 
         // 构造请求参数
         const params = {
-          PageIndex: this.currentPage - 1, // 页码从0开始
+          PageIndex: this.currentPage - 1, // 页码从 0 开始
           PageSize: this.pageSize,
           Item_Tags: allTags, // 合并后的标签数组（包含关键词和选中标签）
           Item_Name: "", // 搜索关键词不再单独传递，而是作为标签处理
@@ -271,7 +279,7 @@ export default {
         SensorRequestPage.InventorySearchByTagsFun(JSON.stringify(params),
           (respData) => {
             try {
-              // 解析响应数据 - 新的数据格式是字符串化的JSON
+              // 解析响应数据 - 新的数据格式是字符串化的 JSON
               let parsedData = null;
               if (typeof respData === 'string') {
                 parsedData = JSON.parse(respData);
@@ -279,7 +287,7 @@ export default {
                 parsedData = respData;
               }
 
-              // 提取实际的Data数组
+              // 提取实际的 Data 数组
               let newData = [];
               if (parsedData && parsedData.Data) {
                 newData = parsedData.Data;
@@ -293,7 +301,7 @@ export default {
                 if (this.currentPage === 1) {
                   // 如果是第一页就返回空数据，说明没有符合条件的结果
                   this.searchResults = [];
-                  this.finished = true; // 设置为true防止继续加载
+                  this.finished = true; // 设置为 true 防止继续加载
                   Toast('未找到匹配的库存信息');
                 } else {
                   // 如果是后续页面返回空数据，说明已经到底了
@@ -319,7 +327,7 @@ export default {
                   brand: item.Item_Brand || '',
                   // 添加图片信息
                   Item_Images: item.Item_Images || [],
-                  // 初始化图片URL为空字符串
+                  // 初始化图片URL 为空字符串
                   imageUrl: ''
                 };
 
@@ -327,7 +335,7 @@ export default {
                 if (processedItem.Item_Images && processedItem.Item_Images.length > 0) {
                   const firstImage = processedItem.Item_Images[0];
                   if (firstImage.File_Md5) {
-                    // 调用后端接口获取临时下载URL
+                    // 调用后端接口获取临时下载 URL
                     const param = {
                       remoteLocation: firstImage.File_Md5
                     };
@@ -336,7 +344,7 @@ export default {
                       JSON.stringify(param),
                       (urlRespData) => {
                         if (urlRespData) {
-                          // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
+                          // 将 URL 中的 http://127.0.0.1:9000 替换为 https://api-v2.sensor-smart.cn:22027
                           processedItem.imageUrl = urlRespData.replace(
                             'http://127.0.0.1:9000',
                             'https://api-v2.sensor-smart.cn:22027'
@@ -375,7 +383,7 @@ export default {
               if (this.currentPage === 1) {
                 this.searchResults = processedData;
               } else {
-                // 防止重复添加相同ID的项目
+                // 防止重复添加相同 ID 的项目
                 const newItems = processedData.filter(newItem =>
                   !this.searchResults.some(existingItem => existingItem.Id === newItem.Id)
                 );
@@ -415,7 +423,7 @@ export default {
           console.error('加载数据失败:', error);
         }
       }
-      this.loading = false; // 在请求完成后设置为false
+      this.loading = false; // 在请求完成后设置为 false
     },
 
     // 下拉刷新
@@ -470,7 +478,7 @@ export default {
 
       console.log('货架位置:', item.Shelf_Location);
 
-      // 将当前物品信息保存到sessionStorage中(模拟扫码情况)
+      // 将当前物品信息保存到 sessionStorage 中 (模拟扫码情况)
       sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, item.Shelf_Location);
 
       // 跳转到库存详情页面
@@ -483,7 +491,7 @@ export default {
       }
     },
 
-    // 修改获取图片URL方法
+    // 修改获取图片URL 方法
     getImageUrl(item) {
       // 直接返回预加载的图片URL
       return item.imageUrl || require('@/assets/暂无图片1.png');
@@ -496,7 +504,6 @@ export default {
   }
 };
 </script>
-
 
 <style scoped>
 /* 样式保持不变 */
