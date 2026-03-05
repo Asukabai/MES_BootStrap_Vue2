@@ -1353,8 +1353,13 @@ export default {
         if (param.Category_Type !== '项目') {
           param.Project_Code = '';
         }
+        // 显示加载提示，告知用户正在处理中
+        Toast.loading({
+          mask: true,
+          message: '保存中...',
+          duration: 0 // 不自动消失
+        });
         SensorRequestPage.InventoryItemAddFun(JSON.stringify(param), (respData) => {
-          Toast.success('新增物品成功');
           // 解析返回的响应数据，获取新增物品的ID
           try {
             console.log('新增物品ID:', respData);
@@ -1367,10 +1372,17 @@ export default {
           } catch (parseError) {
             console.error('解析新增物品响应失败:', parseError);
           }
+          // 隐藏加载提示
+          Toast.clear();
+          // 显示成功消息
+          Toast.success('新增物品成功，即将返回库存管理页面');
           // 返回上一页
           this.navigateTo('/inventoryV1');
         }, (error) => {
           console.error('新增物品失败:', error);
+          // 隐藏加载提示
+          Toast.clear();
+          // 显示错误消息
           Toast.fail('新增物品失败：'+ error)
         });
       } catch (error) {
