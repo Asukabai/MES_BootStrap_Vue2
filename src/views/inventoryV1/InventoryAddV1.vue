@@ -138,46 +138,60 @@
             placeholder="请输入备注"
           />
 
-          <!-- 扩展信息 -->
-          <van-field
-            v-model="itemForm.Item_Color"
-            name="Item_Color"
-            label="物品颜色"
-            placeholder="请输入物品颜色"
-          />
-
-          <van-field
-            v-model="itemForm.Item_Size"
-            name="Item_Size"
-            label="物品尺寸"
-            placeholder="请输入物品尺寸"
-          />
-
-          <van-field
-            v-model="itemForm.Item_Unit"
-            name="Item_Unit"
-            label="物品单位"
-            placeholder="请输入物品单位"
-          />
-
-          <van-field
-            v-model="itemForm.Item_Material"
-            rows="2"
-            autosize
-            type="textarea"
-            maxlength="100"
-            name="Item_Material"
-            label="物品材质"
-            placeholder="请输入物品材质信息（最多100字）"
-            show-word-limit
-          />
-
           <!-- 更多信息输入 -->
-          <van-cell :border="false">
+          <van-cell
+            :border="false"
+            center
+            class="more-info-header"
+          >
             <template #title>
               <span>更多信息</span>
             </template>
+            <template #right-icon>
+              <van-icon
+                :name="showExtendedInfo ? 'arrow-up' : 'arrow-down'"
+                size="16px"
+                class="expand-arrow"
+                @click="toggleExpandInfo"                style="cursor: pointer;"
+              />
+            </template>
           </van-cell>
+          <!-- 扩展信息内容区域 - 使用 v-show 控制显示隐藏 -->
+          <div v-show="showExtendedInfo" class="extended-info-content">
+            <!-- 扩展信息 -->
+            <van-field
+              v-model="itemForm.Item_Color"
+              name="Item_Color"
+              label="物品颜色"
+              placeholder="请输入物品颜色"
+            />
+
+            <van-field
+              v-model="itemForm.Item_Size"
+              name="Item_Size"
+              label="物品尺寸"
+              placeholder="请输入物品尺寸"
+            />
+
+            <van-field
+              v-model="itemForm.Item_Unit"
+              name="Item_Unit"
+              label="物品单位"
+              placeholder="请输入物品单位"
+            />
+
+            <van-field
+              v-model="itemForm.Item_Material"
+              rows="2"
+              autosize
+              type="textarea"
+              maxlength="100"
+              name="Item_Material"
+              label="物品材质"
+              placeholder="请输入物品材质信息（最多 100 字）"
+              show-word-limit
+            />
+          </div>
           <div class="more-fields-container">
             <div v-for="(field, index) in moreFields" :key="index" class="more-field-row">
               <van-field
@@ -210,7 +224,6 @@
               + 自定义添加更多信息字段
             </van-button>
           </div>
-
           <!-- 标签输入区域 -->
           <van-cell :border="false">
             <template #title>
@@ -366,6 +379,7 @@ export default {
   name: 'InventoryAddV1',
   data() {
     return {
+      showExtendedInfo: false, // 控制扩展信息是否展开
       scanIcon: require('../../assets/scan_icon.png'), // 添加扫码图标
       loadIcon: require('../../assets/loadIcon.png'), // 添加扫码图标
       itemForm: {
@@ -451,6 +465,10 @@ export default {
     }
   },
   methods: {
+    // 切换扩展信息的展开/收起状态
+    toggleExpandInfo() {
+      this.showExtendedInfo = !this.showExtendedInfo;
+    },
     // 项目字段点击事件
     onProjectFieldClick() {
       this.showProjectPicker = true;
@@ -1439,6 +1457,27 @@ export default {
 </script>
 
 <style scoped>
+
+/* 扩展信息折叠样式 */
+.expand-info-header {
+  background-color: #f7f8fa;
+  cursor: pointer;
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
+.expand-info-header:active {
+  background-color: #eef0f2;
+}
+
+.expand-arrow {
+  transition: transform 0.3s ease;
+}
+
+.extended-info-content {
+  background-color: #fff;
+}
+
 .inventory-add-page {
   min-height: 100vh;
   background-color: #f5f5f5;
