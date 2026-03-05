@@ -8,6 +8,7 @@
       is-link
       readonly
       @click="showPicker = true"
+      class="project-input-field"
     >
       <template #label>
         <span v-if="required" style="color: red;">*</span>
@@ -28,7 +29,7 @@
 
         <!-- 历史选择区域 -->
         <div v-if="recentProjects.length > 0" class="recent-projects">
-          <div class="recent-title">最近选择：</div>
+          <div class="recent-title">最近选择:</div>
           <div class="recent-list">
             <van-tag
               v-for="(project, index) in recentProjects"
@@ -71,10 +72,9 @@ import SensorRequest from '../utils/SensorRequest.js';
 export default {
   name: 'ProjectPicker',
   props: {
-    // 选中的项目代码（用于 v-model 双向绑定）
+    // 选中的项目代码 (用于 v-model 双向绑定)
     value: {
       type: String,
-      default: ''
     },
     // 标签文本
     label: {
@@ -97,7 +97,7 @@ export default {
       selectedProjectName: '', // 用于显示选中的项目名称
       projectColumns: [], // 项目名称列表，用于选择器显示
       filteredProjectColumns: [], // 过滤后的项目列表
-      fullProjectList: [], // 保存完整的项目信息（包含 Project_Code 和 Project_Name）
+      fullProjectList: [], // 保存完整的项目信息 (包含 Project_Code 和 Project_Name)
       searchKeyword: '', // 搜索关键词
       recentProjects: [] // 最近选择的项目
     };
@@ -260,6 +260,54 @@ export default {
 <style scoped>
 .project-picker-wrapper {
   width: 100%;
+}
+
+/* 关键样式：让输入框内容靠左显示 */
+.project-input-field :deep(.van-cell) {
+  display: flex;
+  align-items: center;
+}
+
+.project-input-field :deep(.van-cell__value) {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start !important;
+  flex: 1;
+  min-width: 0;
+}
+
+.project-input-field :deep(.van-field__body) {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  flex: 1;
+  text-align: left;
+}
+
+.project-input-field :deep(.van-field__control) {
+  text-align: left !important;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 针对移动端优化 */
+@media screen and (max-width: 768px) {
+  .project-input-field :deep(.van-cell) {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .project-input-field :deep(.van-field__label) {
+    width: auto;
+    min-width: 80px;
+    flex-shrink: 0;
+  }
+
+  .project-input-field :deep(.van-field__body) {
+    max-width: calc(100% - 90px);
+  }
 }
 
 .project-picker-container {
