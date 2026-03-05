@@ -73,11 +73,28 @@
         </van-cell>
 
         <!-- 关联项目字段 - 使用 ProjectPicker 组件 -->
-        <van-cell
-          v-if="itemForm.Category_Type === '项目'"
-          title="*关联项目"
-        >
-          <template #default>
+<!--        <van-cell-->
+<!--          v-if="itemForm.Category_Type === '项目'"-->
+<!--          title="关联项目"-->
+<!--          class="project-picker-cell"-->
+<!--          required-->
+<!--        >-->
+<!--        <ProjectPicker-->
+<!--          ref="projectPicker"-->
+<!--          v-model="selectedProjectName"-->
+<!--          placeholder="请选择关联项目"-->
+<!--          :required="false"-->
+<!--          @change="onProjectChange"-->
+<!--        />-->
+<!--        </van-cell>-->
+
+        <!-- 关联项目字段 - 使用 ProjectPicker 组件 -->
+        <div class="project-picker-vertical-cell" v-if="itemForm.Category_Type === '项目'">
+          <div class="project-label-row">
+            <span class="required-mark">*</span>
+            <span class="label-text"> 关联项目</span>
+          </div>
+          <div class="project-content-row">
             <ProjectPicker
               ref="projectPicker"
               v-model="selectedProjectName"
@@ -85,8 +102,8 @@
               :required="false"
               @change="onProjectChange"
             />
-          </template>
-        </van-cell>
+          </div>
+        </div>
 
         <van-cell title="所属公司">
           <template #default>
@@ -987,6 +1004,60 @@ export default {
 </script>
 
 <style scoped>
+
+/* 关联项目选择器 - 垂直布局样式 */
+.project-picker-vertical-cell {
+  padding: 10px 16px;
+  background-color: #fff;
+}
+
+.project-label-row {
+  display: flex;
+  align-items: center;
+  margin-bottom: 8px;
+  font-size: 14px;
+  color: #323233;
+}
+
+.required-mark {
+  color: #ee0a24;
+  margin-right: 2px;
+}
+
+.label-text {
+  font-weight: 500;
+}
+
+.project-content-row {
+  width: 100%;
+}
+
+.project-content-row :deep(.van-field) {
+  padding: 0;
+}
+
+.project-content-row :deep(.van-cell) {
+  padding: 0;
+  border: none;
+}
+
+.project-content-row :deep(.van-field__body) {
+  width: 100%;
+}
+
+.project-content-row :deep(.van-field__control) {
+  text-align: left !important;
+  width: 100%;
+}
+
+/* 图片预览弹窗样式 */
+.image-preview-container {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: #000;
+  color: #fff;
+}
 .card-container {
   background-color: #fff;
   border-radius: 10px;
@@ -1177,6 +1248,20 @@ export default {
 
 .add-tag-btn {
   flex-shrink: 0;
+}
+
+
+.project-picker-cell :deep(.van-cell__title) {
+  flex-shrink: 0;
+  width: auto;
+  min-width: 80px;  /* 确保标题区域不会被压缩 */
+}
+
+.project-picker-cell :deep(.van-cell__value) {
+  display: block;
+  width: 100%;
+  padding: 0;
+  justify-content: flex-start !important;  /* 强制靠左 */
 }
 
 /* 图片预览弹窗样式 */
