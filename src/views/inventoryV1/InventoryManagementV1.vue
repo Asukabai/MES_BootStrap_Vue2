@@ -931,20 +931,20 @@ export default {
         cancelButtonText: '取消'
       }).then(() => {
         // 用户确认，调用 startBatchScan 方法
-        this.startBatchScan();
+        // this.startBatchScan();
+        this.navigateTo('/inventory/addV1');
       }).catch(() => {
         // 用户取消，退出程序
         console.log('用户取消批量扫码');
       });
     },
-// 修改 startBatchScan 方法
+    // 修改 startBatchScan 方法
     startBatchScan() {
-      // 判断是否为PC端（非钉钉环境或钉钉PC端）
+      // 判断是否为 PC 端（非钉钉环境或钉钉 PC 端）
       if (typeof dd === 'undefined' || !dd.env || dd.env.platform === 'pc') {
-        this.$toast.fail('PC端暂不支持扫码功能，请在钉钉移动端使用');
+        this.$toast.fail('PC 端暂不支持扫码功能，请在钉钉移动端使用');
         return;
       }
-
       console.log("开始资产批量扫码");
 
       // 提示用户进入批量扫描模式
@@ -953,51 +953,146 @@ export default {
         type: 'info',
         duration: 2000
       });
-
       const scannedResults = []; // 用于存储扫码结果的列表
-
       // 定义递归扫描函数
       const startScan = () => {
         dd.ready(() => {
           dd.biz.util.scan({
             type: 'qrCode',
-            onSuccess: (data) => {
+            onSuccess: async (data) => {
               const result = data.text; // 获取扫描结果
               console.log("扫描结果:", result);
-
               // 手动解析非标准 JSON 格式
               const parsedResult = this.parseCustomJSON(result);
               console.log('解析后的对象:', parsedResult);
-
               const requiredFields = ['on', 'pc', 'pm', 'qty', 'cc', 'pdi'];
-              const optionalFields = ['mc', 'hp'];
-
               // 检查是否包含所有必需字段
               if (parsedResult && typeof parsedResult === 'object' &&
                 requiredFields.every(field => field in parsedResult)) {
-
                 console.log('扫描结果为嘉立创商城物品结构体');
-                this.$toast.success('扫描成功！');
+                try {
+                  // 显示加载提示
+                  this.$toast.loading({
+                    message: '获取商品详情中...',
+                    duration: 0
+                  });
+                  // 提取商品编号（从 pc 字段或其他合适字段）
+                  let productCode = '';
+                  // 尝试从不同字段提取商品编号
+                  if (parsedResult.pc && typeof parsedResult.pc === 'string') {
+                    // 从 pc 字段提取，例如 "电容 C2885796 5.6nF" -> "C2885796"
+                    const match = parsedResult.pc.match(/C\d{7,}/i);
+                    if (match) {
+                      productCode = match[0];
+                      // alert("提取到商品编号：" + productCode)
+                    }}
+                  // 如果提取到商品编号，调用后端接口获取详情
+                  if (productCode) {
+                    const jlcParam = {
+                      keyword: productCode
+                    };
+                    alert("提取到商品编号，调用后端接口获取详情：" + jlcParam.keyword);
+                    // 调用后端接口 - 使用回调方式
+                    SensorRequest.Jlc_GetProductDetails(
+                      JSON.stringify(jlcParam),
+                      async (respData) => {
+                        console.log('嘉立创商品详情响应:', respData);
+                        // alert('嘉立创商品详情响应：' + respData);
+                        try {
+                          // 解析响应数据
+                          const detailData = JSON.parse(respData);
+                          console.log('解析后的商品详情:', detailData);
+                          // 关闭加载提示
+                          this.$toast.clear();
+                          // 合并扫码结果和后端返回的详情数据
+                          const enrichedResult = {
+                            ...parsedResult,
+                            jlcDetail: detailData, // 添加嘉立创详情数据
+                            productCode: productCode // 添加商品编号
+                          };
+                          console.log('合并后的结果:', enrichedResult);
+                          // alert('合并后的结果：' + JSON.stringify(enrichedResult));
+                          // 去重检查：检查是否已存在相同的物品
+                          const isDuplicate = scannedResults.some(existing => {
+                            // 比较编码 (on)、型号 (pc) 和品牌 (pm)
+                            return existing.on === enrichedResult.on &&
+                              existing.pc === enrichedResult.pc &&
+                              existing.pm === enrichedResult.pm;
+                          });
 
-                // 将扫码结果添加到数组中
-                scannedResults.push(parsedResult);
+                          if (isDuplicate) {
+                            // 发现重复物品，提示用户
+                            this.$toast.fail(`检测到重复物品：${enrichedResult.on} (${enrichedResult.pc})，已自动跳过`);
+                            console.log('跳过重复物品:', enrichedResult);
+                            // 询问是否继续扫码
+                            this.showContinueScanDialog(scannedResults, startScan);
+                          } else {
+                            // 没有重复，添加到数组中
+                            scannedResults.push(enrichedResult);
+                            console.log('添加新物品:', enrichedResult);
+                            this.$toast.success('扫描成功！');
+                            // 询问是否继续扫码
+                            this.showContinueScanDialog(scannedResults, startScan);
+                          }
+                        } catch (error) {
+                          console.error('解析商品详情失败:', error);
+                          this.$toast.clear();
+                          this.$toast.fail('解析商品详情失败');
 
-                // 本次扫码结束，询问是否继续扫码
-                this.$dialog.confirm({
-                  title: `已扫描 ${scannedResults.length} 个物品`,
-                  message: '是否继续扫描其他物品？',
-                  confirmButtonText: '继续扫描',
-                  cancelButtonText: '结束扫码'
-                }).then(() => {
-                  // 用户选择继续扫码，延迟一秒后重新启动扫码
-                  setTimeout(() => {
-                    startScan();
-                  }, 1000);
-                }).catch(() => {
-                  // 用户选择结束扫码
-                  console.log('用户结束批量扫码，准备跳转');
-                  this.stopScan(scannedResults);
-                });
+                          // 即使失败也添加原始数据
+                          scannedResults.push(parsedResult);
+                          this.showContinueScanDialog(scannedResults, startScan);
+                        }
+                      },
+                      (error) => {
+                        console.error('获取嘉立创商品详情失败:', error);
+                        this.$toast.clear();
+                        this.$toast.fail('获取商品详情失败，使用原始数据');
+
+                        // 即使失败也添加原始数据
+                        scannedResults.push(parsedResult);
+                        this.showContinueScanDialog(scannedResults, startScan);
+                      }
+                    );
+                  } else {
+                    // 没有提取到商品编号，直接添加原始数据
+                    // 同样进行去重检查
+                    const isDuplicate = scannedResults.some(existing => {
+                      return existing.on === parsedResult.on &&
+                        existing.pc === parsedResult.pc &&
+                        existing.pm === parsedResult.pm;
+                    });
+
+                    if (isDuplicate) {
+                      this.$toast.fail(`检测到重复物品：${parsedResult.on} (${parsedResult.pc})，已自动跳过`);
+                      this.showContinueScanDialog(scannedResults, startScan);
+                    } else {
+                      scannedResults.push(parsedResult);
+                      this.$toast.success('扫描成功！（未识别到商品编号）');
+                      this.showContinueScanDialog(scannedResults, startScan);
+                    }
+                  }
+                } catch (error) {
+                  console.error('获取商品详情失败:', error);
+                  this.$toast.clear();
+                  this.$toast.fail('获取商品详情失败，使用原始数据');
+
+                  // 即使失败也进行去重检查
+                  const isDuplicate = scannedResults.some(existing => {
+                    return existing.on === parsedResult.on &&
+                      existing.pc === parsedResult.pc &&
+                      existing.pm === parsedResult.pm;
+                  });
+
+                  if (isDuplicate) {
+                    this.$toast.fail(`检测到重复物品：${parsedResult.on}，已自动跳过`);
+                    this.showContinueScanDialog(scannedResults, startScan);
+                  } else {
+                    // 即使失败也添加原始数据
+                    scannedResults.push(parsedResult);
+                    this.showContinueScanDialog(scannedResults, startScan);
+                  }
+                }
               } else {
                 // 不符合嘉立创标准，弹窗提示
                 this.$dialog.alert({
@@ -1034,12 +1129,28 @@ export default {
           });
         });
       };
-
       // 启动首次扫描
       startScan();
     },
-
-// 修改 stopScan 方法
+    // 新增方法：显示是否继续扫码的对话框
+    showContinueScanDialog(scannedResults, continueCallback) {
+      this.$dialog.confirm({
+        title: `已扫描 ${scannedResults.length} 个物品`,
+        message: '是否继续扫描其他物品？',
+        confirmButtonText: '继续扫描',
+        cancelButtonText: '结束扫码'
+      }).then(() => {
+        // 用户选择继续扫码，延迟一秒后重新启动扫码
+        setTimeout(() => {
+          continueCallback();
+        }, 1000);
+      }).catch(() => {
+        // 用户选择结束扫码
+        console.log('用户结束批量扫码，准备跳转');
+        this.stopScan(scannedResults);
+      });
+    },
+    // 修改 stopScan 方法
     stopScan(scannedResults) {
       this.$toast({
         message: `批量扫描结束，共扫描到 ${scannedResults.length} 个物品`,
@@ -1050,7 +1161,7 @@ export default {
       this.navigateToBatchResults(scannedResults);
     },
 
-// 修改 parseCustomJSON 方法（如果还没有这个方法，请添加）
+    // 修改 parseCustomJSON 方法（如果还没有这个方法，请添加）
     parseCustomJSON(str) {
       try {
         // 尝试直接解析JSON
@@ -1081,10 +1192,8 @@ export default {
               result[finalKey] = finalValue;
             }
           });
-
           return result;
         }
-
         // 如果以上都失败，返回原始字符串
         return { raw: str };
       }
@@ -1270,10 +1379,8 @@ export default {
               } else {
                 processedItem.imageUrl = require('@/assets/暂无图片1.png');
               }
-
               return processedItem;
             });
-
             if (this.currentPage === 1) {
               this.list = processedData;
             } else {
