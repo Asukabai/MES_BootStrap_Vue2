@@ -932,7 +932,7 @@ export default {
       }).then(() => {
         // 用户确认，调用 startBatchScan 方法
         // this.startBatchScan();
-        this.navigateTo('/inventory/addV1');
+        this.navigateTo('/inventory/batch_scan_results');
       }).catch(() => {
         // 用户取消，退出程序
         console.log('用户取消批量扫码');
