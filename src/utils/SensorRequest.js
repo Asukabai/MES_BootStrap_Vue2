@@ -283,6 +283,12 @@ import * as ssDing from '../utils/Dingding.js';
               callSuccess(respData);
           }, callFail);
       },
+      // 查询嘉立创商品详情数据
+      Jlc_GetProductDetails(param, callSuccess, callFail) {
+          ssDing.PostDataUrl("Jlc_GetProductDetails", param, true, respData => {
+              callSuccess(respData);
+          }, callFail);
+      },
       // 添加资产信息
       AssetInfoAddFun(param) {
           return new Promise((resolve, reject) => {
