@@ -918,7 +918,8 @@ export default {
         }, 10);
       }).catch(() => {
         // 用户选择批量扫码添加
-        this.showBatchScanConfirmation();
+        // this.showBatchScanConfirmation();
+        this.navigateTo('/batch-scan-results');
       });
     },
 
@@ -932,7 +933,7 @@ export default {
       }).then(() => {
         // 用户确认，调用 startBatchScan 方法
         // this.startBatchScan();
-        this.navigateTo('/inventory/batch_scan_results');
+        this.navigateTo('/batch-scan-results');
       }).catch(() => {
         // 用户取消，退出程序
         console.log('用户取消批量扫码');
