@@ -290,12 +290,12 @@
             </van-uploader>
           </van-cell>
 
-          <van-field
-            name="Current_Stock"
-            label="当前库存"
-            readonly
-            :value="itemForm.Current_Stock.toString()"
-          />
+<!--          <van-field-->
+<!--            name="Current_Stock"-->
+<!--            label="当前库存"-->
+<!--            readonly-->
+<!--            :value="itemForm.Current_Stock.toString()"-->
+<!--          />-->
         </van-cell-group>
         <!--将容器的 display 设置为 flex，使子元素水平排列，添加 gap: 16px 在按钮之间增加间距，为每个按钮添加 style="flex: 1" 使它们平均分配宽度-->
         <div style="margin: 16px; display: flex; gap: 16px;">
