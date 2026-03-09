@@ -204,7 +204,7 @@ const router = new Router({
       path: '/:department/batch_scan_results',
       name: 'ScanConfigList',
       component: () => import('@/views/code/BatchScanResults.vue'),
-      meta: { title: '批量扫码结果' }
+      meta: { title: '资产批量扫码结果' }
     },
     {
       path: '/:department/AddStored',
@@ -363,7 +363,7 @@ const router = new Router({
       path: '/:department/batch-scan-results',
       name: 'BatchScanResults',
       component: () => import('../views/inventoryV1/BatchScanResults.vue'),
-      meta: { title: '批量扫码结果' }
+      meta: { title: '库存批量扫码' }
     },
     {
       path: '/:department/inventory/addV1',
