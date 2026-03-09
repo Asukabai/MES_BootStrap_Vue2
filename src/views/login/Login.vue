@@ -54,7 +54,6 @@ export default {
             } else if (type === 'share') {
               targetPath = `/${department}/cartList`
             }
-
             if (this.$route.path !== targetPath) {
               this.$router.push({ path: targetPath }).catch(err => {
                 console.error('登录后跳转失败:', err)
