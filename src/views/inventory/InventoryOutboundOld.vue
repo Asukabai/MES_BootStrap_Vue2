@@ -574,20 +574,22 @@ export default {
 }
 .button-container {
   display: flex;
-  gap: 16px; /* 设置按钮之间的间距 */
+  flex-direction: row;
+  gap: 12px;
+  max-width: 600px;
+  margin: 0 auto;
+  width: 100%;
 }
 
 .btn-confirm {
-  flex: 1; /* 使两个按钮平分宽度 */
-  height: 56px;
+  flex: 1;
+  height: 48px;
   border: none;
-  border-radius: 16px;
-  background: #3f83f8;
-  color: white;
-  font-size: 18px;
+  border-radius: 12px;
+  font-size: 16px;
   font-weight: 600;
-  cursor: pointer;
   transition: all 0.3s;
+  white-space: nowrap;
 }
 
 .cancel-btn {
