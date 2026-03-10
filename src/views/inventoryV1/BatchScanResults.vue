@@ -3,15 +3,15 @@
     <div class="main-content">
       <!-- 空状态提示 - 使用 hasScannedData 判断 -->
       <div v-if="!hasScannedData" class="empty-hint">
-        <van-empty description="请点击下方按钮开始扫码，且仅支持”嘉立创“物品批量扫码快速新增入库">
-        <van-button
-          type="info"
-          icon="scan"
-          class="custom-round-btn"
-          @click="startBatchScan"
-        >
-          开始扫码
-        </van-button>
+        <van-empty description="请点击下方按钮开始扫码，且仅支持嘉立创物品批量扫码快速新增入库">
+          <van-button
+            type="info"
+            icon="scan"
+            class="custom-round-btn"
+            @click="startBatchScan"
+          >
+            开始扫码
+          </van-button>
         </van-empty>
       </div>
 
@@ -152,6 +152,31 @@
         :items-per-page="pageSize"
         class="pagination"
       />
+
+      <!-- 项目信息展示区域 -->
+      <div v-if="uniqueResults.length > 0" class="project-selection-section">
+        <van-cell-group inset>
+          <van-field
+            v-model="selectedProjectName"
+            name="Project_Code"
+            label="*关联项目"
+            placeholder="请选择关联项目"
+            is-link
+            readonly
+            @click="openProjectPicker"
+          >
+            <template #label>
+              <span style="color: red;">*</span>
+              <span>关联项目</span>
+            </template>
+          </van-field>
+        </van-cell-group>
+        <div v-if="selectedProjectCode" class="project-selected-hint">
+          <van-icon name="checked" color="#07c160" size="16" />
+          <span>已选择：{{ selectedProjectName }}</span>
+        </div>
+      </div>
+
       <div v-if="uniqueResults.length > 0" class="action-bar">
         <div class="button-container">
           <button
@@ -162,20 +187,76 @@
           </button>
           <button
             class="btn-confirm confirm-btn"
+            :disabled="!selectedProjectCode"
             @click="navigateToForm"
           >
             确定添加
           </button>
         </div>
       </div>
+
       <CustomizableFloatingButton
-        :initial-position="{ bottom: 200, right: 10 }"
+        :initial-position="{ bottom: 140, right: 10 }"
         :icon-src="require('@/assets/返回.png')"
         :background-size="46"
         :icon-size="46"
         :on-click="goBack"
       />
     </div>
+
+    <!-- 项目选择器弹窗 - 从底部弹出 -->
+    <van-popup v-model="showProjectPickerPopup" position="bottom" round>
+      <div class="project-picker-full">
+        <div class="picker-header">
+          <p>请为这批商品选择要关联的项目</p>
+        </div>
+
+        <!-- 搜索框 -->
+        <van-search
+          v-model="searchKeyword"
+          placeholder="请输入项目名称搜索"
+          @input="filterProjects"
+          class="project-search"
+        />
+
+        <!-- 历史选择区域 -->
+        <div v-if="recentProjects.length > 0" class="recent-projects">
+          <div class="recent-title">最近选择:</div>
+          <div class="recent-list">
+            <van-tag
+              v-for="(project, index) in recentProjects"
+              :key="index"
+              type="primary"
+              size="medium"
+              class="recent-item"
+              @click="selectRecentProject(project)"
+            >
+              {{ project }}
+            </van-tag>
+          </div>
+        </div>
+
+        <!-- 项目列表选择器 -->
+        <div class="project-list-wrapper">
+          <van-picker
+            show-toolbar
+            :columns="filteredProjectColumns"
+            @confirm="onPickerConfirm"
+            @cancel="showProjectPickerPopup = false"
+          >
+            <template #default>
+              <div v-if="filteredProjectColumns.length === 0 && searchKeyword" class="no-project-result">
+                未找到匹配的项目
+              </div>
+            </template>
+          </van-picker>
+        </div>
+
+        <div class="picker-footer">
+          <button class="picker-btn picker-btn-confirm" @click="confirmProjectSelection">完成选择</button>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -184,6 +265,7 @@ import * as dd from 'dingtalk-jsapi';
 import SensorRequest from '../../utils/SensorRequest.js';
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 import ImageUploaderComponent from "@/components/ImageUploaderComponent.vue";
+// Deleted:import ProjectPicker from "@/components/ProjectPicker.vue";
 
 export default {
   name: 'BatchScanResults',
@@ -198,7 +280,16 @@ export default {
       isScanning: false, // 是否正在扫码
       hasScannedData: false, // 是否有扫码数据标志
       expandedItems: new Set(), // 已展开的物品索引集合
-      expandedImages: new Set() // 已展开图片上传区域的物品索引集合
+      expandedImages: new Set(), // 已展开图片上传区域的物品索引集合
+      showProjectPickerPopup: false, // 显示项目选择器弹窗
+      selectedProjectCode: '', // 选中的项目代码
+      selectedProjectName: '', // 选中的项目名称
+      // 项目选择相关数据
+      projectColumns: [], // 项目名称列表
+      filteredProjectColumns: [], // 过滤后的项目列表
+      fullProjectList: [], // 完整的项目信息列表
+      searchKeyword: '', // 搜索关键词
+      recentProjects: [] // 最近选择的项目
     };
   },
   computed: {
@@ -228,6 +319,10 @@ export default {
     console.log('[created] pageSize:', this.pageSize);
     console.log('[created] 空状态判断条件 !hasScannedData:', !this.hasScannedData);
     console.log('==========================================================\n');
+
+    // 加载项目选项和历史记录
+    this.loadProjectOptions();
+    this.loadRecentProjects();
   },
   mounted() {
     console.log('==================== [mounted] 页面已挂载 ====================');
@@ -238,6 +333,185 @@ export default {
     console.log('==========================================================\n');
   },
   methods: {
+    // 加载项目选项
+    loadProjectOptions() {
+      const param = {};
+      SensorRequest.ProjectInfoGetFun(JSON.stringify(param), (respData) => {
+        try {
+          let data = [];
+          if (typeof respData === 'string') {
+            data = JSON.parse(respData);
+          } else {
+            data = respData;
+          }
+
+          // 确保是数组格式
+          const projectList = Array.isArray(data) ? data : (data.data || []);
+
+          // 保存完整的项目信息
+          this.fullProjectList = projectList;
+
+          // 只提取项目名称用于选择器显示
+          this.projectColumns = projectList.map(project =>
+            project.Project_Name || project.name || project.projectName || '未知项目'
+          );
+          this.filteredProjectColumns = this.projectColumns;
+
+          console.log('[loadProjectOptions] ✓ 项目选项加载成功:', {
+            total: projectList.length,
+            columns: this.projectColumns.length
+          });
+        } catch (error) {
+          console.error('[loadProjectOptions] ✗ 解析项目数据失败:', error);
+        }
+      }, (error) => {
+        console.error('[loadProjectOptions] ✗ 获取项目信息失败:', error);
+      });
+    },
+
+    // 加载最近选择的项目
+    loadRecentProjects() {
+      const stored = localStorage.getItem('recentProjects');
+      if (stored) {
+        this.recentProjects = JSON.parse(stored);
+      }
+    },
+
+    // 过滤项目列表
+    filterProjects() {
+      if (!this.searchKeyword) {
+        this.filteredProjectColumns = this.projectColumns;
+        return;
+      }
+
+      // 将搜索关键词转换为小写进行比较
+      const keyword = this.searchKeyword.toLowerCase().trim();
+
+      this.filteredProjectColumns = this.projectColumns.filter(project =>
+        project.toLowerCase().includes(keyword)
+      );
+    },
+
+    // 选择器确认事件
+    onPickerConfirm(value) {
+      console.log('[onPickerConfirm] 选择器确认:', value);
+      this.selectProject(value);
+    },
+
+    // 选择最近项目
+    selectRecentProject(projectName) {
+      console.log('[selectRecentProject] 选择最近项目:', projectName);
+      this.selectProject(projectName);
+    },
+
+    // 选择项目的统一处理函数
+    selectProject(projectName) {
+      this.selectedProjectName = projectName;
+      // this.showProjectPickerPopup = false; // 不关闭弹窗，让用户点击完成按钮
+
+      // 查找对应的项目代码
+      const selectedProject = this.fullProjectList.find(project =>
+        (project.Project_Name || project.name || project.projectName) === projectName
+      );
+
+      const projectCode = selectedProject ? (selectedProject.Project_Code || '') : '';
+
+      // 更新选中的项目代码
+      this.selectedProjectCode = projectCode;
+
+      console.log('[selectProject] 项目选择结果:', {
+        projectName: projectName,
+        projectCode: projectCode
+      });
+
+      // 保存到历史记录
+      this.saveToRecentProjects(projectName);
+    },
+
+    // 保存到最近选择
+    saveToRecentProjects(projectName) {
+      // 限制历史记录数量为 5 条
+      const maxRecentCount = 5;
+      if (!this.recentProjects.includes(projectName)) {
+        this.recentProjects.unshift(projectName);
+        if (this.recentProjects.length > maxRecentCount) {
+          this.recentProjects.pop();
+        }
+        // 保存到本地存储
+        localStorage.setItem('recentProjects', JSON.stringify(this.recentProjects));
+      }
+    },
+
+    // 打开项目选择器
+    openProjectPicker() {
+      console.log('==================== [openProjectPicker] 打开项目选择器 ====================');
+
+      if (this.uniqueResults.length === 0) {
+        console.warn('[openProjectPicker] ✗ 没有扫描数据');
+        this.$toast.fail('请先扫码添加物品');
+        return;
+      }
+
+      console.log('[openProjectPicker] ✓ 打开项目选择器弹窗');
+      console.log('[openProjectPicker] 项目列表数量:', this.projectColumns.length);
+      this.showProjectPickerPopup = true;
+
+      // 重置搜索关键词
+      this.searchKeyword = '';
+      this.filterProjects();
+
+      console.log('==========================================================\n');
+    },
+
+    // 处理项目选择变化
+    handleProjectChange(projectData) {
+      console.log('[handleProjectChange] 项目选择变化:', projectData);
+      this.selectedProjectCode = projectData.projectCode;
+      this.selectedProjectName = projectData.projectName;
+    },
+
+    // 确认项目选择
+    confirmProjectSelection() {
+      console.log('==================== [confirmProjectSelection] 确认项目选择 ====================');
+      console.log('[confirmProjectSelection] 当前选择:', {
+        selectedProjectCode: this.selectedProjectCode,
+        selectedProjectName: this.selectedProjectName
+      });
+
+      if (!this.selectedProjectCode || !this.selectedProjectName) {
+        console.warn('[confirmProjectSelection] ✗ 未选择项目');
+        this.$toast.fail('请选择关联项目');
+        return;
+      }
+
+      console.log('[confirmProjectSelection] ✓ 项目选择验证通过');
+
+      // 关闭弹窗
+      this.showProjectPickerPopup = false;
+
+      // 将项目信息添加到每个物品数据中
+      this.uniqueResults.forEach((result, index) => {
+        result.Project_Code = this.selectedProjectCode;
+        result.Project_Name = this.selectedProjectName;
+        console.log(`[confirmProjectSelection] 物品 ${index} 已添加项目信息:`, {
+          Project_Code: this.selectedProjectCode,
+          Project_Name: this.selectedProjectName
+        });
+      });
+
+      console.log('[confirmProjectSelection] 更新后的物品数据:', JSON.parse(JSON.stringify(this.uniqueResults)));
+      console.log('[confirmProjectSelection] ✓ 项目选择完成');
+      console.log('==========================================================\n');
+
+      this.$toast.success('项目关联成功');
+    },
+
+    // 取消项目选择
+    cancelProjectSelection() {
+      console.log('[cancelProjectSelection] 用户取消项目选择');
+      this.showProjectPickerPopup = false;
+    },
+
     // 图片加载失败时的处理
     onIconError(event) {
       console.error('[onIconError] 扫码图标加载失败', event);
@@ -736,24 +1010,34 @@ export default {
       console.log('[navigateToForm]   uniqueResults:', JSON.parse(JSON.stringify(this.uniqueResults)));
       console.log('[navigateToForm]   uniqueResults.length:', this.uniqueResults.length);
       console.log('[navigateToForm]  department:', this.$route.params.department);
+      console.log('[navigateToForm]   selectedProjectCode:', this.selectedProjectCode);
+      console.log('[navigateToForm]   selectedProjectName:', this.selectedProjectName);
 
-      if (this.uniqueResults.length > 0) {
-        this.$toast.success('正在跳转到批量添加页面...');
-        const department= this.$route.params.department || 'default';
-        const dataString = JSON.stringify(this.uniqueResults);
-
-        console.log('[navigateToForm] 跳转路径:', `/${department}/inventory-addV1`);
-        console.log('[navigateToForm] 传递的数据大小:', dataString.length, '字符');
-        console.log('[navigateToForm] 传递的数据:', JSON.parse(JSON.stringify(this.uniqueResults)));
-
-        this.$router.push({
-          path: `/${department}/inventory-addV1`,
-          query: { data: dataString }
-        });
-      } else {
-        console.warn('[navigateToForm] ✗ 没有扫描到任何结果，无法跳转');
+      if (this.uniqueResults.length === 0) {
+        console.warn('[navigateToForm] ✗ 没有扫描到任何结果');
         this.$toast.fail('没有扫描到任何结果');
+        return;
       }
+
+      if (!this.selectedProjectCode || !this.selectedProjectName) {
+        console.warn('[navigateToForm] ✗ 未选择关联项目');
+        this.$toast.fail('请先选择关联项目（点击右下角悬浮图标）');
+        return;
+      }
+
+      console.log('[navigateToForm] ✓ 验证通过，准备跳转');
+      this.$toast.success('正在跳转到批量添加页面...');
+      const department= this.$route.params.department || 'default';
+      const dataString = JSON.stringify(this.uniqueResults);
+
+      console.log('[navigateToForm] 跳转路径:', `/${department}/inventory-addV1`);
+      console.log('[navigateToForm] 传递的数据大小:', dataString.length, '字符');
+      console.log('[navigateToForm] 传递的数据:', JSON.parse(JSON.stringify(this.uniqueResults)));
+
+      this.$router.push({
+        path: `/${department}/inventory-addV1`,
+        query: { data: dataString }
+      });
       console.log('==========================================================\n');
     }
   }
@@ -810,6 +1094,153 @@ export default {
 
 .custom-round-btn {
   border-radius: 10px; /* 可自定义圆角大小 */
+}
+
+/* 项目选择区域样式 */
+.project-selection-section {
+  margin: 16px;
+  padding: 0 16px;
+}
+
+.project-selected-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: #e8f5e9;
+  border-radius: 8px;
+  font-size: 13px;
+  color: #07c160;
+  margin-top: 8px;
+}
+
+.project-selected-hint span {
+  font-weight: 500;
+}
+
+/* 全屏项目选择器样式 */
+.project-picker-full {
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 24px;
+  max-height: 85vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.picker-header {
+  text-align: center;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+}
+
+.picker-header h3 {
+  font-size: 20px;
+  font-weight: 600;
+  color: #333;
+  margin: 0 0 8px 0;
+}
+
+.picker-header p {
+  font-size: 14px;
+  color: #999;
+  margin: 0;
+}
+
+/* 搜索框样式 */
+.project-search {
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+/* 历史选择区域样式 */
+.recent-projects {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f2f3f5;
+  background-color: #fafafa;
+  margin-bottom: 12px;
+  flex-shrink: 0;
+}
+
+.recent-title {
+  font-size: 14px;
+  color: #646566;
+  margin-bottom: 8px;
+  font-weight: 500;
+}
+
+.recent-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.recent-item {
+  cursor: pointer;
+}
+
+.recent-item:hover {
+  opacity: 0.8;
+}
+
+/* 项目列表包装器 */
+.project-list-wrapper {
+  flex: 1;
+  overflow-y: auto;
+  min-height: 300px;
+  max-height: 400px;
+}
+
+.project-list-wrapper :deep(.van-picker__toolbar) {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #fff;
+}
+
+.no-project-result {
+  padding: 20px;
+  text-align: center;
+  color: #969799;
+  font-size: 14px;
+}
+
+.picker-footer {
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #f0f0f0;
+  flex-shrink: 0;
+}
+
+.picker-btn {
+  width: 100%;
+  height: 48px;
+  border: none;
+  border-radius: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.picker-btn-confirm {
+  background: #3f83f8;
+  color: white;
+}
+
+.picker-btn-confirm:active {
+  transform: scale(0.98);
+  opacity: 0.9;
+}
+
+/* 调整 ProjectPicker 组件的样式 */
+.project-picker-full :deep(.van-cell__label) {
+  min-width: 90px;
+}
+
+.project-picker-full :deep(.van-field__label) {
+  width: auto;
 }
 
 .main-content {
@@ -986,7 +1417,12 @@ export default {
   color: white;
 }
 
-.btn-confirm:active {
+.btn-confirm:disabled {
+  background: #cccccc;
+  cursor: not-allowed;
+}
+
+.btn-confirm:active:not(:disabled) {
   transform: scale(0.98);
   box-shadow: 0 2px 10px rgba(102, 126, 234, 0.3);
 }
