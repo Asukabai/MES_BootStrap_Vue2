@@ -4,14 +4,14 @@
       <!-- 空状态提示 - 使用 hasScannedData 判断 -->
       <div v-if="!hasScannedData" class="empty-hint">
         <van-empty description="请点击下方按钮开始扫码，且仅支持“嘉立创”物品批量扫码快速新增入库">
-          <van-button
-            type="info"
-            icon="scan"
-            class="custom-round-btn"
-            @click="startBatchScan"
-          >
-            开始扫码
-          </van-button>
+        <van-button
+          type="info"
+          icon="scan"
+          class="custom-round-btn"
+          @click="startBatchScan"
+        >
+          开始扫码
+        </van-button>
         </van-empty>
       </div>
 
@@ -39,27 +39,19 @@
             </div>
           </div>
           <div slot="label" class="result-detail">
-            <div class="detail-row">
-              <span class="label">型号:</span>
-              <span class="value">{{ result.pc || '暂无' }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">品牌:</span>
-              <span class="value">{{ result.pm || '暂无' }}</span>
-            </div>
-            <div class="detail-row">
-              <span class="label">数量:</span>
-              <span class="value">{{ result.qty || 0 }}</span>
-            </div>
-
             <!-- 展示嘉立创详情数据 -->
             <div v-if="result.jlcDetail" class="jlc-detail-section">
               <div class="section-divider"></div>
-              <div class="section-title">
-                <van-icon name="star" color="#ff976a" /> 嘉立创商品信息
+              <div class="section-title" @click="toggleExpand(index)">
+                <van-icon name="star" color="#ff976a" /> 商品信息
+                <van-icon
+                  :name="expandedItems.has(index) ? 'arrow-up' : 'arrow-down'"
+                  color="#999"
+                  size="14"
+                />
               </div>
 
-              <div class="jlc-info-grid">
+              <div v-show="expandedItems.has(index)" class="jlc-info-grid">
                 <div class="info-item" v-if="result.jlcDetail.Item_Name">
                   <span class="info-label">商品名称:</span>
                   <span class="info-value">{{ result.jlcDetail.Item_Name }}</span>
@@ -122,6 +114,33 @@
               <van-icon name="info-o" color="#999" />
               <span>该物品无嘉立创详情数据</span>
             </div>
+
+            <!-- 图片上传区域 -->
+            <div class="image-upload-section">
+              <div class="section-title-with-icon" @click="toggleImageUpload(index)">
+                <van-icon name="photo-o" color="#3f83f8" size="16" />
+                <span>上传图片</span>
+                <van-icon
+                  :name="expandedImages.has(index) ? 'arrow-up' : 'arrow-down'"
+                  color="#999"
+                  size="14"
+                />
+              </div>
+
+              <div v-show="expandedImages.has(index)" class="image-upload-area">
+                <ImageUploaderComponent
+                  :ref="'imageUploader_' + index"
+                  :file-list="result.images || []"
+                  :custom-icon="require('@/assets/custom-upload-icon2.png')"
+                  icon-style="width: 60px; height: 60px;"
+                  :max-count="3"
+                  :max-size="5 * 1024 * 1024"
+                  note="支持点击图标上传图片，总大小不得超过 5M，最多 3 张"
+                  @input="handleImageUpdate($event, index)"
+                />
+              </div>
+            </div>
+
           </div>
         </van-cell>
       </van-cell-group>
@@ -166,10 +185,11 @@ import { Dialog, Toast } from 'vant';
 import * as dd from 'dingtalk-jsapi';
 import SensorRequest from '../../utils/SensorRequest.js';
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
+import ImageUploaderComponent from "@/components/ImageUploaderComponent.vue";
 
 export default {
   name: 'BatchScanResults',
-  components: {CustomizableFloatingButton},
+  components: {CustomizableFloatingButton, ImageUploaderComponent},
   data() {
     return {
       results: [], // 所有扫码结果
@@ -178,13 +198,15 @@ export default {
       currentPage: 1, // 当前页码
       pageSize: 50, // 每页显示条数
       isScanning: false, // 是否正在扫码
-      hasScannedData: false // 是否有扫码数据标志
+      hasScannedData: false, // 是否有扫码数据标志
+      expandedItems: new Set(), // 已展开的物品索引集合
+      expandedImages: new Set() // 已展开图片上传区域的物品索引集合
     };
   },
   computed: {
     // 分页后的结果
     paginatedResults() {
-      const start = (this.currentPage - 1) * this.pageSize;
+      const start = (this.currentPage- 1) * this.pageSize;
       const end = start + this.pageSize;
       console.log('[paginatedResults] 计算分页:', {
         currentPage: this.currentPage,
@@ -221,6 +243,40 @@ export default {
     // 图片加载失败时的处理
     onIconError(event) {
       console.error('[onIconError] 扫码图标加载失败', event);
+    },
+    // 切换图片上传区域展开/折叠状态
+    toggleImageUpload(index) {
+      const newSet = new Set(this.expandedImages);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      this.expandedImages = newSet;
+      console.log(`[toggleImageUpload] 物品 ${index} 图片上传区域展开状态：`, newSet.has(index));
+    },
+    // 处理图片更新
+    handleImageUpdate(fileList, index) {
+      console.log(`[handleImageUpdate] 物品 ${index} 图片更新:`, fileList);
+
+      // 确保 uniqueResults[index] 存在
+      if (this.uniqueResults[index]) {
+        // 将图片文件列表保存到物品数据中
+        this.$set(this.uniqueResults[index], 'images', fileList);
+
+        console.log('[handleImageUpdate] 更新后的物品数据:', this.uniqueResults[index]);
+      }
+    },
+    // 切换展开/折叠状态
+    toggleExpand(index) {
+      const newSet = new Set(this.expandedItems);
+      if (newSet.has(index)) {
+        newSet.delete(index);
+      } else {
+        newSet.add(index);
+      }
+      this.expandedItems = newSet;
+      console.log(`[toggleExpand] 物品 ${index} 展开状态：`, newSet.has(index));
     },
     // 返回上一页
     goBack() {
@@ -267,7 +323,6 @@ export default {
       });
 
       this.isScanning = true;
-
       // 定义递归扫描函数
       const startScan = () => {
         dd.ready(() => {
@@ -280,133 +335,150 @@ export default {
               // 手动解析非标准 JSON 格式
               const parsedResult = this.parseCustomJSON(result);
               console.log('[startBatchScan.scan.onSuccess] 解析后的对象:', parsedResult);
-
-              const requiredFields = ['on', 'pc', 'pm', 'qty', 'cc', 'pdi'];
-
+              const requiredFields = ['on', 'pc'];
               // 检查是否包含所有必需字段
-              if (parsedResult && typeof parsedResult === 'object' &&
-                requiredFields.every(field => field in parsedResult)) {
+              const hasRequiredFields = parsedResult && typeof parsedResult === 'object' &&
+                requiredFields.every(field => field in parsedResult);
+
+              if (hasRequiredFields) {
                 console.log('[startBatchScan.scan.onSuccess] ✓ 扫描结果为嘉立创商城物品结构体');
                 console.log('[startBatchScan.scan.onSuccess] 必需字段检查:', {
                   hasOn: 'on' in parsedResult,
                   hasPc: 'pc' in parsedResult,
-                  hasPm: 'pm' in parsedResult,
-                  hasQty: 'qty' in parsedResult,
-                  hasCc: 'cc' in parsedResult,
-                  hasPdi: 'pdi' in parsedResult
                 });
+              }
+              try {
+                // 显示加载提示
+                this.$toast.loading({
+                  message: '获取商品详情中...',
+                  duration: 0
+                });
+                // 提取商品编号
+                let productCode = '';
+                // 方案一：从 pc 字段提取（仅当有必需字段时）
+                if (hasRequiredFields && parsedResult.pc && typeof parsedResult.pc === 'string') {
+                  const match = parsedResult.pc.match(/C\d{1,}/i);
+                  if (match) {
+                    productCode = match[0];
+                    console.log('[startBatchScan.scan.onSuccess] 方案一提取到商品编号:', productCode);
+                  }
+                }
 
-                try {
-                  // 显示加载提示
-                  this.$toast.loading({
-                    message: '获取商品详情中...',
-                    duration: 0
-                  });
-
-                  // 提取商品编号 (从 pc 字段或其他合适字段)
-                  let productCode = '';
-
-                  // 尝试从不同字段提取商品编号
-                  if (parsedResult.pc && typeof parsedResult.pc === 'string') {
-                    // 从 pc 字段提取，例如 "电容 C2885796 5.6nF" -> "C2885796"
-                    const match = parsedResult.pc.match(/C\d{7,}/i);
+                // 方案二：如果方案一失败，尝试按分号分隔，寻找 C 开头 + 至少 1 位数字的字符串
+                if (!productCode && result) {
+                  console.log('[startBatchScan.scan.onSuccess] 方案一未提取到商品编号，尝试方案二');
+                  const segments = result.split(';');
+                  console.log('[startBatchScan.scan.onSuccess] 分段结果:', segments);
+                  for (const segment of segments) {
+                    const trimmed = segment.trim();
+                    console.log('[startBatchScan.scan.onSuccess] 检查分段:', trimmed);
+                    const match = trimmed.match(/^C\d{1,}$/i);
                     if (match) {
                       productCode = match[0];
-                      console.log('[startBatchScan.scan.onSuccess] 提取到商品编号:', productCode);
+                      console.log('[startBatchScan.scan.onSuccess] 方案二提取到商品编号:', productCode);
+                      break;
                     }
                   }
+                }
 
-                  // 如果提取到商品编号，调用后端接口获取详情
-                  if (productCode) {
-                    const jlcParam = {
-                      keyword: productCode
-                    };
+                // 如果两种方案都未能提取商品编号，提示错误
+                if (!productCode) {
+                  console.warn('[startBatchScan.scan.onSuccess] ✗ 两种方案都未能提取到商品编号');
+                  this.$toast.clear();
+                  this.$dialog.alert({
+                    title: '扫码失败',
+                    message: '无法从二维码中提取有效的商品编号，请扫描嘉立创商城的物品二维码。',
+                    confirmButtonText: '确定'
+                  }).then(() => {
+                    setTimeout(() => {
+                      startScan();
+                    }, 1000);
+                  });
+                  return;
+                }
 
-                    console.log('[startBatchScan.scan.onSuccess] 调用后端接口获取详情:', jlcParam.keyword);
+                // 如果提取到商品编号，调用后端接口获取详情
+                if (productCode) {
+                  const jlcParam = {
+                    keyword: productCode
+                  };
 
-                    // 调用后端接口 - 使用回调方式
-                    SensorRequest.Jlc_GetProductDetails(
-                      JSON.stringify(jlcParam),
-                      async (respData) => {
-                        console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 嘉立创商品详情响应:', respData);
+                  console.log('[startBatchScan.scan.onSuccess] 调用后端接口获取详情:', jlcParam.keyword);
 
-                        try {
-                          // 解析响应数据
-                          const detailData = JSON.parse(respData);
-                          console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 解析后的商品详情:', detailData);
+                  // 调用后端接口 - 使用回调方式
+                  SensorRequest.Jlc_GetProductDetails(
+                    JSON.stringify(jlcParam),
+                    async (respData) => {
+                      console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 嘉立创商品详情响应:', respData);
 
-                          // 关闭加载提示
-                          this.$toast.clear();
+                      try {
+                        // 解析响应数据
+                        const detailData = JSON.parse(respData);
+                        console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 解析后的商品详情:', detailData);
 
-                          // 合并扫码结果和后端返回的详情数据
-                          const enrichedResult = {
-                            ...parsedResult,
-                            jlcDetail: detailData,
-                            productCode: productCode
-                          };
+                        // 关闭加载提示
+                        this.$toast.clear();
 
-                          console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 合并后的结果:', enrichedResult);
+                        // 构造结果对象
+                        const enrichedResult = {
+                          ...parsedResult,
+                          jlcDetail: detailData,
+                          productCode: productCode,
+                          images: [] // 初始化图片数组
+                        };
 
-                          // 去重检查：检查是否已存在相同的物品
-                          const isDuplicate = this.uniqueResults.some(existing => {
-                            return existing.on === enrichedResult.on &&
-                              existing.pc === enrichedResult.pc &&
-                              existing.pm === enrichedResult.pm;
-                          });
+                        console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 合并后的结果:', enrichedResult);
 
-                          console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 去重检查结果:', {
-                            isDuplicate: isDuplicate,
-                            currentUniqueResultsLength: this.uniqueResults.length
-                          });
-
-                          if (isDuplicate) {
-                            console.warn('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] ✗ 检测到重复物品，跳过');
-                            this.$toast.fail(`检测到重复物品:${enrichedResult.on} (${enrichedResult.pc}),已自动跳过`);
-                            console.log('[startBatchScan] 跳过重复物品后状态:', {
-                              uniqueResults: this.uniqueResults,
-                              count: this.count,
-                              hasScannedData: this.hasScannedData
-                            });
-                            this.showContinueScanDialog(startScan);
-                          } else {
-                            console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] ✓ 添加新物品');
-                            this.uniqueResults.push(enrichedResult);
-                            this.count++;
-                            this.hasScannedData = true;
-                            console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 添加后状态:', {
-                              uniqueResults: JSON.parse(JSON.stringify(this.uniqueResults)),
-                              uniqueResultsLength: this.uniqueResults.length,
-                              count: this.count,
-                              hasScannedData: this.hasScannedData,
-                              空状态应该显示:!this.hasScannedData
-                          });
-                            this.$toast.success('扫描成功!');
-                            this.showContinueScanDialog(startScan);
+                        // 去重检查：检查是否已存在相同的物品
+                        const isDuplicate = this.uniqueResults.some(existing => {
+                          // 优先使用商品编号去重
+                          if (productCode && existing.productCode) {
+                            return existing.productCode === productCode;
                           }
-                        } catch (error) {
-                          console.error('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 解析商品详情失败:', error);
-                          this.$toast.clear();
-                          this.$toast.fail('解析商品详情失败');
-                          this.uniqueResults.push(parsedResult);
-                          this.count++;
-                          this.hasScannedData = true;
-                          console.log('[startBatchScan] 解析失败后状态:', {
-                            uniqueResults: JSON.parse(JSON.stringify(this.uniqueResults)),
-                            uniqueResultsLength: this.uniqueResults.length,
+                          // 如果商品编号不存在，使用传统字段去重
+                          return existing.on === enrichedResult.on &&
+                            existing.pc === enrichedResult.pc &&
+                            existing.pm === enrichedResult.pm;
+                        });
+
+                        console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 去重检查结果:', {
+                          isDuplicate: isDuplicate,
+                          currentUniqueResultsLength: this.uniqueResults.length,
+                          productCode: productCode
+                        });
+
+                        if (isDuplicate) {
+                          console.warn('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] ✗ 检测到重复物品，跳过');
+                          this.$toast.fail(`检测到重复物品:${enrichedResult.on || productCode},已自动跳过`);
+                          console.log('[startBatchScan] 跳过重复物品后状态:', {
+                            uniqueResults: this.uniqueResults,
                             count: this.count,
                             hasScannedData: this.hasScannedData
                           });
                           this.showContinueScanDialog(startScan);
+                        } else {
+                          console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] ✓ 添加新物品');
+                          this.uniqueResults.push(enrichedResult);
+                          this.count++;
+                          this.hasScannedData = true;
+                          console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 添加后状态:', {
+                            uniqueResults: JSON.parse(JSON.stringify(this.uniqueResults)),
+                            uniqueResultsLength: this.uniqueResults.length,
+                            count: this.count,
+                            hasScannedData: this.hasScannedData,
+                            空状态应该显示:!this.hasScannedData
+                          });
+                          this.$toast.success('扫描成功!');
+                          this.showContinueScanDialog(startScan);
                         }
-                      },
-                      (error) => {
-                        console.error('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.fail] 获取嘉立创商品详情失败:', error);
+                      } catch (error) {
+                        console.error('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 解析商品详情失败:', error);
                         this.$toast.clear();
-                        this.$toast.fail('获取商品详情失败，使用原始数据');
+                        this.$toast.fail('解析商品详情失败');
                         this.uniqueResults.push(parsedResult);
                         this.count++;
                         this.hasScannedData = true;
-                        console.log('[startBatchScan] 获取详情失败后状态:', {
+                        console.log('[startBatchScan] 解析失败后状态:', {
                           uniqueResults: JSON.parse(JSON.stringify(this.uniqueResults)),
                           uniqueResultsLength: this.uniqueResults.length,
                           count: this.count,
@@ -414,92 +486,67 @@ export default {
                         });
                         this.showContinueScanDialog(startScan);
                       }
-                    );
-                  } else {
-                    // 没有提取到商品编号，直接添加原始数据
-                    console.log('[startBatchScan.scan.onSuccess] 未提取到商品编号，使用原始数据');
-                    const isDuplicate = this.uniqueResults.some(existing => {
-                      return existing.on === parsedResult.on &&
-                        existing.pc === parsedResult.pc &&
-                        existing.pm === parsedResult.pm;
-                    });
-
-                    console.log('[startBatchScan.scan.onSuccess] 去重检查结果:', {
-                      isDuplicate: isDuplicate,
-                      currentUniqueResultsLength: this.uniqueResults.length
-                    });
-
-                    if (isDuplicate) {
-                      console.warn('[startBatchScan.scan.onSuccess] ✗ 检测到重复物品，跳过');
-                      this.$toast.fail(`检测到重复物品:${parsedResult.on} (${parsedResult.pc}),已自动跳过`);
-                      this.showContinueScanDialog(startScan);
-                    } else {
-                      console.log('[startBatchScan.scan.onSuccess] ✓ 添加新物品 (无商品编号)');
+                    },
+                    (error) => {
+                      console.error('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.fail] 获取嘉立创商品详情失败:', error);
+                      this.$toast.clear();
+                      this.$toast.fail('获取商品详情失败，使用原始数据');
                       this.uniqueResults.push(parsedResult);
                       this.count++;
                       this.hasScannedData = true;
-                      console.log('[startBatchScan.scan.onSuccess] 添加后状态:', {
+                      console.log('[startBatchScan] 获取详情失败后状态:', {
                         uniqueResults: JSON.parse(JSON.stringify(this.uniqueResults)),
                         uniqueResultsLength: this.uniqueResults.length,
                         count: this.count,
-                        hasScannedData: this.hasScannedData,
-                        空状态应该显示:!this.hasScannedData
-                    });
-                      this.$toast.success('扫描成功!(未识别到商品编号)');
+                        hasScannedData: this.hasScannedData
+                      });
                       this.showContinueScanDialog(startScan);
                     }
-                  }
-                } catch (error) {
-                  console.error('[startBatchScan.scan.onSuccess] 获取商品详情失败:', error);
-                  this.$toast.clear();
-                  this.$toast.fail('获取商品详情失败，使用原始数据');
-
-                  const isDuplicate = this.uniqueResults.some(existing => {
-                    return existing.on === parsedResult.on &&
-                      existing.pc === parsedResult.pc &&
-                      existing.pm === parsedResult.pm;
-                  });
-
-                  console.log('[startBatchScan.scan.onSuccess] 去重检查结果:', {
-                    isDuplicate: isDuplicate,
-                    currentUniqueResultsLength: this.uniqueResults.length
-                  });
-
-                  if (isDuplicate) {
-                    console.warn('[startBatchScan.scan.onSuccess] ✗ 检测到重复物品，跳过');
-                    this.$toast.fail(`检测到重复物品:${parsedResult.on},已自动跳过`);
-                    this.showContinueScanDialog(startScan);
-                  } else {
-                    console.log('[startBatchScan.scan.onSuccess] ✓ 添加新物品 (获取详情失败)');
-                    this.uniqueResults.push(parsedResult);
-                    this.count++;
-                    this.hasScannedData = true;
-                    console.log('[startBatchScan.scan.onSuccess] 添加后状态:', {
-                      uniqueResults: JSON.parse(JSON.stringify(this.uniqueResults)),
-                      uniqueResultsLength: this.uniqueResults.length,
-                      count: this.count,
-                      hasScannedData: this.hasScannedData,
-                      空状态应该显示:!this.hasScannedData
-                  });
-                    this.showContinueScanDialog(startScan);
-                  }
+                  );
                 }
-              } else {
-                console.warn('[startBatchScan.scan.onSuccess] ✗ 不符合嘉立创标准');
-                console.log('[startBatchScan.scan.onSuccess] 缺少字段:', {
-                  parsedResult: parsedResult,
-                  missingFields: requiredFields.filter(field => !(field in parsedResult))
+              } catch (error) {
+                console.error('[startBatchScan.scan.onSuccess] 获取商品详情失败:', error);
+                this.$toast.clear();
+                this.$toast.fail('获取商品详情失败，使用原始数据');
+
+                const isDuplicate = this.uniqueResults.some(existing => {
+                  // 优先使用商品编号去重
+                  if (productCode && existing.productCode) {
+                    return existing.productCode === productCode;
+                  }
+                  // 如果商品编号不存在，使用传统字段去重
+                  return existing.on === parsedResult.on &&
+                    existing.pc === parsedResult.pc &&
+                    existing.pm === parsedResult.pm;
                 });
-                // 不符合嘉立创标准，弹窗提示
-                this.$dialog.alert({
-                  title: '扫码失败',
-                  message: '该物品不符合嘉立创标准，请扫描嘉立创商城的物品二维码。',
-                  confirmButtonText: '确定'
-                }).then(() => {
-                  setTimeout(() => {
-                    startScan();
-                  }, 1000);
+
+                console.log('[startBatchScan.scan.onSuccess] 去重检查结果:', {
+                  isDuplicate: isDuplicate,
+                  currentUniqueResultsLength: this.uniqueResults.length,
+                  productCode: productCode
                 });
+
+                if (isDuplicate) {
+                  console.warn('[startBatchScan.scan.onSuccess] ✗ 检测到重复物品，跳过');
+                  this.$toast.fail(`检测到重复物品:${parsedResult.on || productCode},已自动跳过`);
+                  this.showContinueScanDialog(startScan);
+                } else {
+                  console.log('[startBatchScan.scan.onSuccess] ✓ 添加新物品 (获取详情失败)');
+                  // 保存商品编号（如果有）
+                  parsedResult.productCode = productCode;
+                  parsedResult.images = []; // 初始化图片数组
+                  this.uniqueResults.push(parsedResult);
+                  this.count++;
+                  this.hasScannedData = true;
+                  console.log('[startBatchScan.scan.onSuccess] 添加后状态:', {
+                    uniqueResults: JSON.parse(JSON.stringify(this.uniqueResults)),
+                    uniqueResultsLength: this.uniqueResults.length,
+                    count: this.count,
+                    hasScannedData: this.hasScannedData,
+                    空状态应该显示:!this.hasScannedData
+                  });
+                  this.showContinueScanDialog(startScan);
+                }
               }
             },
             onFail: (err) => {
@@ -528,7 +575,6 @@ export default {
       // 启动首次扫描
       startScan();
     },
-
     // 显示是否继续扫码的对话框
     showContinueScanDialog(continueCallback) {
       console.log('[showContinueScanDialog] 显示继续扫码对话框');
@@ -650,9 +696,9 @@ export default {
     clearAndRescan() {
       console.log('==================== [clearAndRescan] 清空列表 ====================');
       console.log('[clearAndRescan] 清空前状态:');
-      console.log('[clearAndRescan]   results:', JSON.parse(JSON.stringify(this.results)));
+      console.log('[clearAndRescan]  results:', JSON.parse(JSON.stringify(this.results)));
       console.log('[clearAndRescan]   uniqueResults:', JSON.parse(JSON.stringify(this.uniqueResults)));
-      console.log('[clearAndRescan]   count:', this.count);
+      console.log('[clearAndRescan]  count:', this.count);
       console.log('[clearAndRescan]   hasScannedData:', this.hasScannedData);
 
       this.results = [];
@@ -662,9 +708,9 @@ export default {
       this.hasScannedData = false;
 
       console.log('[clearAndRescan] 清空后状态:');
-      console.log('[clearAndRescan]   results:', JSON.parse(JSON.stringify(this.results)));
+      console.log('[clearAndRescan]  results:', JSON.parse(JSON.stringify(this.results)));
       console.log('[clearAndRescan]   uniqueResults:', JSON.parse(JSON.stringify(this.uniqueResults)));
-      console.log('[clearAndRescan]   count:', this.count);
+      console.log('[clearAndRescan]  count:', this.count);
       console.log('[clearAndRescan]   hasScannedData:', this.hasScannedData);
       console.log('[clearAndRescan]   空状态应该显示:', !this.hasScannedData);
       console.log('==========================================================\n');
@@ -678,11 +724,11 @@ export default {
       console.log('[navigateToForm] 当前状态:');
       console.log('[navigateToForm]   uniqueResults:', JSON.parse(JSON.stringify(this.uniqueResults)));
       console.log('[navigateToForm]   uniqueResults.length:', this.uniqueResults.length);
-      console.log('[navigateToForm]   department:', this.$route.params.department);
+      console.log('[navigateToForm]  department:', this.$route.params.department);
 
       if (this.uniqueResults.length > 0) {
         this.$toast.success('正在跳转到批量添加页面...');
-        const department = this.$route.params.department || 'default';
+        const department= this.$route.params.department || 'default';
         const dataString = JSON.stringify(this.uniqueResults);
 
         console.log('[navigateToForm] 跳转路径:', `/${department}/inventory-addV1`);
@@ -705,6 +751,53 @@ export default {
 
 <style scoped>
 
+.section-title-with-icon {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #3f83f8;
+  cursor: pointer;
+  transition: all 0.3s;
+  margin-bottom: 8px;
+}
+
+.section-title-with-icon:active {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
+.image-upload-section {
+  margin-bottom: 12px;
+  padding: 12px;
+  background: #f7f8fa;
+  border-radius: 8px;
+}
+
+.image-upload-area {
+  margin-top: 8px;
+}
+
+.section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #f57c00;
+  margin-bottom: 12px;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.section-title:active {
+  opacity: 0.7;
+  transform: scale(0.98);
+}
+
 .custom-round-btn {
   border-radius: 10px; /* 可自定义圆角大小 */
 }
@@ -712,6 +805,7 @@ export default {
 .main-content {
   max-width: 600px;
   margin: 0 auto;
+  padding-bottom: 120px;
 }
 
 /* 空状态提示 */
