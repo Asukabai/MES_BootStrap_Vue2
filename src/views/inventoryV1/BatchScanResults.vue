@@ -3,7 +3,7 @@
     <div class="main-content">
       <!-- 空状态提示 - 使用 hasScannedData 判断 -->
       <div v-if="!hasScannedData" class="empty-hint">
-        <van-empty description="请点击下方按钮开始扫码，且仅支持“嘉立创”物品批量扫码快速新增入库">
+        <van-empty description="请点击下方按钮开始扫码，且仅支持”嘉立创“物品批量扫码快速新增入库">
         <van-button
           type="info"
           icon="scan"
@@ -39,6 +39,32 @@
             </div>
           </div>
           <div slot="label" class="result-detail">
+            <!-- 图片上传区域 - 只在有嘉立创详情数据时显示 -->
+            <div v-if="result.jlcDetail" class="image-upload-section">
+              <div class="section-title-with-icon" @click="toggleImageUpload(index)">
+                <van-icon name="photo-o" color="#3f83f8" size="16" />
+                <span>上传图片</span>
+                <van-icon
+                  :name="expandedImages.has(index) ? 'arrow-up' : 'arrow-down'"
+                  color="#999"
+                  size="14"
+                />
+              </div>
+
+              <div v-show="expandedImages.has(index)" class="image-upload-area">
+                <ImageUploaderComponent
+                  :ref="'imageUploader_' + index"
+                  :file-list="result.images || []"
+                  :custom-icon="require('@/assets/custom-upload-icon2.png')"
+                  icon-style="width: 60px; height: 60px;"
+                  :max-count="3"
+                  :max-size="5 * 1024 * 1024"
+                  note="支持点击图标上传图片，总大小不得超过 5M，最多 3 张"
+                  @input="handleImageUpdate($event, index)"
+                />
+              </div>
+            </div>
+
             <!-- 展示嘉立创详情数据 -->
             <div v-if="result.jlcDetail" class="jlc-detail-section">
               <div class="section-divider"></div>
@@ -114,33 +140,6 @@
               <van-icon name="info-o" color="#999" />
               <span>该物品无嘉立创详情数据</span>
             </div>
-
-            <!-- 图片上传区域 -->
-            <div class="image-upload-section">
-              <div class="section-title-with-icon" @click="toggleImageUpload(index)">
-                <van-icon name="photo-o" color="#3f83f8" size="16" />
-                <span>上传图片</span>
-                <van-icon
-                  :name="expandedImages.has(index) ? 'arrow-up' : 'arrow-down'"
-                  color="#999"
-                  size="14"
-                />
-              </div>
-
-              <div v-show="expandedImages.has(index)" class="image-upload-area">
-                <ImageUploaderComponent
-                  :ref="'imageUploader_' + index"
-                  :file-list="result.images || []"
-                  :custom-icon="require('@/assets/custom-upload-icon2.png')"
-                  icon-style="width: 60px; height: 60px;"
-                  :max-count="3"
-                  :max-size="5 * 1024 * 1024"
-                  note="支持点击图标上传图片，总大小不得超过 5M，最多 3 张"
-                  @input="handleImageUpdate($event, index)"
-                />
-              </div>
-            </div>
-
           </div>
         </van-cell>
       </van-cell-group>
@@ -180,8 +179,7 @@
   </div>
 </template>
 
-<script>
-import { Dialog, Toast } from 'vant';
+<script>import { Dialog, Toast } from 'vant';
 import * as dd from 'dingtalk-jsapi';
 import SensorRequest from '../../utils/SensorRequest.js';
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
@@ -283,7 +281,7 @@ export default {
       this.navigateTo('/inventoryV1');
     },
     navigateTo(path) {
-      const department = this.$route.params.department;
+      const department= this.$route.params.department;
       if (department) {
         this.$router.push(`/${department}${path}`);
       } else {
@@ -333,7 +331,7 @@ export default {
               console.log('\n[startBatchScan.scan.onSuccess] 扫描结果:', result);
 
               // 手动解析非标准 JSON 格式
-              const parsedResult = this.parseCustomJSON(result);
+              const parsedResult= this.parseCustomJSON(result);
               console.log('[startBatchScan.scan.onSuccess] 解析后的对象:', parsedResult);
               const requiredFields = ['on', 'pc'];
               // 检查是否包含所有必需字段
@@ -420,7 +418,7 @@ export default {
                         this.$toast.clear();
 
                         // 构造结果对象
-                        const enrichedResult = {
+                        const enrichedResult= {
                           ...parsedResult,
                           jlcDetail: detailData,
                           productCode: productCode,
@@ -461,6 +459,13 @@ export default {
                           this.uniqueResults.push(enrichedResult);
                           this.count++;
                           this.hasScannedData = true;
+
+                          // 默认展开该物品的图片上传区域
+                          const newExpandedImages = new Set(this.expandedImages);
+                          newExpandedImages.add(this.uniqueResults.length - 1);
+                          this.expandedImages = newExpandedImages;
+                          console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 展开图片上传区域:', this.uniqueResults.length - 1);
+
                           console.log('[startBatchScan.scan.onSuccess.Jlc_GetProductDetails.success] 添加后状态:', {
                             uniqueResults: JSON.parse(JSON.stringify(this.uniqueResults)),
                             uniqueResultsLength: this.uniqueResults.length,
@@ -538,6 +543,12 @@ export default {
                   this.uniqueResults.push(parsedResult);
                   this.count++;
                   this.hasScannedData = true;
+
+                  // 默认展开该物品的图片上传区域
+                  const newExpandedImages = new Set(this.expandedImages);
+                  newExpandedImages.add(this.uniqueResults.length - 1);
+                  this.expandedImages = newExpandedImages;
+                  console.log('[startBatchScan.scan.onSuccess] 展开图片上传区域:', this.uniqueResults.length - 1);
                   console.log('[startBatchScan.scan.onSuccess] 添加后状态:', {
                     uniqueResults: JSON.parse(JSON.stringify(this.uniqueResults)),
                     uniqueResultsLength: this.uniqueResults.length,
@@ -609,7 +620,7 @@ export default {
     parseCustomJSON(str) {
       console.log('[parseCustomJSON] 解析字符串:', str);
       try {
-        const result = JSON.parse(str);
+        const result= JSON.parse(str);
         console.log('[parseCustomJSON] ✓ JSON 解析成功:', result);
         return result;
       } catch (e) {
@@ -650,7 +661,7 @@ export default {
       try {
         // 如果是字符串，尝试解析 JSON
         if (typeof itemMores === 'string') {
-          const result = JSON.parse(itemMores);
+          const result= JSON.parse(itemMores);
           console.log('[parseJlcMore] ✓ 解析成功:', result);
           return result;
         }
@@ -750,7 +761,6 @@ export default {
 </script>
 
 <style scoped>
-
 .section-title-with-icon {
   display: flex;
   align-items: center;
