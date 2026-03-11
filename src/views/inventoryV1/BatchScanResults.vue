@@ -134,7 +134,7 @@
         class="pagination"
       />
       <div v-if="uniqueResults.length > 0" class="project-selection-section">
-      <!-- 货架位置输入区域 -->
+        <!-- 货架位置输入区域 -->
         <div class="shelf-location-container">
           <van-field
             v-model="selectedShelfLocation"
@@ -144,61 +144,31 @@
             :rules="[{ required: true, message: '请填写货架位置' }]"
             :right-icon="scanIcon"
             @click-right-icon="handleShelfLocationScan"
-            @input="onShelfLocationInput"
-            @blur="onShelfLocationBlur"
           >
             <template #label>
               <span style="color: red;">*</span>
               <span>货架位置</span>
             </template>
           </van-field>
-          <!-- 下拉建议列表 -->
-          <div
-            v-if="showSuggestionList && suggestionList.length > 0"
-            class="suggestion-dropdown"
-          >
-            <div
-              v-for="(item, index) in suggestionList"
-              :key="index"
-              class="suggestion-item"
-              @click="selectSuggestion(item)"
-            >
-              <div class="suggestion-title">{{ item.Item_Name }}</div>
-              <div class="suggestion-subtitle">
-                位置：{{ item.Shelf_Location }} |
-                型号：{{ item.Item_Model || '未知' }} |
-                库存：{{ item.Current_Stock }}
-              </div>
-            </div>
-          </div>
-          <!-- 提示信息 -->
-          <div
-            v-else-if="showSuggestionList && suggestionList.length === 0 && selectedShelfLocation"
-            class="no-result"
-          >
-            该位置不存在可放心添加
-          </div>
         </div>
       </div>
 
       <!-- 项目信息展示区域 -->
       <div v-if="uniqueResults.length > 0" class="project-selection-section">
-        <van-cell-group inset>
-          <van-field
-            v-model="selectedProjectName"
-            name="Project_Code"
-            label="*关联项目"
-            placeholder="请选择关联项目"
-            is-link
-            readonly
-            @click="openProjectPicker"
-          >
-            <template #label>
-              <span style="color: red;">*</span>
-              <span>关联项目</span>
-            </template>
-          </van-field>
-        </van-cell-group>
+        <van-field
+          v-model="selectedProjectName"
+          name="Project_Code"
+          label="*关联项目"
+          placeholder="请选择关联项目"
+          is-link
+          readonly
+          @click="openProjectPicker"
+        >
+          <template #label>
+            <span style="color: red;">*</span>
+            <span>关联项目</span>
+          </template>
+        </van-field>
         <div v-if="selectedProjectCode" class="project-selected-hint">
           <van-icon name="checked" color="#07c160" size="16" />
           <span>已选择：{{ selectedProjectName }}</span>
@@ -316,8 +286,6 @@ export default {
       recentProjects: [], // 最近选择的项目
       // 货架位置相关数据
       selectedShelfLocation: '', // 选中的货架位置
-      suggestionList: [], // 建议列表
-      showSuggestionList: false, // 是否显示建议列表
       scanIcon: 'scan' // 扫码图标
     };
   },
@@ -362,78 +330,6 @@ export default {
     console.log('==========================================================\n');
   },
   methods: {
-    // 处理货架位置输入
-    onShelfLocationInput(value) {
-      console.log('[onShelfLocationInput] 货架位置输入:', value);
-      if (value && value.length > 0) {
-        this.searchShelfLocationSuggestions(value);
-      } else {
-        this.showSuggestionList = false;
-        this.suggestionList = [];
-      }
-    },
-
-    // 处理货架位置失去焦点
-    onShelfLocationBlur() {
-      console.log('[onShelfLocationBlur] 货架位置失去焦点');
-      // 延迟隐藏，给点击事件留出时间
-      setTimeout(() => {
-        this.showSuggestionList = false;
-      }, 200);
-    },
-
-    // 搜索货架位置建议
-    searchShelfLocationSuggestions(keyword) {
-      const param = {
-        keyword: keyword
-      };
-
-      SensorRequest.InventoryFun_GetList(
-        JSON.stringify(param),
-        (respData) => {
-          try {
-            let data = [];
-            if (typeof respData === 'string') {
-              data = JSON.parse(respData);
-            } else {
-              data = respData;
-            }
-
-            const inventoryList = Array.isArray(data) ? data : (data.data || []);
-
-            // 过滤出有货架位置的记录
-            this.suggestionList = inventoryList
-              .filter(item => item.Shelf_Location)
-              .slice(0, 10); // 最多显示 10 条
-
-            this.showSuggestionList = this.suggestionList.length > 0;
-
-            console.log('[searchShelfLocationSuggestions] ✓ 获取建议成功:', {
-              keyword: keyword,
-              count: this.suggestionList.length
-            });
-          } catch (error) {
-            console.error('[searchShelfLocationSuggestions] ✗ 解析数据失败:', error);
-            this.showSuggestionList = false;
-          }
-        },
-        (error) => {
-          console.error('[searchShelfLocationSuggestions] ✗ 获取建议失败:', error);
-          this.showSuggestionList = false;
-        }
-      );
-    },
-
-    // 选择建议项
-    selectSuggestion(item) {
-      console.log('[selectSuggestion] 选择建议项:', item);
-      this.selectedShelfLocation = item.Shelf_Location;
-      this.showSuggestionList = false;
-
-      // 可以在这里触发后续操作，比如自动填充其他字段
-      this.$toast.success(`已选择位置：${item.Shelf_Location}`);
-    },
-
     // 处理货架位置扫码
     handleShelfLocationScan() {
       console.log('==================== [handleShelfLocationScan] 开始扫码 ====================');
@@ -456,13 +352,6 @@ export default {
 
             this.$toast.clear();
             this.selectedShelfLocation = result;
-            this.showSuggestionList = false;
-
-            // 尝试查询该位置是否存在
-            if (result && result.trim()) {
-              this.searchShelfLocationSuggestions(result.trim());
-            }
-
             this.$toast.success('扫码成功');
           },
           onFail: (err) => {
@@ -492,10 +381,13 @@ export default {
           const projectList = Array.isArray(data) ? data : (data.data || []);
           // 保存完整的项目信息
           this.fullProjectList = projectList;
-          // 只提取项目名称用于选择器显示
-          this.projectColumns = projectList.map(project =>
-            project.Project_Name || project.name || project.projectName || '未知项目'
-          );
+          // 提取项目名称和编码用于选择器显示
+          this.projectColumns = projectList.map(project => {
+            const projectName = project.Project_Name || project.name || project.projectName || '未知项目';
+            const projectCode = project.Project_Code || '';
+            // 拼接项目名称和编码
+            return projectCode ? `${projectName} (${projectCode})` : projectName;
+          });
           this.filteredProjectColumns = this.projectColumns;
           console.log('[loadProjectOptions] ✓ 项目选项加载成功:', {
             total: projectList.length,
@@ -558,10 +450,17 @@ export default {
       // 实时更新选中的项目，这样即使用户直接点击"完成选择"也能获取到当前选中的值
       if (values && values[0]) {
         this.selectedProjectName = values[0];
+        // 从显示文本中提取项目名称（去除括号内的编码）
+        const nameMatch = values[0].match(/(.+?)\s*\([^)]*\)$/);
+        const extractedName = nameMatch ? nameMatch[1].trim() : values[0];
+
         // 查找对应的项目代码
-        const selectedProject = this.fullProjectList.find(project =>
-          (project.Project_Name || project.name || project.projectName) === values[0]
-        );
+        const selectedProject = this.fullProjectList.find(project => {
+          const fullName = (project.Project_Name || project.name || project.projectName) +
+            (project.Project_Code ? ` (${project.Project_Code})` : '');
+          return fullName === values[0] ||
+            (project.Project_Name || project.name || project.projectName) === extractedName;
+        });
         const projectCode = selectedProject ? (selectedProject.Project_Code || '') : '';
         this.selectedProjectCode = projectCode;
         console.log('[onPickerChange] 实时更新项目选择:', {
@@ -581,10 +480,17 @@ export default {
     selectProject(projectName) {
       this.selectedProjectName = projectName;
       // this.showProjectPickerPopup = false; // 不关闭弹窗，让用户点击完成按钮
+      // 从显示文本中提取项目名称（去除括号内的编码）
+      const nameMatch = projectName.match(/(.+?)\s*\([^)]*\)$/);
+      const extractedName = nameMatch ? nameMatch[1].trim() : projectName;
+
       // 查找对应的项目代码
-      const selectedProject = this.fullProjectList.find(project =>
-        (project.Project_Name || project.name || project.projectName) === projectName
-      );
+      const selectedProject = this.fullProjectList.find(project => {
+        const fullName = (project.Project_Name || project.name || project.projectName) +
+          (project.Project_Code ? ` (${project.Project_Code})` : '');
+        return fullName === projectName ||
+          (project.Project_Name || project.name || project.projectName) === extractedName;
+      });
       const projectCode = selectedProject ? (selectedProject.Project_Code || '') : '';
       // 更新选中的项目代码
       this.selectedProjectCode = projectCode;
@@ -1200,7 +1106,11 @@ export default {
 /* 项目选择区域样式 */
 .project-selection-section {
   margin: 16px;
-  padding: 0 16px;
+  padding: 0;
+}
+
+.shelf-location-container {
+  background-color: #fff;
 }
 
 .project-selected-hint {
