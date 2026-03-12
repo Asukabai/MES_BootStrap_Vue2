@@ -256,11 +256,11 @@
   </div>
 </template>
 
-<script>
-import * as dd from 'dingtalk-jsapi';
+<script>import * as dd from 'dingtalk-jsapi';
 import SensorRequest from '../../utils/SensorRequest.js';
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 import ImageUploaderComponent from "@/components/ImageUploaderComponent.vue";
+import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
 export default {
   name: 'BatchScanResults',
   components: {CustomizableFloatingButton, ImageUploaderComponent},
@@ -330,6 +330,18 @@ export default {
     console.log('==========================================================\n');
   },
   methods: {
+    // 获取本地用户信息（参考 InventoryDetailV1.vue）
+    getLocalUserInfo() {
+      const name = localStorage.getItem(key_DingName);
+      const phone = localStorage.getItem(key_DingUserPhone);
+      const dingID = localStorage.getItem(key_DingUserIndex);
+
+      return {
+        name: name || '',
+        phone: phone || '',
+        dingID: dingID || ''
+      };
+    },
     // 处理货架位置扫码
     handleShelfLocationScan() {
       console.log('==================== [handleShelfLocationScan] 开始扫码 ====================');
@@ -978,14 +990,15 @@ export default {
       this.$toast.success('列表已清空，请重新开始扫码');
     },
     // 跳转到批量添加表单页面
-    navigateToForm() {
-      console.log('==================== [navigateToForm] 跳转表单 ====================');
+    async navigateToForm() {
+      console.log('==================== [navigateToForm] 提交批量添加请求 ====================');
       console.log('[navigateToForm] 当前状态:');
       console.log('[navigateToForm]   uniqueResults:', JSON.parse(JSON.stringify(this.uniqueResults)));
       console.log('[navigateToForm]   uniqueResults.length:', this.uniqueResults.length);
-      console.log('[navigateToForm]  department:', this.$route.params.department);
       console.log('[navigateToForm]   selectedProjectCode:', this.selectedProjectCode);
       console.log('[navigateToForm]   selectedProjectName:', this.selectedProjectName);
+      console.log('[navigateToForm]   selectedShelfLocation:', this.selectedShelfLocation);
+
       if (this.uniqueResults.length === 0) {
         console.warn('[navigateToForm] ✗ 没有扫描到任何结果');
         this.$toast.fail('没有扫描到任何结果');
@@ -993,21 +1006,177 @@ export default {
       }
       if (!this.selectedProjectCode || !this.selectedProjectName) {
         console.warn('[navigateToForm] ✗ 未选择关联项目');
-        this.$toast.fail('请先选择关联项目（点击右下角悬浮图标）');
+        this.$toast.fail('请先选择关联项目');
         return;
       }
-      console.log('[navigateToForm] ✓ 验证通过，准备跳转');
-      this.$toast.success('正在跳转到批量添加页面...');
-      const department= this.$route.params.department || 'default';
-      const dataString = JSON.stringify(this.uniqueResults);
-      console.log('[navigateToForm] 跳转路径:', `/${department}/inventory-addV1`);
-      console.log('[navigateToForm] 传递的数据大小:', dataString.length, '字符');
-      console.log('[navigateToForm] 传递的数据:', JSON.parse(JSON.stringify(this.uniqueResults)));
-      this.$router.push({
-        path: `/${department}/inventory-addV1`,
-        query: { data: dataString }
+      if (!this.selectedShelfLocation) {
+        console.warn('[navigateToForm] ✗ 未填写货架位置');
+        this.$toast.fail('请填写货架位置');
+        return;
+      }
+
+      console.log('[navigateToForm] ✓ 验证通过，准备提交数据');
+      this.$toast.loading({ message: '正在提交数据...', duration: 0 });
+
+      try {
+        // 获取当前用户信息（参考 InventoryDetailV1.vue 的方式）
+        const userInfo = this.getLocalUserInfo();
+        const personName = userInfo.name || '未知用户';
+        const personId = userInfo.dingID || '';
+        const personPhone = userInfo.phone || '';
+
+        console.log('[navigateToForm] 用户信息:', userInfo);
+
+        // 构造 Inventory_ItemList 数组
+        const inventoryItemList = await Promise.all(this.uniqueResults.map(async (result, index) => {
+          console.log(`[navigateToForm] 处理第 ${index + 1} 个物品:`, result);
+
+          // 解析嘉立创更多字段
+          const itemMores = result.jlcDetail ? this.parseJlcMore(result.jlcDetail.Item_Mores) : {};
+
+          // 构造每个物品的请求体（参考提供的请求体格式）
+          const inventoryItem = {
+            // 基本信息
+            Item_Name: result.jlcDetail.Item_Name || '', // 商品名称
+            Shelf_Location: this.selectedShelfLocation, // 使用扫码的货架位置
+            Item_Model: result.jlcDetail.Item_Model || '', // 规格型号
+            Current_Stock: parseInt(result.qty, 10) || 0, // 从 result.qty 获取数量
+            Item_Brand: result.jlcDetail.Item_Brand || '', // 品牌
+            Category_Type: '项目', // 类型都是项目
+            Project_Code: this.selectedProjectCode, // 关联项目编码
+            Warning_Threshold: 0, // 初始化为 0
+            Is_Low_Stock: '否', // 初始状态
+            Remark: '', // 备注
+            Company: '晟思', // 默认公司
+            Item_Tags: ['晟思', '项目','嘉立创',result.pc, this.selectedProjectName], // 标签数组
+            // 扩展信息
+            Item_Color: '',
+            Item_Size: '',
+            Item_Unit: itemMores['最小包装单位'] || '',
+            Item_Material: '',
+            // 图片信息（base64 格式）
+            Item_Images: [],
+            // 更多信息字段（嘉立创详情数据）
+            Item_Mores: result.jlcDetail ? JSON.stringify(itemMores) : '',
+            // 其他字段
+            Logic_del: 0,
+            PageIndex: 0,
+            PageSize: 0,
+            RowIndex: 0
+          };
+
+          // 处理图片信息（如果有上传图片）- 模仿InventoryAddV1.vue 的逻辑
+          if (result.images && result.images.length > 0) {
+            console.log(`[navigateToForm] 物品 ${index + 1} 有 ${result.images.length} 张图片`);
+
+            // 遍历处理每张图片
+            for (const file of result.images) {
+              try {
+                const fileInfo = await this.processFileToBase64(file);
+                inventoryItem.Item_Images.push(fileInfo);
+              } catch (error) {
+                console.error(`[navigateToForm] 处理物品 ${index + 1} 的图片失败:`, error);
+              }
+            }
+          } else {
+            inventoryItem.Item_Images = null; // 如果没有图片，设置为 null
+          }
+
+          console.log(`[navigateToForm] 物品 ${index + 1} 构造完成:`, inventoryItem);
+          return inventoryItem;
+        }));
+
+        // 构造完整的请求体
+        const requestParam = {
+          Inventory_ItemList: inventoryItemList,
+          Report_Person: {
+            Person_Name: personName,
+            Person_Phone: personPhone,
+            Person_ID: personId
+          }
+        };
+
+        console.log('[navigateToForm] 最终请求参数:', JSON.stringify(requestParam, null, 2));
+        // alert("最终请求参数: "+ JSON.stringify(requestParam, null, 2))
+
+        // 调用批量添加接口
+        SensorRequest.JLCInventoryItemBatchAddFun(
+          JSON.stringify(requestParam),
+          (respData) => {
+            console.log('[navigateToForm.JLCInventoryItemBatchAddFun.success] 批量添加成功响应:', respData);
+            // alert("批量添加成功"+ respData)
+            this.$toast.clear();
+            try {
+              const response = typeof respData === 'string' ? JSON.parse(respData) : respData;
+
+              if (response.code === 200 || response.success || !response.code) {
+                this.$toast.success(`批量添加成功，共 ${inventoryItemList.length} 个物品`);
+                console.log('[navigateToForm] 添加成功后清空数据');
+
+                // 清空数据
+                this.results = [];
+                this.uniqueResults = [];
+                this.count = 0;
+                this.currentPage = 1;
+                this.hasScannedData = false;
+                this.selectedProjectCode = '';
+                this.selectedProjectName = '';
+                this.selectedShelfLocation = '';
+
+                // 延迟返回首页
+                setTimeout(() => {
+                  this.navigateTo('/inventoryV1');
+                }, 1500);
+              } else {
+                const errorMsg = response.message || response.msg || '批量添加失败';
+                console.error('[navigateToForm] 批量添加失败:', errorMsg);
+                this.$toast.fail(errorMsg);
+              }
+            } catch (error) {
+              console.error('[navigateToForm] 解析响应数据失败:', error);
+              this.$toast.fail('批量添加成功，但响应格式异常');
+            }
+          },
+          (error) => {
+            console.error('[navigateToForm.JLCInventoryItemBatchAddFun.fail] 批量添加失败:', error);
+            this.$toast.clear();
+            // alert('批量添加失败'+ error)
+            const errorMsg = error.message || error.msg || '批量添加失败，请重试';
+            this.$toast.fail(errorMsg);
+          }
+        );
+
+      } catch (error) {
+        console.error('[navigateToForm] 构造请求参数失败:', error);
+        this.$toast.clear();
+        this.$toast.fail('数据构造失败：' + error.message);
+      }
+    },
+
+    // 将文件转换为 base64 的方法（模仿InventoryAddV1.vue）
+    processFileToBase64(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          try {
+            // 获取 base64 数据部分（去掉 data:image/jpeg;base64, 前缀）
+            const base64 = e.target.result.split(',')[1];
+            const fileInfo = {
+              File_Name: file.file ? file.file.name : file.name,
+              File_Base64: base64,
+              Upload_Time: new Date().toISOString()
+            };
+            resolve(fileInfo);
+          } catch (error) {
+            reject(error);
+          }
+        };
+        reader.onerror = (error) => {
+          reject(error);
+        };
+        // 读取文件
+        reader.readAsDataURL(file.file || file);
       });
-      console.log('==========================================================\n');
     }
   }
 };
