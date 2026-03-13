@@ -44,9 +44,9 @@
               >
                 <div class="suggestion-title">{{ item.Item_Name }}</div>
                 <div class="suggestion-subtitle">
-                  位置: {{ item.Shelf_Location }} |
-                  型号: {{ item.Item_Model || '未知' }} |
-                  库存: {{ item.Current_Stock }}
+                  位置：{{ item.Shelf_Location }} |
+                  型号：{{ item.Item_Model || '未知' }} |
+                  库存：{{ item.Current_Stock }}
                 </div>
               </div>
             </div>
@@ -129,7 +129,17 @@
             is-link
             readonly
             @click="onProjectFieldClick"
-          />
+          >
+            <template #label>
+              <span>*关联项目</span>
+            </template>
+            <template #input>
+              <div v-if="selectedProjectName && selectedProjectCode" class="project-display">
+                <span class="project-name">{{ selectedProjectName }}</span>
+                <span class="project-code">[{{ selectedProjectCode }}]</span>
+              </div>
+            </template>
+          </van-field>
 
           <van-field
             v-model="itemForm.Remark"
@@ -273,7 +283,7 @@
           <!-- 图片上传 -->
           <van-cell title="物品图片">
             <template #label>
-              <span class="upload-note">支持点击图标上传图片，但总大小不得超过5M，总数不得超过3个</span>
+              <span class="upload-note">支持点击图标上传图片，但总大小不得超过 5M，总数不得超过 3 个</span>
             </template>
             <van-uploader
               v-model="fileList"
@@ -290,12 +300,12 @@
             </van-uploader>
           </van-cell>
 
-<!--          <van-field-->
-<!--            name="Current_Stock"-->
-<!--            label="当前库存"-->
-<!--            readonly-->
-<!--            :value="itemForm.Current_Stock.toString()"-->
-<!--          />-->
+          <!--          <van-field-->
+          <!--            name="Current_Stock"-->
+          <!--            label="当前库存"-->
+          <!--            readonly-->
+          <!--            :value="itemForm.Current_Stock.toString()"-->
+          <!--          />-->
         </van-cell-group>
         <!--将容器的 display 设置为 flex，使子元素水平排列，添加 gap: 16px 在按钮之间增加间距，为每个按钮添加 style="flex: 1" 使它们平均分配宽度-->
         <div style="margin: 16px; display: flex; gap: 16px;">
@@ -315,20 +325,10 @@
         <!-- 搜索框 -->
         <van-search
           v-model="searchKeyword"
-          placeholder="请输入项目名称搜索"
+          placeholder="请输入项目名称或编码搜索"
           @input="filterProjects"
           class="project-search"
         >
-<!--          <van-search-->
-<!--          v-model="searchKeyword"-->
-<!--          placeholder="请输入项目名称搜索"-->
-<!--          @input="filterProjects"-->
-<!--          class="project-search"-->
-<!--          show-action-->
-<!--        >-->
-<!--          <template #action>-->
-<!--            <div @click="showProjectPicker = false">取消</div>-->
-<!--          </template>-->
         </van-search>
 
         <!-- 历史选择区域 -->
@@ -350,19 +350,25 @@
 
         <!-- 项目列表 -->
         <div class="project-list">
-          <van-picker
-            show-toolbar
-            :columns="filteredProjectColumns"
-            @confirm="onProjectConfirm"
-            @cancel="showProjectPicker = false"
-          >
-            <template #default>
-              <!-- 如果没有搜索到项目时显示的提示 -->
-              <div v-if="filteredProjectColumns.length === 0 && searchKeyword" class="no-project-result">
-                未找到匹配的项目
-              </div>
-            </template>
-          </van-picker>
+          <div v-if="filteredProjectColumns.length === 0 && searchKeyword" class="no-project-result">
+            未找到匹配的项目
+          </div>
+          <van-cell-group v-else>
+            <van-cell
+              v-for="(item, index) in filteredProjectColumns"
+              :key="index"
+              clickable
+              @click="onProjectItemClick(item)"
+              class="project-item"
+            >
+              <template #title>
+                <div class="project-item-content">
+                  <div class="project-item-name">{{ extractProjectName(item) }}</div>
+                  <div v-if="extractProjectCode(item)" class="project-item-code">{{ extractProjectCode(item) }}</div>
+                </div>
+              </template>
+            </van-cell>
+          </van-cell-group>
         </div>
       </div>
     </van-popup>
@@ -407,6 +413,7 @@ export default {
       filteredProjectColumns: [],
       fullProjectList: [], // 保存完整的项目信息
       selectedProjectName: '', // 用于显示选中的项目名称
+      selectedProjectCode: '', // 用于显示选中的项目编码
       searchKeyword: '', // 搜索关键词
       recentProjects: [], // 最近选择的项目
       // 更多字段
@@ -476,13 +483,40 @@ export default {
       this.filterProjects();
     },
 
+    // 项目列表项点击事件
+    onProjectItemClick(itemText) {
+      // 从显示文本中提取项目名称
+      const projectName = this.extractProjectName(itemText);
+      this.onProjectConfirm(projectName);
+    },
+
+    // 提取项目名称
+    extractProjectName(item) {
+      if (typeof item === 'string') {
+        // 如果是字符串格式 "项目名称 [编码]"
+        const match = item.match(/^(.*?)\s*\[/);
+        return match ? match[1].trim() : item;
+      }
+      return item.Project_Name || item.name || item.projectName || '未知项目';
+    },
+
+    // 提取项目编码
+    extractProjectCode(item) {
+      if (typeof item === 'string') {
+        // 如果是字符串格式 "项目名称 [编码]"
+        const match = item.match(/\[(.*?)\]/);
+        return match ? match[1] : '';
+      }
+      return item.Project_Code || '';
+    },
+
     // 添加新增信息操作日志记录方法
     addAdditionRecord(itemId, itemName) {
       // 构造新增操作的事务请求参数
       const requestData = {
         PageIndex: 0,
         PageSize: 10,
-        Inventory_ID: itemId, // 使用新增物品的ID作为库存ID
+        Inventory_ID: itemId, // 使用新增物品的 ID 作为库存 ID
         Transaction_Type: "新增", // 操作类型为"新增"
         Quantity_Change: 0,
         Current_Quantity: 0,
@@ -491,7 +525,7 @@ export default {
           Person_Phone: this.getLocalUserInfo().phone,
           Person_DingID: this.getLocalUserInfo().dingID
         },
-        Remark: `${this.getLocalUserInfo().name} 新增了物品: ${itemName}`
+        Remark: `${this.getLocalUserInfo().name} 新增了物品：${itemName}`
       };
 
       // 调用事务记录接口
@@ -502,7 +536,7 @@ export default {
         },
         (error) => {
           console.error('新增操作记录添加失败:', error);
-          this.$toast.fail('新增操作记录添加失败: ' + (error.message || '未知错误'));
+          this.$toast.fail('新增操作记录添加失败：' + (error.message || '未知错误'));
         }
       );
     },
@@ -529,7 +563,7 @@ export default {
     },
 
 // 点击图标实现（导入上一篇功能）
-// 修改新增物品信息时候的组件页面逻辑-2（新增导入上一篇的逻辑）
+// 修改新增物品信息时候的组件页面逻辑 -2（新增导入上一篇的逻辑）
     async handleLoadClick() {
       try {
         // 弹窗提示用户确认是否导入上一篇操作信息记录
@@ -607,6 +641,7 @@ export default {
             const project = this.fullProjectList.find(p => p.Project_Code === lastRecord.Project_Code);
             if (project) {
               this.selectedProjectName = project.Project_Name || project.name || project.projectName || '';
+              this.selectedProjectCode = project.Project_Code || '';
             }
           }
           // 恢复原有的位置信息和图片信息
@@ -629,7 +664,7 @@ export default {
           console.log('用户取消导入');
         } else {
           console.error('导入上一篇记录失败:', error);
-          this.$toast.fail('导入失败: ' + (error.message || '未知错误'));
+          this.$toast.fail('导入失败：' + (error.message || '未知错误'));
         }
       }
     },
@@ -641,7 +676,7 @@ export default {
         clearTimeout(this.debounceTimer);
       }
 
-      // 设置防抖，延迟500ms执行查询
+      // 设置防抖，延迟 500ms 执行查询
       this.debounceTimer = setTimeout(() => {
         this.searchShelfLocation();
       }, 500);
@@ -845,11 +880,11 @@ export default {
         // 用户选择继续添加，显示储物箱规则弹窗
         const storageBoxMessage = `继续添加将默认此位置为储物箱非收纳格。
 请按照如下编号规则进行物品添加，且编号不能与已有物品编号重复：
-编码规则：货架-层数-位置-序号
+编码规则：货架 - 层数 - 位置 - 序号
 例如：A1L-2-003-01
 同一货位存放多个物品时使用序号区分
-若是上一个编号是AL1-01-012，则生成的是AL1-01-012-01，
-若上一个编号是AL1-01-012-05，则生成的是AL1-01-012-06，
+若是上一个编号是 AL1-01-012，则生成的是 AL1-01-012-01，
+若上一个编号是 AL1-01-012-05，则生成的是 AL1-01-012-06，
 生成的编号会自动填入对应的位置中，
 并且此时会产生一个标签"储物箱"作为固定标签，不能删除。`;
 
@@ -862,7 +897,7 @@ export default {
           });
 
           // 获取该位置的所有物品编号并生成新编号
-          // 使用最后一个数据的Shelf_Location作为基准
+          // 使用最后一个数据的 Shelf_Location 作为基准
           const lastItem = items[items.length - 1]; // 获取最后一个数据
           const newNumber = await this.generateNextItemNumber(lastItem.Shelf_Location);
 
@@ -907,7 +942,7 @@ export default {
           JSON.stringify(param),
           (respData) => {
             try {
-              // 解析响应数据 (模仿第401-407行的解析逻辑)
+              // 解析响应数据 (模仿第 401-407 行的解析逻辑)
               const responseJson = JSON.parse(respData);
 
               // 从 Data 数组中获取库存项
@@ -916,12 +951,12 @@ export default {
                 items = responseJson.Data;
               }
 
-              // 从返回的items中获取所有的Shelf_Location内容
+              // 从返回的 items 中获取所有的 Shelf_Location 内容
               const allShelfLocations = items.map(item => item.Shelf_Location).filter(location => location);
               // alert('所有货架位置：'+ allShelfLocations);
 
               if (allShelfLocations.length > 0) {
-                // 对Shelf_Location进行排序，找出最大的编号
+                // 对 Shelf_Location 进行排序，找出最大的编号
                 const sortedLocations = allShelfLocations.sort((a, b) => {
                   const partsA = a.split('-');
                   const partsB = b.split('-');
@@ -929,8 +964,8 @@ export default {
                   const maxLength = Math.max(partsA.length, partsB.length);
                   for (let i = 0; i < maxLength; i++) {
                     // 如果一个数组结束了，另一个还有内容，则长度长的更大
-                    if (i >= partsA.length) return -1; // b更长，b更大
-                    if (i >= partsB.length) return 1;  // a更长，a更大
+                    if (i >= partsA.length) return -1; // b 更长，b 更大
+                    if (i >= partsB.length) return 1;  // a 更长，a 更大
 
                     const partA = partsA[i];
                     const partB = partsB[i];
@@ -959,9 +994,9 @@ export default {
 
                 const lastShelfLocation = sortedLocations[sortedLocations.length - 1];
 
-                // 检查最后一条数据的Shelf_Location是否符合编号规则
+                // 检查最后一条数据的 Shelf_Location 是否符合编号规则
                 if (this.isValidNumberFormat(lastShelfLocation)) {
-                  // 如果最后一条数据的Shelf_Location已经有编号格式，基于它生成下一个编号
+                  // 如果最后一条数据的 Shelf_Location 已经有编号格式，基于它生成下一个编号
                   const newNumber = this.incrementNumber(lastShelfLocation);
                   resolve(newNumber);
                 } else {
@@ -1037,6 +1072,7 @@ export default {
       if (value !== '项目') {
         this.itemForm.Project_Code = '';
         this.selectedProjectName = '';
+        this.selectedProjectCode = '';
       }
       if (value !== '耗材') {
         this.itemForm.Warning_Threshold = '';
@@ -1055,6 +1091,7 @@ export default {
       );
       if (selectedProject) {
         this.itemForm.Project_Code = selectedProject.Project_Code || '';
+        this.selectedProjectCode = selectedProject.Project_Code || '';
       }
       // 更新系统标签以包含项目名称
       this.updateSystemTags();
@@ -1072,9 +1109,12 @@ export default {
       // 将搜索关键词转换为小写进行比较
       const keyword = this.searchKeyword.toLowerCase().trim();
 
-      this.filteredProjectColumns = this.projectColumns.filter(project =>
-        project.toLowerCase().includes(keyword)
-      );
+      // 同时支持项目名称和项目编码搜索
+      this.filteredProjectColumns = this.projectColumns.filter((project, index) => {
+        const projectName = project.toLowerCase();
+        const projectCode = (this.fullProjectList[index].Project_Code || '').toLowerCase();
+        return projectName.includes(keyword) || projectCode.includes(keyword);
+      });
     },
 
     // 选择最近项目
@@ -1087,6 +1127,7 @@ export default {
       );
       if (selectedProject) {
         this.itemForm.Project_Code = selectedProject.Project_Code || '';
+        this.selectedProjectCode = selectedProject.Project_Code || '';
       }
       // 更新系统标签
       this.updateSystemTags();
@@ -1096,7 +1137,7 @@ export default {
 
     // 保存到最近选择
     saveToRecentProjects(projectName) {
-      // 限制历史记录数量为5条
+      // 限制历史记录数量为 5 条
       const maxRecentCount = 5;
       if (!this.recentProjects.includes(projectName)) {
         this.recentProjects.unshift(projectName); // 添加到开头
@@ -1130,13 +1171,16 @@ export default {
           // 确保是数组格式
           const projectList = Array.isArray(data) ? data : (data.data || []);
 
-          // 保存完整的项目信息（包含Project_Code和Project_Name）
+          // 保存完整的项目信息（包含 Project_Code 和 Project_Name）
           this.fullProjectList = projectList;
 
-          // 只提取项目名称用于选择器显示
-          this.projectColumns = projectList.map(project =>
-            project.Project_Name || project.name || project.projectName || '未知项目'
-          );
+          // 显示项目名称 + 项目编码的组合
+          this.projectColumns = projectList.map(project => {
+            const projectName = project.Project_Name || project.name || project.projectName || '未知项目';
+            const projectCode = project.Project_Code || '';
+            // 返回带有项目编码的显示文本
+            return projectCode ? `${projectName} [${projectCode}]` : projectName;
+          });
           this.filteredProjectColumns = this.projectColumns; // 初始化过滤后的项目列表
         } catch (error) {
           console.error('解析项目数据失败:', error);
@@ -1216,7 +1260,7 @@ export default {
 
     // 删除标签方法
     removeTag(index) {
-      // 计算实际在userTags中的索引
+      // 计算实际在 userTags 中的索引
       const actualIndex = index - this.systemTags.length;
 
       // 检查是否为系统标签
@@ -1232,13 +1276,13 @@ export default {
       }
     },
 
-    // 将文件转换为base64的方法
+    // 将文件转换为 base64 的方法
     processFileToBase64(file) {
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onload = (e) => {
           try {
-            const base64 = e.target.result.split(',')[1]; // 获取base64数据部分
+            const base64 = e.target.result.split(',')[1]; // 获取 base64 数据部分
             const fileInfo = {
               File_Name: file.file ? file.file.name : file.name,
               File_Base64: base64,
@@ -1268,12 +1312,12 @@ export default {
           return;
         }
         if (!allowedTypes.includes(f.file.type)) {
-          this.$toast.fail(`不支持的文件类型: ${f.file.type}，请上传图片文件`);
+          this.$toast.fail(`不支持的文件类型：${f.file.type}，请上传图片文件`);
           return;
         }
       }
 
-      // 处理文件并转换为base64
+      // 处理文件并转换为 base64
       try {
         if (Array.isArray(file)) {
           // 如果是多文件，逐个处理
@@ -1326,7 +1370,7 @@ export default {
         // 构造请求参数
         const param = {
           ...this.itemForm,
-          Current_Stock: 0, // 新增物品初始库存为0
+          Current_Stock: 0, // 新增物品初始库存为 0
           Is_Low_Stock: '', // 初始状态不设置低库存标记
           Item_Images: this.imageList, // 设置图片信息
           Item_Mores: this.convertMoreFieldsToString(), // 将更多字段转换为字符串
@@ -1360,14 +1404,14 @@ export default {
           duration: 0 // 不自动消失
         });
         SensorRequestPage.InventoryItemAddFun(JSON.stringify(param), (respData) => {
-          // 解析返回的响应数据，获取新增物品的ID
+          // 解析返回的响应数据，获取新增物品的 ID
           try {
-            console.log('新增物品ID:', respData);
+            console.log('新增物品 ID:', respData);
             if (respData) {
               // 记录新增操作日志
               this.addAdditionRecord(respData, this.itemForm.Item_Name);
             } else {
-              console.error('新增物品成功但未获取到物品ID:', respData);
+              console.error('新增物品成功但未获取到物品 ID:', respData);
             }
           } catch (parseError) {
             console.error('解析新增物品响应失败:', parseError);
@@ -1404,7 +1448,7 @@ export default {
         return '';
       }
 
-      // 转换为JSON字符串
+      // 转换为 JSON 字符串
       return JSON.stringify(validFields.reduce((acc, field) => {
         acc[field.key] = field.value;
         return acc;
@@ -1572,8 +1616,8 @@ export default {
 
 .more-fields-container {
   width: 100%;
-  padding-left: 16px; /* 与van-cell的内边距对齐 */
-  padding-right: 16px; /* 与van-cell的内边距对齐 */
+  padding-left: 16px; /* 与 van-cell 的内边距对齐 */
+  padding-right: 16px; /* 与 van-cell 的内边距对齐 */
   margin-top: 1px; /* 负值让内容更贴近标题 */
 }
 
@@ -1716,6 +1760,26 @@ export default {
   min-width: 0; /* 防止输入框溢出 */
 }
 
+/* 项目显示样式 */
+.project-display {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.project-name {
+  flex: 1;
+  color: #323233;
+}
+
+.project-code {
+  color: #1989fa;
+  font-weight: 500;
+  font-size: 13px;
+  white-space: nowrap;
+}
+
 /* 项目选择器样式 */
 .project-picker-container {
   background-color: #fff;
@@ -1757,6 +1821,35 @@ export default {
 .project-list {
   max-height: 300px;
   overflow-y: auto;
+}
+
+.project-item {
+  padding: 12px 16px;
+  border-bottom: 1px solid #f2f3f5;
+}
+
+.project-item:last-child {
+  border-bottom: none;
+}
+
+.project-item-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.project-item-name {
+  flex: 1;
+  font-size: 14px;
+  color: #323233;
+}
+
+.project-item-code {
+  font-size: 12px;
+  color: #1989fa;
+  font-weight: 500;
+  margin-left: 8px;
+  white-space: nowrap;
 }
 
 .no-project-result {
