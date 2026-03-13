@@ -86,7 +86,7 @@
         v-model="showFilterPopover"
         position="bottom"
         round
-        :style="{ height: '60%' }"
+        :style="{ height: '75%' }"
       >
         <div class="filter-popup">
           <!-- 弹出层头部 -->
@@ -97,24 +97,24 @@
 
           <!-- 筛选内容 -->
           <div class="filter-content">
-            <!-- 分类筛选 -->
+            <!-- 组合搜索模式选择 -->
             <div class="filter-group">
-              <h4 class="filter-group-title">物品分类</h4>
-              <div class="filter-options">
+              <h4 class="filter-group-title">搜索模式</h4>
+              <div class="filter-options search-mode-options">
                 <div
-                  v-for="option in categoryOptions"
-                  :key="option.value"
-                  :class="['filter-option', { active: filter.category === option.value }]"
-                  @click="filter.category = option.value"
+                  v-for="mode in searchModeOptions"
+                  :key="mode.value"
+                  :class="['filter-option', { active: currentSearchMode === mode.value }]"
+                  @click="currentSearchMode = mode.value"
                 >
                   <div class="option-content">
                     <div class="option-icon">
-                      <van-icon :name="getCategoryIcon(option.value)" />
+                      <van-icon :name="mode.icon" />
                     </div>
-                    <span class="option-text">{{ option.text }}</span>
+                    <span class="option-text">{{ mode.label }}</span>
                   </div>
                   <van-icon
-                    v-if="filter.category === option.value"
+                    v-if="currentSearchMode === mode.value"
                     name="success"
                     class="check-icon"
                   />
@@ -122,8 +122,73 @@
               </div>
             </div>
 
-            <!-- 公司筛选 -->
-            <div class="filter-group">
+            <!-- 物品名称输入 -->
+            <div v-if="currentSearchMode.includes('name')" class="filter-group">
+              <h4 class="filter-group-title">物品名称</h4>
+              <div class="search-input-wrapper">
+                <van-field
+                  v-model="filter.itemName"
+                  placeholder="请输入物品名称关键词"
+                  clearable
+                  @input="onItemNameInput"
+                >
+                  <template #button>
+                    <van-button
+                      size="small"
+                      type="primary"
+                      icon="search"
+                      @click="searchItemName"
+                    />
+                  </template>
+                </van-field>
+              </div>
+              <!-- 物品名称搜索结果 -->
+              <div v-if="itemNameSuggestions.length > 0" class="suggestions-list">
+                <div
+                  v-for="(suggestion, index) in itemNameSuggestions"
+                  :key="index"
+                  class="suggestion-item"
+                  @click="selectItemName(suggestion)"
+                >
+                  {{ suggestion }}
+                </div>
+              </div>
+            </div>
+
+            <!-- 物品型号输入 -->
+            <div v-if="currentSearchMode.includes('model')" class="filter-group">
+              <h4 class="filter-group-title">物品型号</h4>
+              <div class="search-input-wrapper">
+                <van-field
+                  v-model="filter.itemModel"
+                  placeholder="请输入型号关键词"
+                  clearable
+                  @input="onItemModelInput"
+                >
+                  <template #button>
+                    <van-button
+                      size="small"
+                      type="primary"
+                      icon="search"
+                      @click="searchItemModel"
+                    />
+                  </template>
+                </van-field>
+              </div>
+              <!-- 型号搜索结果 -->
+              <div v-if="itemModelSuggestions.length > 0" class="suggestions-list">
+                <div
+                  v-for="(suggestion, index) in itemModelSuggestions"
+                  :key="index"
+                  class="suggestion-item"
+                  @click="selectItemModel(suggestion)"
+                >
+                  {{ suggestion }}
+                </div>
+              </div>
+            </div>
+            <!-- 公司选择 -->
+            <div v-if="currentSearchMode.includes('company')" class="filter-group">
               <h4 class="filter-group-title">所属公司</h4>
               <div class="filter-options">
                 <div
@@ -146,33 +211,12 @@
                 </div>
               </div>
             </div>
-
-            <!-- 库存状态筛选 -->
-            <div class="filter-group">
-              <h4 class="filter-group-title">库存状态</h4>
-              <div class="filter-options">
-                <div
-                  v-for="option in stockStatusOptions"
-                  :key="option.value"
-                  :class="['filter-option', { active: filter.stockStatus === option.value }]"
-                  @click="filter.stockStatus = option.value"
-                >
-                  <div class="option-content">
-                    <div class="option-icon">
-                      <van-icon :name="getStockStatusIcon(option.value)" />
-                    </div>
-                    <span class="option-text">{{ option.text }}</span>
-                  </div>
-                  <van-icon
-                    v-if="filter.stockStatus === option.value"
-                    name="success"
-                    class="check-icon"
-                  />
-                </div>
-              </div>
+            <!-- 提示信息 -->
+            <div class="filter-hint">
+              <van-icon name="info-o" />
+              <span>当前模式：{{ getCurrentModeLabel() }}</span>
             </div>
           </div>
-
           <!-- 操作按钮 -->
           <div class="filter-popup-actions">
             <van-button
@@ -594,6 +638,7 @@ export default {
         stockStatus: this.getStoredFilterValue('stockStatus')
       },
 
+      // 智能搜索相关数据
       currentSearchTag: 'itemName',
       searchTags: [
         { key: 'itemName', label: '名称', icon: 'apps-o' },
@@ -601,30 +646,22 @@ export default {
         { key: 'company', label: '公司', icon: 'home-o' },
         { key: 'location', label: '位置', icon: 'location-o' }
       ],
-
-      // 筛选选项
-      categoryOptions: [
-        { text: '全部类型', value: '', icon: 'apps-o' },
-        { text: '耗材', value: '耗材', icon: 'send-gift-o' },
-        { text: '公用', value: '公用', icon: 'share-o' },
-        { text: '项目', value: '项目', icon: 'todo-list-o' },
-        { text: '其他', value: '其他', icon: 'ellipsis' }
+      currentSearchMode: 'name-model-company', // 当前搜索模式
+      searchModeOptions: [
+        { value: 'name-model-company', label: '名称 + 型号 + 公司', icon: 'apps-o' },
+        { value: 'name-company', label: '名称 + 公司', icon: 'home-o' },
+        { value: 'model-company', label: '型号 + 公司', icon: 'setting-o' },
+        { value: 'name-model', label: '名称 + 型号', icon: 'records' }
       ],
+      itemNameSuggestions: [], // 物品名称搜索建议
+      itemModelSuggestions: [], // 型号搜索建议
+      searchDebounceTimer: null, // 防抖定时器
+      isSearching: false, // 是否正在搜索
       companyOptions: [
-        { text: '全部公司', value: '', icon: 'building-o' },
-        { text: '晟思智能', value: '晟思智能', icon: 'home-o' },
-        { text: '大钧科技', value: '大钧科技', icon: 'shop-o' },
-        { text: '星移科技', value: '星移科技', icon: 'star-o' },
-        { text: '总公司', value: '总公司', icon: 'gem-o' }
+        { text: '晟思', value: '晟思', icon: 'home-o' },
+        { text: '大钧', value: '大钧', icon: 'home-o' },
+        { text: '星移', value: '星移', icon: 'home-o' }
       ],
-      stockStatusOptions: [
-        { text: '全部状态', value: '', icon: 'bars' },
-        { text: '库存充足', value: '充足', icon: 'good-job-o' },
-        { text: '库存紧张', value: '紧张', icon: 'warning-o' },
-        { text: '库存为零', value: '为零', icon: 'minus-o' },
-        { text: '库存异常', value: '异常', icon: 'clear-o' }
-      ],
-
       inboundTypeColumns: [
         { text: '采购入库', value: 1 },
         { text: '生产入库', value: 2 },
@@ -679,6 +716,11 @@ export default {
   },
   created() {
     this.loadProjectOptions();
+    // 初始化搜索模式
+    const savedMode = localStorage.getItem('inventorySearchMode');
+    if (savedMode && this.searchModeOptions.find(m => m.value === savedMode)) {
+      this.currentSearchMode = savedMode;
+    }
     // 如果有存储的搜索值或筛选值，自动执行搜索
     if (this.searchValue || this.filter.category || this.filter.company || this.filter.stockStatus) {
       this.$nextTick(() => {
@@ -738,7 +780,7 @@ export default {
         if (option) {
           filters.push({
             key: 'category',
-            label: `分类: ${option.text}`,
+            label: `分类：${option.text}`,
             value: this.filter.category
           });
         }
@@ -749,7 +791,7 @@ export default {
         if (option) {
           filters.push({
             key: 'company',
-            label: `公司: ${option.text}`,
+            label: `公司：${option.text}`,
             value: this.filter.company
           });
         }
@@ -760,7 +802,7 @@ export default {
         if (option) {
           filters.push({
             key: 'stockStatus',
-            label: `状态: ${option.text}`,
+            label: `状态：${option.text}`,
             value: this.filter.stockStatus
           });
         }
@@ -770,6 +812,174 @@ export default {
     }
   },
   methods: {
+    // 获取当前搜索模式标签
+    getCurrentModeLabel() {
+      const mode = this.searchModeOptions.find(m => m.value === this.currentSearchMode);
+      return mode ? mode.label : '未知模式';
+    },
+
+    // 物品名称输入处理（带防抖）
+    onItemNameInput() {
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer);
+      }
+
+      this.searchDebounceTimer = setTimeout(() => {
+        if (this.filter.itemName && this.filter.itemName.trim()) {
+          this.searchItemName();
+        } else {
+          this.itemNameSuggestions = [];
+        }
+      }, 500);
+    },
+
+    // 搜索物品名称
+    searchItemName() {
+      if (!this.filter.itemName || this.isSearching) return;
+
+      this.isSearching = true;
+      const keyword = this.filter.itemName.trim();
+
+      const param = {
+        PageIndex: 0,
+        PageSize: 20,
+        Item_Name: keyword,
+        Item_Model: '',
+        Company: '',
+        Shelf_Location: '',
+        Item_Brand: '',
+        Category_Type: '',
+        Company_Filter: ''
+      };
+
+      SensorRequestPage.InventoryItemGetFun(
+        JSON.stringify(param),
+        (respData) => {
+          try {
+            let parsedData = null;
+            if (typeof respData === 'string') {
+              parsedData = JSON.parse(respData);
+            } else {
+              parsedData = respData;
+            }
+
+            if (parsedData && parsedData.Data) {
+              // 提取不重复的物品名称
+              const suggestions = [];
+              const seen = new Set();
+
+              parsedData.Data.forEach(item => {
+                if (item.Item_Name && !seen.has(item.Item_Name)) {
+                  suggestions.push(item.Item_Name);
+                  seen.add(item.Item_Name);
+                }
+              });
+
+              // 限制最多 20 条
+              this.itemNameSuggestions = suggestions.slice(0, 20);
+            }
+          } catch (error) {
+            console.error('获取物品名称建议失败:', error);
+            this.itemNameSuggestions = [];
+          } finally {
+            this.isSearching = false;
+          }
+        },
+        (error) => {
+          console.error('获取物品名称建议接口失败:', error);
+          this.isSearching = false;
+          this.itemNameSuggestions = [];
+        }
+      );
+    },
+
+    // 选择物品名称
+    selectItemName(name) {
+      this.filter.itemName = name;
+      this.itemNameSuggestions = [];
+    },
+
+    // 型号输入处理（带防抖）
+    onItemModelInput() {
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer);
+      }
+
+      this.searchDebounceTimer = setTimeout(() => {
+        if (this.filter.itemModel && this.filter.itemModel.trim()) {
+          this.searchItemModel();
+        } else {
+          this.itemModelSuggestions = [];
+        }
+      }, 500);
+    },
+
+    // 搜索型号
+    searchItemModel() {
+      if (!this.filter.itemModel || this.isSearching) return;
+
+      this.isSearching = true;
+      const keyword = this.filter.itemModel.trim();
+
+      const param = {
+        PageIndex: 0,
+        PageSize: 20,
+        Item_Name: '',
+        Item_Model: keyword,
+        Company: '',
+        Shelf_Location: '',
+        Item_Brand: '',
+        Category_Type: '',
+        Company_Filter: ''
+      };
+
+      SensorRequestPage.InventoryItemGetFun(
+        JSON.stringify(param),
+        (respData) => {
+          try {
+            let parsedData = null;
+            if (typeof respData === 'string') {
+              parsedData = JSON.parse(respData);
+            } else {
+              parsedData = respData;
+            }
+
+            if (parsedData && parsedData.Data) {
+              // 提取不重复的型号
+              const suggestions = [];
+              const seen = new Set();
+
+              parsedData.Data.forEach(item => {
+                if (item.Item_Model && item.Item_Model.trim() && !seen.has(item.Item_Model)) {
+                  suggestions.push(item.Item_Model);
+                  seen.add(item.Item_Model);
+                }
+              });
+
+              // 限制最多 20 条
+              this.itemModelSuggestions = suggestions.slice(0, 20);
+            }
+          } catch (error) {
+            console.error('获取型号建议失败:', error);
+            this.itemModelSuggestions = [];
+          } finally {
+            this.isSearching = false;
+          }
+        },
+        (error) => {
+          console.error('获取型号建议接口失败:', error);
+          this.isSearching = false;
+          this.itemModelSuggestions = [];
+        }
+      );
+    },
+
+    // 选择型号
+    selectItemModel(model) {
+      this.filter.itemModel = model;
+      this.itemModelSuggestions = [];
+    },
+
     // 切换搜索标签
     switchSearchTag(tagKey) {
       // 如果点击的是当前已选中的标签，不做处理
@@ -845,9 +1055,12 @@ export default {
 
     // 应用筛选
     applyFilters() {
+      // 保存搜索模式
+      localStorage.setItem('inventorySearchMode', this.currentSearchMode);
       this.saveFilterValue();
       this.showFilterPopover = false;
       this.onSearch();
+      this.$toast.success('筛选已应用');
     },
 
     // 重置筛选
@@ -857,6 +1070,8 @@ export default {
         company: '',
         stockStatus: ''
       };
+      this.itemNameSuggestions = [];
+      this.itemModelSuggestions = [];
       this.showFilterPopover = false;
     },
 
@@ -927,7 +1142,7 @@ export default {
     showBatchScanConfirmation() {
       this.$dialog.confirm({
         title: '批量扫码提示',
-        message: '目前仅支持“嘉立创”物品批量扫码快速新增入库，是否继续？',
+        message: '目前仅支持"嘉立创"物品批量扫码快速新增入库，是否继续？',
         confirmButtonText: '确认',
         cancelButtonText: '取消'
       }).then(() => {
@@ -1165,13 +1380,13 @@ export default {
     // 修改 parseCustomJSON 方法（如果还没有这个方法，请添加）
     parseCustomJSON(str) {
       try {
-        // 尝试直接解析JSON
+        // 尝试直接解析 JSON
         return JSON.parse(str);
       } catch (e) {
-        console.log('非标准JSON格式，尝试其他解析方式');
+        console.log('非标准 JSON 格式，尝试其他解析方式');
 
-        // 尝试处理可能的格式问题，比如缺失引号的JSON
-        // 示例格式: {on: "物品名称", pc: "型号", pm: "品牌", qty: "数量", cc: "类别", pdi: "描述"}
+        // 尝试处理可能的格式问题，比如缺失引号的 JSON
+        // 示例格式：{on: "物品名称", pc: "型号", pm: "品牌", qty: "数量", cc: "类别", pdi: "描述"}
 
         // 移除可能的换行符和多余空格
         let cleanStr = str.trim();
@@ -1239,7 +1454,7 @@ export default {
 
     // 搜索方法
     onSearch() {
-      if (this.searchValue || this.isFilterActive) {
+      if (this.searchValue || this.isFilterActive || this.filter.itemName || this.filter.itemModel) {
         this.saveSearchValue();
         this.saveFilterValue();
         this.hasSearched = true;
@@ -1252,13 +1467,12 @@ export default {
         const param = {
           PageIndex: this.currentPage - 1,
           PageSize: this.pageSize,
-          Item_Name: this.currentSearchTag === 'itemName' ? this.searchValue : '',
-          Item_Model: this.currentSearchTag === 'itemModel' ? this.searchValue : '',
-          Company: this.currentSearchTag === 'company' ? this.searchValue : '',
+          Item_Name: this.currentSearchTag === 'itemName' ? this.searchValue : (this.filter.itemName || ''),
+          Item_Model: this.currentSearchTag === 'itemModel' ? this.searchValue : (this.filter.itemModel || ''),
+          Company: this.currentSearchTag === 'company' ? this.searchValue : (this.filter.company || ''),
           Shelf_Location: this.currentSearchTag === 'location' ? this.searchValue : '',
           Category_Type: this.filter.category,
           Company_Filter: this.filter.company
-          // 注意：stockStatus 筛选需要后端接口支持
         };
 
         this.onLoad(param);
@@ -1270,6 +1484,8 @@ export default {
     // 重置搜索
     onReset() {
       this.searchValue = '';
+      this.filter.itemName = '';
+      this.filter.itemModel = '';
       this.resetFilters();
       this.currentPage = 1;
       this.list = [];
@@ -1314,14 +1530,14 @@ export default {
           try {
             let parsedData = null;
 
-            // 解析响应数据 - 新的数据格式是字符串化的JSON
+            // 解析响应数据 - 新的数据格式是字符串化的 JSON
             if (typeof respData === 'string') {
               parsedData = JSON.parse(respData);
             } else {
               parsedData = respData;
             }
 
-            // 提取实际的Data数组
+            // 提取实际的 Data 数组
             let newData = [];
             if (parsedData && parsedData.Data) {
               newData = parsedData.Data;
@@ -1343,7 +1559,7 @@ export default {
                 brand: item.Item_Brand || '',
                 // 添加图片信息
                 Item_Images: item.Item_Images || [],
-                // 初始化图片URL为空字符串
+                // 初始化图片URL 为空字符串
                 imageUrl: ''
               };
 
@@ -1351,7 +1567,7 @@ export default {
               if (processedItem.Item_Images && processedItem.Item_Images.length > 0) {
                 const firstImage = processedItem.Item_Images[0];
                 if (firstImage.File_Md5) {
-                  // 调用后端接口获取临时下载URL
+                  // 调用后端接口获取临时下载 URL
                   const param = {
                     remoteLocation: firstImage.File_Md5
                   };
@@ -1360,7 +1576,7 @@ export default {
                     JSON.stringify(param),
                     (respData) => {
                       if (respData) {
-                        // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
+                        // 将 URL 中的 http://127.0.0.1:9000 替换为 https://api-v2.sensor-smart.cn:22027
                         processedItem.imageUrl = respData.replace(
                           'http://127.0.0.1:9000',
                           'https://api-v2.sensor-smart.cn:22027'
@@ -1385,7 +1601,7 @@ export default {
             if (this.currentPage === 1) {
               this.list = processedData;
             } else {
-              // 防止重复添加相同ID的项目
+              // 防止重复添加相同 ID 的项目
               const newItems = processedData.filter(newItem =>
                 !this.list.some(existingItem => existingItem.Id === newItem.Id)
               );
@@ -1419,7 +1635,7 @@ export default {
       });
     },
 
-    // 修改获取图片URL方法
+    // 修改获取图片URL 方法
     getImageUrl(item) {
       // 直接返回预加载的图片URL
       return item.imageUrl || require('@/assets/暂无图片1.png');
@@ -1438,7 +1654,7 @@ export default {
     },
 
     viewDetail(item) {
-      // 将当前物品信息保存到sessionStorage中(模拟扫码情况)
+      // 将当前物品信息保存到 sessionStorage 中 (模拟扫码情况)
       sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, item);
       // 跳转到库存详情页面
       const department = this.$route.params.department;
@@ -1457,7 +1673,7 @@ export default {
       if (item.Item_Images && item.Item_Images.length > 0) {
         item.Item_Images.forEach(img => {
           if (img.File_Md5) {
-            // 使用MinIO接口获取预览URL
+            // 使用 MinIO 接口获取预览 URL
             const param = {
               remoteLocation: img.File_Md5
             };
@@ -1465,7 +1681,7 @@ export default {
               JSON.stringify(param),
               (url) => {
                 if (url) {
-                  // 将URL中的http://127.0.0.1:9000替换为https://api-v2.sensor-smart.cn:22027
+                  // 将 URL 中的 http://127.0.0.1:9000 替换为 https://api-v2.sensor-smart.cn:22027
                   const finalUrl = url.replace(
                     'http://127.0.0.1:9000',
                     'https://api-v2.sensor-smart.cn:22027'
@@ -1483,7 +1699,7 @@ export default {
                 }
               },
               (error) => {
-                console.error('获取图片URL失败:', error);
+                console.error('获取图片URL 失败:', error);
                 images.push(require('@/assets/暂无图片1.png'));
 
                 // 当收集完所有图片URL后显示预览
@@ -1551,10 +1767,10 @@ export default {
 
       // 检查库存数量
       if (item.Current_Stock > 0) {
-        // 如果库存大于0，显示库存检查弹窗
+        // 如果库存大于 0，显示库存检查弹窗
         this.showStockCheckDialog = true;
       } else {
-        // 如果库存为0，直接显示删除确认弹窗
+        // 如果库存为 0，直接显示删除确认弹窗
         this.showDeleteConfirm = true;
       }
     },
@@ -1594,7 +1810,7 @@ export default {
                 this.executeDelete();
               } else {
                 // 如果该位置有多个物品，不允许删除
-                Toast(`该位置(${shelfLocation})为储物箱！请将此位置所有物品移出后再执行删除操作！`);
+                Toast(`该位置 (${shelfLocation}) 为储物箱！请将此位置所有物品移出后再执行删除操作！`);
                 this.showDeleteConfirm = false;
                 this.deletingItem = null;
               }
@@ -1633,7 +1849,7 @@ export default {
           Toast('删除成功');
           // 从列表中移除已删除的项目
           this.list = this.list.filter(item => item.Id !== this.deletingItem.Id);
-          // 在重置状态前先记录删除操作（否则会出现ID不存在的情况）
+          // 在重置状态前先记录删除操作（否则会出现 ID 不存在的情况）
           this.addDeletionRecord();
           // 重置状态
           this.showDeleteConfirm = false;
@@ -1663,7 +1879,7 @@ export default {
           Person_Phone: this.getLocalUserInfo().phone,
           Person_DingID: this.getLocalUserInfo().dingID
         },
-        Remark: `${this.getLocalUserInfo().name} 删除了物品: ${this.deletingItem.Item_Name}`
+        Remark: `${this.getLocalUserInfo().name} 删除了物品：${this.deletingItem.Item_Name}`
       };
 
       // 调用事务记录接口
@@ -1674,7 +1890,7 @@ export default {
         },
         (error) => {
           console.error('删除操作记录添加失败:', error);
-          this.$toast.fail('删除操作记录添加失败: ' + (error.message || '未知错误'));
+          this.$toast.fail('删除操作记录添加失败：' + (error.message || '未知错误'));
         }
       );
     },
@@ -1737,7 +1953,7 @@ export default {
     // 选择操作类型（入库/出库）
     selectOperationType(type) {
       this.currentOperationType = type;
-      // 重置数量为1
+      // 重置数量为 1
       this.singleOperationQuantity = 1;
       // 清空自定义输入
       this.customQuantity = '';
@@ -1887,7 +2103,7 @@ export default {
         const failed = results.filter(result => result.status === 'rejected').length;
 
         if (failed > 0) {
-          Toast(`操作完成！成功: ${successful}，失败: ${failed}`);
+          Toast(`操作完成！成功：${successful}，失败：${failed}`);
         } else {
           Toast.success(`全部 ${successful} 个操作执行成功！`);
         }
@@ -1963,6 +2179,7 @@ export default {
   }
 };
 </script>
+
 
 <style scoped>
 .inventory-page {
