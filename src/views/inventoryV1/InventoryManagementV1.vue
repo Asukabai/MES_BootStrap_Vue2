@@ -596,7 +596,6 @@ import { key_DingScannedInventoryQRCodeResult } from "../../utils/Dingding";
 import SensorRequestPage from "../../utils/SensorRequestPage";
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
 import { key_DingName, key_DingUserIndex, key_DingUserPhone } from "../../utils/Dingding";
-
 // 添加 Promise.allSettled 的 polyfill
 if (!Promise.allSettled) {
   Promise.allSettled = function (promises) {
@@ -2077,12 +2076,10 @@ export default {
       }
       this.showBatchConfirmPopup = true;
     },
-
     // 关闭批量确认弹窗
     closeBatchConfirmation() {
       this.showBatchConfirmPopup = false;
     },
-
     // 执行批量操作
     async executeBatchOperations() {
       if (this.selectedOperations.length === 0) {
@@ -2111,7 +2108,6 @@ export default {
         this.clearSelection();
         this.closeBatchConfirmation();
         this.onRefresh();
-
       } catch (error) {
         console.error('批量操作失败:', error);
         Toast.fail('批量操作失败');
@@ -2124,7 +2120,6 @@ export default {
     executeSingleOperation(operation) {
       return new Promise((resolve, reject) => {
         const { item, operationType, quantity, remark } = operation;
-
         // 构造请求参数
         const requestData = {
           PageIndex: 0,
@@ -2142,7 +2137,6 @@ export default {
           },
           Remark: `${operationType === 'inbound' ? '批量入库' : '批量出库'}: ${quantity}, ${remark || '无备注'}`
         };
-
         // 调用接口
         SensorRequestPage.InventoryTransactionAddFun(
           JSON.stringify(requestData),
@@ -2157,23 +2151,19 @@ export default {
         );
       });
     },
-
     // 新增删除点击事件
     handleDeleteClick() {
       if (!this.currentSelectedItem) {
         Toast('请选择要删除的物品');
         return;
       }
-
       this.deletingItem = this.currentSelectedItem;
-
       // 检查库存数量
       if (this.currentSelectedItem.Current_Stock > 0) {
         this.showStockCheckDialog = true;
       } else {
         this.showDeleteConfirm = true;
       }
-
       this.closeSingleOperationPopup();
     }
   }
@@ -2858,7 +2848,6 @@ export default {
   color: #F44336;
   font-weight: bold;
 }
-
 /* 批量确认弹窗样式 */
 .batch-confirmation-popup {
   padding: 16px;
@@ -2866,60 +2855,50 @@ export default {
   display: flex;
   flex-direction: column;
 }
-
 .confirmation-summary {
   margin-bottom: 16px;
   padding: 12px;
   background-color: #f0f7ff;
   border-radius: 8px;
 }
-
 .confirmation-summary p {
   margin: 4px 0;
   font-size: 14px;
   color: #333;
 }
-
 .operations-list h4 {
   margin: 16px 0 8px 0;
   font-size: 16px;
   color: #333;
 }
-
 .operation-item {
   padding: 12px;
   border: 1px solid #e0e0e0;
   border-radius: 8px;
   margin-bottom: 8px;
 }
-
 .item-info {
   display: flex;
   justify-content: space-between;
   align-items: center;
   margin-bottom: 4px;
 }
-
 .item-name {
   font-weight: 500;
   color: #333;
 }
-
 .operation-type {
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
   color: white;
 }
-
 .operation-type.inbound {
   background-color: #4CAF50;
 }
-
 .operation-type.outbound {
   background-color: #F44336;
 }
-
 .operation-details {
   display: flex;
   justify-content: space-between;
@@ -2927,18 +2906,15 @@ export default {
   color: #666;
   margin-bottom: 4px;
 }
-
 .operation-remark {
   font-size: 12px;
   color: #888;
   font-style: italic;
 }
-
 .confirmation-actions {
   margin-top: auto;
   padding-top: 16px;
 }
-
 /* 自定义全图预览图片-关闭按钮样式 */
 .custom-close-button {
   background-color: red;
@@ -2947,7 +2923,6 @@ export default {
   top: 15px;
   right: 15px;
 }
-
 /* 悬浮按钮区域 */
 .floating-buttons {
   position: fixed;
@@ -2955,33 +2930,27 @@ export default {
   right: 0;
   z-index: 999;
 }
-
 /* 响应式调整 */
 @media (max-width: 480px) {
   .search-tags {
     gap: 6px;
   }
-
   .tag-item {
     padding: 6px 12px;
     font-size: 12px;
   }
-
   .search-input-container {
     gap: 8px;
   }
-
   .action-btn {
     width: 44px;
     height: 44px;
     font-size: 18px;
   }
-
   .reset-btn {
     padding: 0 16px;
     font-size: 13px;
   }
-
   .filter-options {
     grid-template-columns: 1fr;
   }

@@ -344,6 +344,12 @@
               @click="selectRecentProject(project)"
             >
               {{ project }}
+              <van-icon
+                name="cross"
+                size="14px"
+                class="recent-item-close"
+                @click.stop="removeRecentProject(index)"
+              />
             </van-tag>
           </div>
         </div>
@@ -1135,6 +1141,14 @@ export default {
       this.saveToRecentProjects(projectName);
     },
 
+    // 移除最近选择的项目
+    removeRecentProject(index) {
+      this.recentProjects.splice(index, 1);
+      // 更新本地存储
+      localStorage.setItem('recentProjects', JSON.stringify(this.recentProjects));
+      Toast.success('已清除最近选择');
+    },
+
     // 保存到最近选择
     saveToRecentProjects(projectName) {
       // 限制历史记录数量为 5 条
@@ -1543,16 +1557,30 @@ export default {
   margin-top: 10px;
 }
 
-.van-radio-group {
-  display: flex;
-  flex-wrap: wrap;
+.recent-item {
+  cursor: pointer;
+  position: relative;
+  padding-right: 24px; /* 为叉号预留空间 */
 }
 
-.van-radio {
-  margin-right: 15px;
-  margin-bottom: 5px;
+.recent-item:hover {
+  opacity: 0.8;
 }
 
+.recent-item-close {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #fff;
+  opacity: 0.8;
+  transition: all 0.2s;
+}
+
+.recent-item-close:hover {
+  opacity: 1;
+  color: #ff7676;
+}
 /* 货架位置输入框容器 */
 .shelf-location-container {
   position: relative;
@@ -1648,16 +1676,6 @@ export default {
   margin-bottom: 8px;
 }
 
-.more-field-key {
-  flex: 1;
-  margin-right: 0;
-}
-
-.more-field-value {
-  flex: 1;
-  margin-right: 0;
-}
-
 .remove-field-btn {
   flex-shrink: 0;
   margin-left: 5px;
@@ -1702,16 +1720,6 @@ export default {
   margin-bottom: 5px;
   font-size: 12px;
   line-height: 1.2;
-}
-
-.system-tag {
-  background-color: #d0f0ff;
-  border: 1px solid #87ceeb;
-}
-
-.user-tag {
-  background-color: #f5f5f5;
-  border: 1px solid #ebedf0;
 }
 
 .tag-text {
