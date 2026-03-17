@@ -289,6 +289,18 @@ import * as ssDing from '../utils/Dingding.js';
               callSuccess(respData);
           }, callFail);
       },
+      // 查询嘉立创商品详情数据
+      JLCInventoryItemBatchAddFun(param, callSuccess, callFail) {
+          ssDing.PostDataUrl("JLCInventoryItemBatchAddFun", param, true, respData => {
+              callSuccess(respData);
+          }, callFail);
+      },
+      // 根据条件查询库存并导出为Excel文件
+      InventoryExportToExcelFun(param, callSuccess, callFail) {
+          ssDing.PostDataUrl("InventoryExportToExcelFun", param, true, respData => {
+              callSuccess(respData);
+          }, callFail);
+      },
       // 添加资产信息
       AssetInfoAddFun(param) {
           return new Promise((resolve, reject) => {
