@@ -13,8 +13,8 @@
               <van-field
                 v-model="searchForm.Item_Name"
                 placeholder="请输入物品名称"
-                clearable
                 @input="onItemNameInput"
+                ref="itemNameInput"
               >
                 <template #button>
                   <van-button
@@ -22,6 +22,14 @@
                     type="primary"
                     icon="search"
                     @click="searchItemName"
+                  />
+                </template>
+                <template #right-icon>
+                  <van-icon
+                    v-if="searchForm.Item_Name"
+                    name="cross"
+                    class="custom-clear-icon"
+                    @click="clearItemName"
                   />
                 </template>
               </van-field>
@@ -45,8 +53,8 @@
               <van-field
                 v-model="searchForm.Shelf_Location"
                 placeholder="请输入货架位置"
-                clearable
                 @input="onShelfLocationInput"
+                ref="shelfLocationInput"
               >
                 <template #button>
                   <van-button
@@ -54,6 +62,14 @@
                     type="primary"
                     icon="search"
                     @click="searchShelfLocation"
+                  />
+                </template>
+                <template #right-icon>
+                  <van-icon
+                    v-if="searchForm.Shelf_Location"
+                    name="cross"
+                    class="custom-clear-icon"
+                    @click="clearShelfLocation"
                   />
                 </template>
               </van-field>
@@ -79,8 +95,8 @@
               <van-field
                 v-model="searchForm.Item_Model"
                 placeholder="请输入物品型号"
-                clearable
                 @input="onItemModelInput"
+                ref="itemModelInput"
               >
                 <template #button>
                   <van-button
@@ -88,6 +104,14 @@
                     type="primary"
                     icon="search"
                     @click="searchItemModel"
+                  />
+                </template>
+                <template #right-icon>
+                  <van-icon
+                    v-if="searchForm.Item_Model"
+                    name="cross"
+                    class="custom-clear-icon"
+                    @click="clearItemModel"
                   />
                 </template>
               </van-field>
@@ -111,8 +135,8 @@
               <van-field
                 v-model="searchForm.Item_Brand"
                 placeholder="请输入物品品牌"
-                clearable
                 @input="onItemBrandInput"
+                ref="itemBrandInput"
               >
                 <template #button>
                   <van-button
@@ -120,6 +144,14 @@
                     type="primary"
                     icon="search"
                     @click="searchItemBrand"
+                  />
+                </template>
+                <template #right-icon>
+                  <van-icon
+                    v-if="searchForm.Item_Brand"
+                    name="cross"
+                    class="custom-clear-icon"
+                    @click="clearItemBrand"
                   />
                 </template>
               </van-field>
@@ -338,28 +370,90 @@ export default {
     selectItemName(name) {
       this.searchForm.Item_Name = name;
       this.itemNameSuggestions = [];
-      Toast.success(`已选择：${name}`);
+      // 可选：自动聚焦输入框
+      this.$nextTick(() => {
+        if (this.$refs.itemNameInput) {
+          this.$refs.itemNameInput.focus();
+        }
+      });
     },
 
     // 选择货架位置
     selectShelfLocation(location) {
       this.searchForm.Shelf_Location = location;
       this.shelfLocationSuggestions = [];
-      Toast.success(`已选择：${location}`);
+      this.$nextTick(() => {
+        if (this.$refs.shelfLocationInput) {
+          this.$refs.shelfLocationInput.focus();
+        }
+      });
     },
 
     // 选择物品型号
     selectItemModel(model) {
       this.searchForm.Item_Model = model;
       this.itemModelSuggestions = [];
-      Toast.success(`已选择：${model}`);
+      this.$nextTick(() => {
+        if (this.$refs.itemModelInput) {
+          this.$refs.itemModelInput.focus();
+        }
+      });
     },
 
     // 选择物品品牌
     selectItemBrand(brand) {
       this.searchForm.Item_Brand = brand;
       this.itemBrandSuggestions = [];
-      Toast.success(`已选择：${brand}`);
+      this.$nextTick(() => {
+        if (this.$refs.itemBrandInput) {
+          this.$refs.itemBrandInput.focus();
+        }
+      });
+    },
+
+    // 清空物品名称
+    clearItemName() {
+      this.searchForm.Item_Name = '';
+      this.itemNameSuggestions = [];
+      // 自动聚焦输入框以便继续输入
+      this.$nextTick(() => {
+        if (this.$refs.itemNameInput) {
+          this.$refs.itemNameInput.focus();
+        }
+      });
+    },
+
+    // 清空货架位置
+    clearShelfLocation() {
+      this.searchForm.Shelf_Location = '';
+      this.shelfLocationSuggestions = [];
+      this.$nextTick(() => {
+        if (this.$refs.shelfLocationInput) {
+          this.$refs.shelfLocationInput.focus();
+        }
+      });
+    },
+
+    // 清空物品型号
+    clearItemModel() {
+      this.searchForm.Item_Model = '';
+      this.itemModelSuggestions = [];
+      this.$nextTick(() => {
+        if (this.$refs.itemModelInput) {
+          this.$refs.itemModelInput.focus();
+        }
+      });
+    },
+
+    // 清空物品品牌
+    clearItemBrand() {
+      this.searchForm.Item_Brand = '';
+      this.itemBrandSuggestions = [];
+      this.$nextTick(() => {
+        if (this.$refs.itemBrandInput) {
+          this.$refs.itemBrandInput.focus();
+        }
+      });
     },
 
     // 搜索物品名称
@@ -403,7 +497,7 @@ export default {
                 }
               });
 
-              this.itemNameSuggestions = suggestions.slice(0, 20);
+              this.itemNameSuggestions = suggestions;
             } else if (parsedData && parsedData.Msg) {
               // 显示后端返回的错误信息
               Toast.fail(parsedData.Msg);
@@ -467,7 +561,7 @@ export default {
                 }
               });
 
-              this.shelfLocationSuggestions = suggestions.slice(0, 20);
+              this.shelfLocationSuggestions = suggestions;
             } else if (parsedData && parsedData.Msg) {
               // 显示后端返回的错误信息
               Toast.fail(parsedData.Msg);
@@ -531,7 +625,7 @@ export default {
                 }
               });
 
-              this.itemModelSuggestions = suggestions.slice(0, 20);
+              this.itemModelSuggestions = suggestions;
             } else if (parsedData && parsedData.Msg) {
               // 显示后端返回的错误信息
               Toast.fail(parsedData.Msg);
@@ -595,7 +689,7 @@ export default {
                 }
               });
 
-              this.itemBrandSuggestions = suggestions.slice(0, 20);
+              this.itemBrandSuggestions = suggestions;
             } else if (parsedData && parsedData.Msg) {
               // 显示后端返回的错误信息
               Toast.fail(parsedData.Msg);
@@ -899,6 +993,17 @@ export default {
 .export-actions .primary-btn:hover {
   background-color: #2563eb;
   border-color: #2563eb;
+}
+
+/* 自定义清除图标样式 */
+.custom-clear-icon {
+  font-size: 16px;
+  color: #969799;
+  padding: 0 8px;
+  cursor: pointer;
+}
+.custom-clear-icon:active {
+  color: #333;
 }
 
 .footer {
