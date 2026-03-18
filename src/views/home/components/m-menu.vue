@@ -424,11 +424,11 @@ export default {
         }
       }
       if (item.title === '库存导出') {
-        // 仅在PC端允许跳转
+        // 仅在 PC 端允许跳转
         if (this.isPC) {
-          this.$toast.success('正在开发中 ！');
+          this.navigateTo('/inventory-export');
         } else {
-          this.$toast.fail('此功能仅在PC端可用');
+          this.$toast.fail('此功能仅在 PC 端可用');
         }
       }
     },
