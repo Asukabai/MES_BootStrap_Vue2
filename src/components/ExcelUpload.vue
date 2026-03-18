@@ -9,40 +9,132 @@
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">物品名称</label>
-            <van-field
-              v-model="searchForm.Item_Name"
-              placeholder="请输入物品名称"
-              clearable
-            />
+            <div class="search-input-wrapper">
+              <van-field
+                v-model="searchForm.Item_Name"
+                placeholder="请输入物品名称"
+                clearable
+                @input="onItemNameInput"
+              >
+                <template #button>
+                  <van-button
+                    size="small"
+                    type="primary"
+                    icon="search"
+                    @click="searchItemName"
+                  />
+                </template>
+              </van-field>
+            </div>
+            <!-- 物品名称搜索结果 -->
+            <div v-if="itemNameSuggestions.length > 0" class="suggestions-list">
+              <div
+                v-for="(suggestion, index) in itemNameSuggestions"
+                :key="index"
+                class="suggestion-item"
+                @click="selectItemName(suggestion)"
+              >
+                {{ suggestion }}
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
             <label class="form-label">货架位置</label>
-            <van-field
-              v-model="searchForm.Shelf_Location"
-              placeholder="请输入货架位置"
-              clearable
-            />
+            <div class="search-input-wrapper">
+              <van-field
+                v-model="searchForm.Shelf_Location"
+                placeholder="请输入货架位置"
+                clearable
+                @input="onShelfLocationInput"
+              >
+                <template #button>
+                  <van-button
+                    size="small"
+                    type="primary"
+                    icon="search"
+                    @click="searchShelfLocation"
+                  />
+                </template>
+              </van-field>
+            </div>
+            <!-- 货架位置搜索结果 -->
+            <div v-if="shelfLocationSuggestions.length > 0" class="suggestions-list">
+              <div
+                v-for="(suggestion, index) in shelfLocationSuggestions"
+                :key="index"
+                class="suggestion-item"
+                @click="selectShelfLocation(suggestion)"
+              >
+                {{ suggestion }}
+              </div>
+            </div>
           </div>
         </div>
 
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">物品型号</label>
-            <van-field
-              v-model="searchForm.Item_Model"
-              placeholder="请输入物品型号"
-              clearable
-            />
+            <div class="search-input-wrapper">
+              <van-field
+                v-model="searchForm.Item_Model"
+                placeholder="请输入物品型号"
+                clearable
+                @input="onItemModelInput"
+              >
+                <template #button>
+                  <van-button
+                    size="small"
+                    type="primary"
+                    icon="search"
+                    @click="searchItemModel"
+                  />
+                </template>
+              </van-field>
+            </div>
+            <!-- 物品型号搜索结果 -->
+            <div v-if="itemModelSuggestions.length > 0" class="suggestions-list">
+              <div
+                v-for="(suggestion, index) in itemModelSuggestions"
+                :key="index"
+                class="suggestion-item"
+                @click="selectItemModel(suggestion)"
+              >
+                {{ suggestion }}
+              </div>
+            </div>
           </div>
 
           <div class="form-group">
             <label class="form-label">物品品牌</label>
-            <van-field
-              v-model="searchForm.Item_Brand"
-              placeholder="请输入物品品牌"
-              clearable
-            />
+            <div class="search-input-wrapper">
+              <van-field
+                v-model="searchForm.Item_Brand"
+                placeholder="请输入物品品牌"
+                clearable
+                @input="onItemBrandInput"
+              >
+                <template #button>
+                  <van-button
+                    size="small"
+                    type="primary"
+                    icon="search"
+                    @click="searchItemBrand"
+                  />
+                </template>
+              </van-field>
+            </div>
+            <!-- 物品品牌搜索结果 -->
+            <div v-if="itemBrandSuggestions.length > 0" class="suggestions-list">
+              <div
+                v-for="(suggestion, index) in itemBrandSuggestions"
+                :key="index"
+                class="suggestion-item"
+                @click="selectItemBrand(suggestion)"
+              >
+                {{ suggestion }}
+              </div>
+            </div>
           </div>
         </div>
 
@@ -137,6 +229,8 @@ export default {
       exporting: false,
       showCategoryAction: false,
       showCompanyAction: false,
+      isSearching: false,
+      searchDebounceTimer: null,
       searchForm: {
         Item_Name: '',
         Shelf_Location: '',
@@ -145,6 +239,11 @@ export default {
         Category_Type: '',
         Company: ''
       },
+      // 搜索建议列表
+      itemNameSuggestions: [],
+      shelfLocationSuggestions: [],
+      itemModelSuggestions: [],
+      itemBrandSuggestions: [],
       categoryOptions: [
         { text: '公用', value: '公用' },
         { text: '项目', value: '项目' },
@@ -175,6 +274,350 @@ export default {
     }
   },
   methods: {
+    // 物品名称输入处理（带防抖）
+    onItemNameInput() {
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer);
+      }
+
+      this.searchDebounceTimer = setTimeout(() => {
+        if (this.searchForm.Item_Name && this.searchForm.Item_Name.trim()) {
+          this.searchItemName();
+        } else {
+          this.itemNameSuggestions = [];
+        }
+      }, 500);
+    },
+
+    // 货架位置输入处理（带防抖）
+    onShelfLocationInput() {
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer);
+      }
+
+      this.searchDebounceTimer = setTimeout(() => {
+        if (this.searchForm.Shelf_Location && this.searchForm.Shelf_Location.trim()) {
+          this.searchShelfLocation();
+        } else {
+          this.shelfLocationSuggestions = [];
+        }
+      }, 500);
+    },
+
+    // 物品型号输入处理（带防抖）
+    onItemModelInput() {
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer);
+      }
+
+      this.searchDebounceTimer = setTimeout(() => {
+        if (this.searchForm.Item_Model && this.searchForm.Item_Model.trim()) {
+          this.searchItemModel();
+        } else {
+          this.itemModelSuggestions = [];
+        }
+      }, 500);
+    },
+
+    // 物品品牌输入处理（带防抖）
+    onItemBrandInput() {
+      if (this.searchDebounceTimer) {
+        clearTimeout(this.searchDebounceTimer);
+      }
+
+      this.searchDebounceTimer = setTimeout(() => {
+        if (this.searchForm.Item_Brand && this.searchForm.Item_Brand.trim()) {
+          this.searchItemBrand();
+        } else {
+          this.itemBrandSuggestions = [];
+        }
+      }, 500);
+    },
+
+    // 选择物品名称
+    selectItemName(name) {
+      this.searchForm.Item_Name = name;
+      this.itemNameSuggestions = [];
+      Toast.success(`已选择：${name}`);
+    },
+
+    // 选择货架位置
+    selectShelfLocation(location) {
+      this.searchForm.Shelf_Location = location;
+      this.shelfLocationSuggestions = [];
+      Toast.success(`已选择：${location}`);
+    },
+
+    // 选择物品型号
+    selectItemModel(model) {
+      this.searchForm.Item_Model = model;
+      this.itemModelSuggestions = [];
+      Toast.success(`已选择：${model}`);
+    },
+
+    // 选择物品品牌
+    selectItemBrand(brand) {
+      this.searchForm.Item_Brand = brand;
+      this.itemBrandSuggestions = [];
+      Toast.success(`已选择：${brand}`);
+    },
+
+    // 搜索物品名称
+    searchItemName() {
+      if (!this.searchForm.Item_Name || this.isSearching) return;
+
+      this.isSearching = true;
+      const keyword = this.searchForm.Item_Name.trim();
+
+      const param = {
+        PageIndex: 0,
+        PageSize: 20,
+        Item_Name: keyword,
+        Item_Model: '',
+        Company: '',
+        Shelf_Location: '',
+        Item_Brand: '',
+        Category_Type: '',
+        Company_Filter: ''
+      };
+
+      SensorRequestPage.InventoryItemGetFun(
+        JSON.stringify(param),
+        (respData) => {
+          try {
+            let parsedData = null;
+            if (typeof respData === 'string') {
+              parsedData = JSON.parse(respData);
+            } else {
+              parsedData = respData;
+            }
+
+            if (parsedData && parsedData.Data) {
+              const suggestions = [];
+              const seen = new Set();
+
+              parsedData.Data.forEach(item => {
+                if (item.Item_Name && !seen.has(item.Item_Name)) {
+                  suggestions.push(item.Item_Name);
+                  seen.add(item.Item_Name);
+                }
+              });
+
+              this.itemNameSuggestions = suggestions.slice(0, 20);
+            } else if (parsedData && parsedData.Msg) {
+              // 显示后端返回的错误信息
+              Toast.fail(parsedData.Msg);
+            }
+          } catch (error) {
+            console.error('获取物品名称建议失败:', error);
+            Toast.fail('解析数据失败');
+            this.itemNameSuggestions = [];
+          } finally {
+            this.isSearching = false;
+          }
+        },
+        (error) => {
+          console.error('获取物品名称建议接口失败:', error);
+          const errorMsg = typeof error === 'string' ? error : '请求失败';
+          Toast.fail(errorMsg);
+          this.isSearching = false;
+          this.itemNameSuggestions = [];
+        }
+      );
+    },
+
+    // 搜索货架位置
+    searchShelfLocation() {
+      if (!this.searchForm.Shelf_Location || this.isSearching) return;
+
+      this.isSearching = true;
+      const keyword = this.searchForm.Shelf_Location.trim();
+
+      const param = {
+        PageIndex: 0,
+        PageSize: 20,
+        Item_Name: '',
+        Item_Model: '',
+        Company: '',
+        Shelf_Location: keyword,
+        Item_Brand: '',
+        Category_Type: '',
+        Company_Filter: ''
+      };
+
+      SensorRequestPage.InventoryItemGetFun(
+        JSON.stringify(param),
+        (respData) => {
+          try {
+            let parsedData = null;
+            if (typeof respData === 'string') {
+              parsedData = JSON.parse(respData);
+            } else {
+              parsedData = respData;
+            }
+
+            if (parsedData && parsedData.Data) {
+              const suggestions = [];
+              const seen = new Set();
+
+              parsedData.Data.forEach(item => {
+                if (item.Shelf_Location && !seen.has(item.Shelf_Location)) {
+                  suggestions.push(item.Shelf_Location);
+                  seen.add(item.Shelf_Location);
+                }
+              });
+
+              this.shelfLocationSuggestions = suggestions.slice(0, 20);
+            } else if (parsedData && parsedData.Msg) {
+              // 显示后端返回的错误信息
+              Toast.fail(parsedData.Msg);
+            }
+          } catch (error) {
+            console.error('获取货架位置建议失败:', error);
+            Toast.fail('解析数据失败');
+            this.shelfLocationSuggestions = [];
+          } finally {
+            this.isSearching = false;
+          }
+        },
+        (error) => {
+          console.error('获取货架位置建议接口失败:', error);
+          const errorMsg = typeof error === 'string' ? error : '请求失败';
+          Toast.fail(errorMsg);
+          this.isSearching = false;
+          this.shelfLocationSuggestions = [];
+        }
+      );
+    },
+
+    // 搜索物品型号
+    searchItemModel() {
+      if (!this.searchForm.Item_Model || this.isSearching) return;
+
+      this.isSearching = true;
+      const keyword = this.searchForm.Item_Model.trim();
+
+      const param = {
+        PageIndex: 0,
+        PageSize: 20,
+        Item_Name: '',
+        Item_Model: keyword,
+        Company: '',
+        Shelf_Location: '',
+        Item_Brand: '',
+        Category_Type: '',
+        Company_Filter: ''
+      };
+
+      SensorRequestPage.InventoryItemGetFun(
+        JSON.stringify(param),
+        (respData) => {
+          try {
+            let parsedData = null;
+            if (typeof respData === 'string') {
+              parsedData = JSON.parse(respData);
+            } else {
+              parsedData = respData;
+            }
+
+            if (parsedData && parsedData.Data) {
+              const suggestions = [];
+              const seen = new Set();
+
+              parsedData.Data.forEach(item => {
+                if (item.Item_Model && item.Item_Model.trim() && !seen.has(item.Item_Model)) {
+                  suggestions.push(item.Item_Model);
+                  seen.add(item.Item_Model);
+                }
+              });
+
+              this.itemModelSuggestions = suggestions.slice(0, 20);
+            } else if (parsedData && parsedData.Msg) {
+              // 显示后端返回的错误信息
+              Toast.fail(parsedData.Msg);
+            }
+          } catch (error) {
+            console.error('获取物品型号建议失败:', error);
+            Toast.fail('解析数据失败');
+            this.itemModelSuggestions = [];
+          } finally {
+            this.isSearching = false;
+          }
+        },
+        (error) => {
+          console.error('获取物品型号建议接口失败:', error);
+          const errorMsg = typeof error === 'string' ? error : '请求失败';
+          Toast.fail(errorMsg);
+          this.isSearching = false;
+          this.itemModelSuggestions = [];
+        }
+      );
+    },
+
+    // 搜索物品品牌
+    searchItemBrand() {
+      if (!this.searchForm.Item_Brand || this.isSearching) return;
+
+      this.isSearching = true;
+      const keyword = this.searchForm.Item_Brand.trim();
+
+      const param = {
+        PageIndex: 0,
+        PageSize: 20,
+        Item_Name: '',
+        Item_Model: '',
+        Company: '',
+        Shelf_Location: '',
+        Item_Brand: keyword,
+        Category_Type: '',
+        Company_Filter: ''
+      };
+
+      SensorRequestPage.InventoryItemGetFun(
+        JSON.stringify(param),
+        (respData) => {
+          try {
+            let parsedData = null;
+            if (typeof respData === 'string') {
+              parsedData = JSON.parse(respData);
+            } else {
+              parsedData = respData;
+            }
+
+            if (parsedData && parsedData.Data) {
+              const suggestions = [];
+              const seen = new Set();
+
+              parsedData.Data.forEach(item => {
+                if (item.Item_Brand && !seen.has(item.Item_Brand)) {
+                  suggestions.push(item.Item_Brand);
+                  seen.add(item.Item_Brand);
+                }
+              });
+
+              this.itemBrandSuggestions = suggestions.slice(0, 20);
+            } else if (parsedData && parsedData.Msg) {
+              // 显示后端返回的错误信息
+              Toast.fail(parsedData.Msg);
+            }
+          } catch (error) {
+            console.error('获取物品品牌建议失败:', error);
+            Toast.fail('解析数据失败');
+            this.itemBrandSuggestions = [];
+          } finally {
+            this.isSearching = false;
+          }
+        },
+        (error) => {
+          console.error('获取物品品牌建议接口失败:', error);
+          const errorMsg = typeof error === 'string' ? error : '请求失败';
+          Toast.fail(errorMsg);
+          this.isSearching = false;
+          this.itemBrandSuggestions = [];
+        }
+      );
+    },
+
     // 分类类型选择
     onCategorySelect(item) {
       this.searchForm.Category_Type = item.value;
@@ -197,6 +640,10 @@ export default {
         Category_Type: '',
         Company: ''
       };
+      this.itemNameSuggestions = [];
+      this.shelfLocationSuggestions = [];
+      this.itemModelSuggestions = [];
+      this.itemBrandSuggestions = [];
       Toast('已重置筛选条件');
     },
 
@@ -280,6 +727,11 @@ export default {
       // 返回上一页
       this.$router.go(-1);
     }
+  },
+  beforeDestroy() {
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+    }
   }
 }
 </script>
@@ -332,6 +784,7 @@ export default {
 .form-group {
   display: flex;
   flex-direction: column;
+  position: relative;
 }
 
 .form-label {
@@ -341,6 +794,41 @@ export default {
   color: #555;
   font-weight: 500;
   letter-spacing: 0.5px;
+}
+
+.search-input-wrapper {
+  position: relative;
+}
+
+.suggestions-list {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  background: white;
+  border: 1px solid #ebedf0;
+  border-radius: 8px;
+  margin-top: 4px;
+  max-height: 300px;
+  overflow-y: auto;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.suggestion-item {
+  padding: 12px 16px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  font-size: 14px;
+  color: #323233;
+}
+
+.suggestion-item:hover {
+  background-color: #f7f8fa;
+}
+
+.suggestion-item:active {
+  background-color: #e8f3ff;
 }
 
 .select-input {
