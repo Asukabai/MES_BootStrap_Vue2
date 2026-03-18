@@ -1,4 +1,3 @@
-NEW_FILE_CODE
 <template>
   <div class="inventory-export-page">
     <!-- 使用 Flexbox 实现垂直水平居中 -->
@@ -50,30 +49,22 @@ NEW_FILE_CODE
         <div class="form-row">
           <div class="form-group">
             <label class="form-label">分类类型</label>
-            <van-field
-              v-model="searchForm.Category_Type"
-              placeholder="请选择分类类型"
-              readonly
-              @click="showCategoryPicker = true"
-            >
-              <template #right-icon>
-                <van-icon name="arrow" />
-              </template>
-            </van-field>
+            <div class="select-input" @click="showCategoryAction = true">
+              <span :class="{ 'selected-value': searchForm.Category_Type }">
+                {{ searchForm.Category_Type || '请选择分类类型' }}
+              </span>
+              <van-icon name="arrow" />
+            </div>
           </div>
 
           <div class="form-group">
             <label class="form-label">所属公司</label>
-            <van-field
-              v-model="searchForm.Company"
-              placeholder="请选择所属公司"
-              readonly
-              @click="showCompanyPicker = true"
-            >
-              <template #right-icon>
-                <van-icon name="arrow" />
-              </template>
-            </van-field>
+            <div class="select-input" @click="showCompanyAction = true">
+              <span :class="{ 'selected-value': searchForm.Company }">
+                {{ searchForm.Company || '请选择所属公司' }}
+              </span>
+              <van-icon name="arrow" />
+            </div>
           </div>
         </div>
       </div>
@@ -98,23 +89,23 @@ NEW_FILE_CODE
       </div>
     </div>
 
-    <!-- 分类类型选择器 -->
-    <van-popup v-model="showCategoryPicker" position="bottom" round>
-      <van-picker
-        :columns="categoryOptions"
-        @confirm="onCategoryConfirm"
-        @cancel="showCategoryPicker = false"
-      />
-    </van-popup>
+    <!-- 分类类型动作面板 -->
+    <van-action-sheet
+      v-model="showCategoryAction"
+      :actions="categoryActions"
+      @select="onCategorySelect"
+      cancel-text="取消"
+      close-on-click-action
+    />
 
-    <!-- 公司选择器 -->
-    <van-popup v-model="showCompanyPicker" position="bottom" round>
-      <van-picker
-        :columns="companyOptions"
-        @confirm="onCompanyConfirm"
-        @cancel="showCompanyPicker = false"
-      />
-    </van-popup>
+    <!-- 公司动作面板 -->
+    <van-action-sheet
+      v-model="showCompanyAction"
+      :actions="companyActions"
+      @select="onCompanySelect"
+      cancel-text="取消"
+      close-on-click-action
+    />
 
     <CustomizableFloatingButton
       :initial-position="{ bottom: 100, right: 50 }"
@@ -144,8 +135,8 @@ export default {
     return {
       currentYear: new Date().getFullYear(), // 当前年份
       exporting: false,
-      showCategoryPicker: false,
-      showCompanyPicker: false,
+      showCategoryAction: false,
+      showCompanyAction: false,
       searchForm: {
         Item_Name: '',
         Shelf_Location: '',
@@ -167,7 +158,35 @@ export default {
       ]
     }
   },
+  computed: {
+    // 分类类型动作列表
+    categoryActions() {
+      return this.categoryOptions.map(option => ({
+        name: option.text,
+        value: option.value
+      }))
+    },
+    // 公司动作列表
+    companyActions() {
+      return this.companyOptions.map(option => ({
+        name: option.text,
+        value: option.value
+      }))
+    }
+  },
   methods: {
+    // 分类类型选择
+    onCategorySelect(item) {
+      this.searchForm.Category_Type = item.value;
+      Toast.success(`已选择：${item.name}`);
+    },
+
+    // 公司选择
+    onCompanySelect(item) {
+      this.searchForm.Company = item.value;
+      Toast.success(`已选择：${item.name}`);
+    },
+
     // 重置表单
     resetForm() {
       this.searchForm = {
@@ -179,18 +198,6 @@ export default {
         Company: ''
       };
       Toast('已重置筛选条件');
-    },
-
-    // 分类类型确认选择
-    onCategoryConfirm(value) {
-      this.searchForm.Category_Type = value;
-      this.showCategoryPicker = false;
-    },
-
-    // 公司确认选择
-    onCompanyConfirm(value) {
-      this.searchForm.Company = value;
-      this.showCompanyPicker = false;
     },
 
     // 导出库存信息
@@ -334,6 +341,38 @@ export default {
   color: #555;
   font-weight: 500;
   letter-spacing: 0.5px;
+}
+
+.select-input {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  background-color: #f7f8fa;
+  border: 1px solid #ebedf0;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.select-input:hover {
+  border-color: #3f83f8;
+  background-color: #f0f7ff;
+}
+
+.select-input span {
+  font-size: 14px;
+  color: #323233;
+}
+
+.select-input .selected-value {
+  color: #3f83f8;
+  font-weight: 500;
+}
+
+.select-input .van-icon {
+  font-size: 16px;
+  color: #969799;
 }
 
 .export-actions {
