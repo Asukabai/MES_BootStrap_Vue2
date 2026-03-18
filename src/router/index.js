@@ -341,6 +341,12 @@ const router = new Router({
       meta: { title: '快速入库V1' }
     },
     {
+      path: '/:department/inventory-export',
+      name: 'ExcelUpload',
+      component: () => import('../components/ExcelUpload.vue'),
+      meta: { title: '库存导出' }
+    },
+    {
       path: '/:department/inventoryLogV1',
       name: 'InventoryLogV1',
       component: () => import('../views/inventoryV1/InventoryLogV1.vue'),
