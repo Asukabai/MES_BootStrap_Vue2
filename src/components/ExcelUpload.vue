@@ -195,24 +195,16 @@
         <!-- 关联项目字段 - 仅当分类类型为"项目"时显示 -->
         <div class="form-row" v-if="searchForm.Category_Type === '项目'">
           <div class="form-group" style="grid-column: 1 / -1;">
-            <label class="form-label">
-              <span style="color: red;">*</span> 关联项目
-            </label>
-            <van-field
-              v-model="selectedProjectName"
-              name="Project_Code"
+            <project-selector
+              ref="projectSelector"
+              field-name="Project_Code"
+              label=" * 关联项目"
               placeholder="请选择关联项目"
-              is-link
-              readonly
-              @click="onProjectFieldClick"
-            >
-              <template #input>
-                <div v-if="selectedProjectName && selectedProjectCode" class="project-display">
-                  <span class="project-name">{{ selectedProjectName }}</span>
-                  <span class="project-code">[{{ selectedProjectCode }}]</span>
-                </div>
-              </template>
-            </van-field>
+              :rules="[]"
+              search-placeholder="请输入项目名称或编码搜索"
+              storage-key="recentProjects_Export"
+              @change="onProjectChange"
+            />
           </div>
         </div>
       </div>
@@ -255,72 +247,6 @@
       close-on-click-action
     />
 
-    <!-- 项目选择器弹窗 - 从底部弹出 -->
-    <van-popup v-model="showProjectPickerPopup" position="bottom" round>
-      <div class="project-picker-full">
-        <!-- 搜索框 -->
-        <van-search
-          v-model="searchKeyword"
-          placeholder="请输入项目名称或编码搜索"
-          @input="filterProjects"
-          class="project-search"
-        />
-        <!-- 历史选择区域 -->
-        <div v-if="recentProjects.length > 0" class="recent-projects">
-          <div class="recent-header">
-            <div class="recent-title">最近选择:</div>
-            <van-icon
-              name="clear"
-              size="14"
-              color="#969799"
-              class="clear-recent-icon"
-              @click="clearAllRecentProjects"
-            />
-          </div>
-          <div class="recent-list">
-            <van-tag
-              v-for="(project, index) in recentProjects"
-              :key="index"
-              type="primary"
-              size="medium"
-              class="recent-item"
-              @click="selectRecentProject(project)"
-            >
-              {{ project }}
-              <van-icon
-                name="cross"
-                size="14px"
-                class="recent-item-close"
-                @click.stop="removeRecentProject(index)"
-              />
-            </van-tag>
-          </div>
-        </div>
-        <!-- 项目列表 -->
-        <div class="project-list">
-          <div v-if="filteredProjectColumns.length === 0 && searchKeyword" class="no-project-result">
-            未找到匹配的项目
-          </div>
-          <van-cell-group v-else>
-            <van-cell
-              v-for="(item, index) in filteredProjectColumns"
-              :key="index"
-              clickable
-              @click="onProjectItemClick(item)"
-              class="project-item"
-            >
-              <template #title>
-                <div class="project-item-content">
-                  <div class="project-item-name">{{ extractProjectName(item) }}</div>
-                  <div v-if="extractProjectCode(item)" class="project-item-code">{{ extractProjectCode(item) }}</div>
-                </div>
-              </template>
-            </van-cell>
-          </van-cell-group>
-        </div>
-      </div>
-    </van-popup>
-
     <CustomizableFloatingButton
       :initial-position="{ bottom: 100, right: 50 }"
       :icon-src="require('@/assets/返回.png')"
@@ -339,19 +265,23 @@
 <script>
 import { Toast, Dialog } from 'vant'
 import SensorRequestPage from "../utils/SensorRequestPage";
-import { downloadFileByBase64 } from '../utils/fileUtils';
+import { downloadFile } from '../utils/fileUtils';
 import CustomizableFloatingButton from "./CustomizableFloatingButton.vue";
+import ProjectSelector from './ProjectSelector.vue';
+import SensorRequest from "../utils/SensorRequest";
 
 export default {
   name: 'InventoryExport',
-  components: {CustomizableFloatingButton},
+  components: {
+    CustomizableFloatingButton,
+    ProjectSelector
+  },
   data() {
     return {
       currentYear: new Date().getFullYear(), // 当前年份
       exporting: false,
       showCategoryAction: false,
       showCompanyAction: false,
-      showProjectPickerPopup: false, // 项目选择器弹窗
       isSearching: false,
       searchDebounceTimer: null,
       searchForm: {
@@ -361,16 +291,11 @@ export default {
         Item_Brand: '',
         Category_Type: '',
         Company: '',
-        Project_Code: '' // 新增：关联项目编码
+        Project_Code: '' // 关联项目编码
       },
       // 项目选择相关
       selectedProjectName: '', // 选中的项目名称（用于显示）
       selectedProjectCode: '', // 选中的项目编码（用于提交）
-      projectColumns: [], // 项目列表（显示用）
-      fullProjectList: [], // 完整项目列表（原始数据）
-      filteredProjectColumns: [], // 过滤后的项目列表
-      searchKeyword: '', // 搜索关键词
-      recentProjects: [], // 最近选择的项目
       // 搜索建议列表
       itemNameSuggestions: [],
       shelfLocationSuggestions: [],
@@ -407,11 +332,14 @@ export default {
       }))
     }
   },
-  mounted() {
-    this.loadProjectOptions(); // 加载项目列表
-    this.loadRecentProjects(); // 加载最近选择
-  },
   methods: {
+    // 处理项目选择变化
+    onProjectChange(data) {
+      this.selectedProjectName = data.projectName;
+      this.selectedProjectCode = data.projectCode;
+      this.searchForm.Project_Code = data.projectCode;
+    },
+
     // 物品名称输入处理（带防抖）
     onItemNameInput() {
       if (this.searchDebounceTimer) {
@@ -826,6 +754,10 @@ export default {
         this.searchForm.Project_Code = '';
         this.selectedProjectName = '';
         this.selectedProjectCode = '';
+        // 清空项目选择器的值
+        if (this.$refs.projectSelector) {
+          this.$refs.projectSelector.clearSelection();
+        }
       }
       Toast.success(`已选择：${item.name}`);
     },
@@ -834,187 +766,6 @@ export default {
     onCompanySelect(item) {
       this.searchForm.Company = item.value;
       Toast.success(`已选择：${item.name}`);
-    },
-
-    // 项目字段点击事件
-    onProjectFieldClick() {
-      this.showProjectPickerPopup = true;
-      this.searchKeyword = '';
-      this.filterProjects();
-    },
-
-    // 项目列表项点击事件
-    onProjectItemClick(itemText) {
-      // 从显示文本中提取项目名称
-      const projectName = this.extractProjectName(itemText);
-      this.onProjectConfirm(projectName);
-    },
-
-    // 提取项目名称
-    extractProjectName(item) {
-      if (typeof item === 'string') {
-        // 如果是字符串格式 "项目名称 [编码]"
-        const match = item.match(/^(.*?)\s*\[/);
-        return match ? match[1].trim() : item;
-      }
-      return item.Project_Name || item.name || item.projectName || '未知项目';
-    },
-
-    // 提取项目编码
-    extractProjectCode(item) {
-      if (typeof item === 'string') {
-        // 如果是字符串格式 "项目名称 [编码]"
-        const match = item.match(/\[(.*?)\]/);
-        return match ? match[1] : '';
-      }
-      return item.Project_Code || '';
-    },
-
-    // 项目选择器确认事件
-    onProjectConfirm(value) {
-      // 保存选中的项目名称用于显示
-      this.selectedProjectName = value;
-      this.showProjectPickerPopup = false;
-
-      // 查找对应的项目代码并更新表单
-      const selectedProject = this.fullProjectList.find(project =>
-        (project.Project_Name || project.name || project.projectName) === value
-      );
-
-      if (selectedProject) {
-        this.searchForm.Project_Code = selectedProject.Project_Code || '';
-        this.selectedProjectCode = selectedProject.Project_Code || '';
-      }
-
-      // 保存到历史记录
-      this.saveToRecentProjects(value);
-
-      Toast.success(`已选择项目：${value}`);
-    },
-
-    // 选择最近项目
-    selectRecentProject(projectName) {
-      this.selectProject(projectName);
-      this.showProjectPickerPopup = false;
-    },
-
-    // 选择项目的统一处理函数
-    selectProject(projectName) {
-      this.selectedProjectName = projectName;
-
-      // 查找对应的项目代码
-      const selectedProject = this.fullProjectList.find(project => {
-        const fullName = (project.Project_Name || project.name || project.projectName);
-        return fullName === projectName;
-      });
-
-      const projectCode = selectedProject ? (selectedProject.Project_Code || '') : '';
-      this.searchForm.Project_Code = projectCode;
-      this.selectedProjectCode = projectCode;
-
-      // 保存到历史记录
-      this.saveToRecentProjects(projectName);
-    },
-
-    // 保存到最近选择
-    saveToRecentProjects(projectName) {
-      // 限制历史记录数量为 5 条
-      const maxRecentCount = 5;
-      if (!this.recentProjects.includes(projectName)) {
-        this.recentProjects.unshift(projectName);
-        if (this.recentProjects.length > maxRecentCount) {
-          this.recentProjects.pop();
-        }
-        // 保存到本地存储
-        localStorage.setItem('recentProjects', JSON.stringify(this.recentProjects));
-      }
-    },
-
-    // 移除最近选择
-    removeRecentProject(index) {
-      this.recentProjects.splice(index, 1);
-      localStorage.setItem('recentProjects', JSON.stringify(this.recentProjects));
-    },
-
-    // 清除所有最近选择
-    clearAllRecentProjects() {
-      Dialog.confirm({
-        title: '确认清除',
-        message: '确定要清除所有最近选择的项目吗？',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消'
-      }).then(() => {
-        this.recentProjects = [];
-        localStorage.removeItem('recentProjects');
-        Toast.success('已清除所有最近选择');
-      }).catch(() => {
-        // 用户取消
-      });
-    },
-
-    // 过滤项目列表
-    filterProjects() {
-      if (!this.searchKeyword) {
-        this.filteredProjectColumns = this.projectColumns;
-        return;
-      }
-
-      // 将搜索关键词转换为小写进行比较
-      const keyword = this.searchKeyword.toLowerCase().trim();
-      this.filteredProjectColumns = this.projectColumns.filter(project =>
-        project.toLowerCase().includes(keyword)
-      );
-    },
-
-    // 加载项目选项
-    loadProjectOptions() {
-      const param = {};
-      SensorRequestPage.ProjectInfoGetFun(JSON.stringify(param), (respData) => {
-        try {
-          let parsedData = null;
-          if (typeof respData === 'string') {
-            parsedData = JSON.parse(respData);
-          } else {
-            parsedData = respData;
-          }
-
-          if (parsedData && parsedData.data) {
-            const projectList = parsedData.data;
-
-            // 保存完整的项目信息（包含 Project_Code 和 Project_Name）
-            this.fullProjectList = projectList.map(p => ({
-              Project_Code: p.Project_Code,
-              Project_Name: p.Project_Name || p.name || p.projectName
-            }));
-
-            // 显示项目名称 + 项目编码的组合
-            this.projectColumns = projectList.map(project => {
-              const projectName = project.Project_Name || '未知项目';
-              const projectCode = project.Project_Code || '';
-              // 返回带有项目编码的显示文本
-              return projectCode ? `${projectName} [${projectCode}]` : projectName;
-            });
-
-            this.filteredProjectColumns = this.projectColumns;
-            console.log('[loadProjectOptions] ✓ 项目选项加载成功:', {
-              total: projectList.length,
-              columns: this.projectColumns.length
-            });
-          }
-        } catch (error) {
-          console.error('[loadProjectOptions] ✗ 解析项目数据失败:', error);
-        }
-      }, (error) => {
-        console.error('[loadProjectOptions] ✗ 获取项目信息失败:', error);
-      });
-    },
-
-    // 加载最近选择的项目
-    loadRecentProjects() {
-      const stored = localStorage.getItem('recentProjects');
-      if (stored) {
-        this.recentProjects = JSON.parse(stored);
-      }
     },
 
     // 重置表单
@@ -1034,6 +785,10 @@ export default {
       this.shelfLocationSuggestions = [];
       this.itemModelSuggestions = [];
       this.itemBrandSuggestions = [];
+      // 清空项目选择器
+      if (this.$refs.projectSelector) {
+        this.$refs.projectSelector.clearSelection();
+      }
       Toast('已重置筛选条件');
     },
 
@@ -1053,7 +808,7 @@ export default {
         Item_Brand: this.searchForm.Item_Brand || '',
         Category_Type: this.searchForm.Category_Type || '',
         Company: this.searchForm.Company || '',
-        Project_Code: this.searchForm.Project_Code || '' // 新增：关联项目编码
+        Project_Code: this.searchForm.Project_Code || ''
       };
 
       // 检查是否所有条件都为空
@@ -1078,7 +833,7 @@ export default {
 
       try {
         // 调用后端接口导出 Excel
-        SensorRequestPage.InventoryExportToExcelFun(
+        SensorRequest.InventoryExportToExcelFun(
           JSON.stringify(params),
           (respData) => {
             this.exporting = false;
@@ -1087,14 +842,16 @@ export default {
             if (respData) {
               const responseJson = typeof respData === 'string' ? JSON.parse(respData) : respData;
 
-              if (responseJson.File_Name && responseJson.File_Base64) {
+              if (responseJson.File_Name && responseJson. File_Md5) {
                 Toast.success('文件导出成功，正在下载...');
-
-                // 调用 Base64 下载方法
-                downloadFileByBase64(
-                  responseJson.File_Name,
-                  responseJson.File_Base64
-                );
+                // 获取 department 参数
+                const department = this.$route.params.department;
+                if (!department) {
+                  Toast.fail('路由参数缺失');
+                  return;
+                }
+                // 调用 downloadFile 方法下载文件
+                downloadFile(responseJson, department);
 
                 // 延迟返回，给用户下载时间
                 setTimeout(() => {
@@ -1258,151 +1015,6 @@ export default {
 .select-input .van-icon {
   font-size: 16px;
   color: #969799;
-}
-
-/* 项目选择器样式 */
-.project-display {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 14px;
-}
-
-.project-name {
-  color: #323233;
-  font-weight: 500;
-}
-
-.project-code {
-  color: #969799;
-  font-size: 13px;
-}
-
-/* 全屏项目选择器样式 */
-.project-picker-full {
-  background: #fff;
-  border-radius: 16px 16px 0 0;
-  padding: 24px;
-  max-height: 85vh;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.picker-header {
-  text-align: center;
-  margin-bottom: 16px;
-  flex-shrink: 0;
-}
-
-.picker-header h3 {
-  font-size: 20px;
-  font-weight: 600;
-  color: #333;
-  margin: 0 0 8px 0;
-}
-
-.picker-header p {
-  font-size: 14px;
-  color: #999;
-  margin: 0;
-}
-
-/* 搜索框样式 */
-.project-search {
-  margin-bottom: 12px;
-  flex-shrink: 0;
-}
-
-/* 历史选择区域样式 */
-.recent-projects {
-  padding: 12px 16px;
-  border-bottom: 1px solid #f2f3f5;
-  background-color: #fafafa;
-  margin-bottom: 12px;
-  flex-shrink: 0;
-}
-
-.recent-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 8px;
-}
-
-.recent-title {
-  font-size: 14px;
-  color: #646566;
-  font-weight: 500;
-}
-
-.clear-recent-icon {
-  cursor: pointer;
-  padding: 4px;
-}
-
-.recent-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.recent-item {
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.recent-item-close {
-  margin-left: 4px;
-  cursor: pointer;
-}
-
-/* 项目列表包装器 */
-.project-list {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 300px;
-  max-height: 400px;
-}
-
-.project-item {
-  padding: 12px 16px;
-  cursor: pointer;
-  transition: background-color 0.2s;
-}
-
-.project-item:hover {
-  background-color: #f7f8fa;
-}
-
-.project-item:active {
-  background-color: #e8f3ff;
-}
-
-.project-item-content {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.project-item-name {
-  font-size: 15px;
-  color: #323233;
-  font-weight: 500;
-}
-
-.project-item-code {
-  font-size: 13px;
-  color: #969799;
-}
-
-.no-project-result {
-  padding: 20px;
-  text-align: center;
-  color: #969799;
-  font-size: 14px;
 }
 
 .export-actions {
