@@ -1,9 +1,41 @@
 <template>
   <div class="video-meeting-container">
-    <div class="video-header">
-      <h2>🎥 晟思视频会议 - 房间号：<span>{{ roomName }}</span></h2>
+    <!-- 钉钉环境提示层 -->
+    <div v-if="isInDingTalk" class="dingtalk-overlay">
+      <div class="dingtalk-card">
+        <div class="dingtalk-icon">⚠️</div>
+        <h3>检测到当前在钉钉内打开</h3>
+        <p>由于钉钉小程序不支持摄像头/麦克风权限，视频会议无法正常运行。</p>
+        <p>请点击下方按钮，在系统浏览器中打开，即可正常加入会议。</p>
+        <button @click="openInBrowser" class="open-browser-btn">
+          在浏览器中打开
+        </button>
+        <button @click="copyLinkAndExit" class="copy-link-btn">
+          复制链接并退出
+        </button>
+      </div>
     </div>
-    <div id="videoContainer" class="video-grid"></div>
+
+    <!-- 正常视频会议界面（仅在非钉钉环境显示） -->
+    <div v-else>
+      <div class="video-header">
+        <h2>🎥 晟思视频会议 - 房间号：<span>{{ roomName }}</span></h2>
+      </div>
+      <div id="videoContainer" class="video-grid"></div>
+
+      <!-- 控制栏 -->
+      <div class="video-controls">
+        <button @click="toggleCamera" :class="{ active: cameraEnabled }">
+          📷 {{ cameraEnabled ? '摄像头开' : '摄像头关' }}
+        </button>
+        <button @click="toggleMicrophone" :class="{ active: microphoneEnabled }">
+          🎤 {{ microphoneEnabled ? '麦克风开' : '麦克风关' }}
+        </button>
+        <button @click="shareScreen" :class="{ active: screenShareActive }">
+          🖥️ {{ screenShareActive ? '停止共享' : '共享屏幕' }}
+        </button>
+      </div>
+    </div>
 
     <CustomizableFloatingButton
       :initial-position="{ bottom: 70, right: 20 }"
@@ -29,9 +61,15 @@ export default {
       meetingUrl: '',
       roomName: '未连接',
       room: null,
-      // ✅ 修正 WebSocket 地址：去掉 /livechat，让 LiveKit 客户端自动拼接 /rtc/v1
-      wsUrl: 'wss://api-v2.sensor-smart.cn:29028/',
-      mediaRequestInProgress: false,   // 防止重复请求
+      wsUrl: 'wss://api-v2.sensor-smart.cn:29028',
+      mediaRequestInProgress: false,
+      cameraEnabled: true,
+      microphoneEnabled: true,
+      screenShareActive: false,
+      screenShareTrack: null,
+      localCameraTrack: null,
+      localMicrophoneTrack: null,
+      isInDingTalk: false,
     };
   },
   created() {
@@ -47,6 +85,10 @@ export default {
     console.log('是否支持 mediaDevices:', !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
   },
   mounted() {
+    this.checkDingTalkEnvironment();
+
+    if (this.isInDingTalk) return;
+
     if (this.meetingUrl) {
       this.parseAndJoinRoom();
     } else {
@@ -61,6 +103,59 @@ export default {
     document.title = '工作助手';
   },
   methods: {
+    checkDingTalkEnvironment() {
+      const ua = navigator.userAgent.toLowerCase();
+      const isDingTalkUA = ua.includes('dingtalk');
+      const hasDD = typeof window.dd !== 'undefined';
+      this.isInDingTalk = isDingTalkUA || hasDD;
+      if (this.isInDingTalk) {
+        console.log('⚠️ 检测到钉钉环境，将引导用户跳转至浏览器');
+      }
+    },
+
+    openInBrowser() {
+      const currentUrl = window.location.href;
+      if (window.dd && window.dd.biz && window.dd.biz.util && window.dd.biz.util.openLink) {
+        window.dd.biz.util.openLink({
+          url: currentUrl,
+          onSuccess: () => console.log('跳转成功'),
+          onFail: (err) => {
+            console.error('钉钉跳转失败', err);
+            this.fallbackOpenLink(currentUrl);
+          }
+        });
+      } else {
+        this.fallbackOpenLink(currentUrl);
+      }
+    },
+
+    fallbackOpenLink(url) {
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(url).then(() => {
+          this.$toast.success('链接已复制，请打开浏览器访问');
+        }).catch(() => {
+          this.$toast.fail('复制失败，请手动复制链接');
+        });
+      } else {
+        prompt('请复制以下链接到浏览器中打开', url);
+      }
+    },
+
+    copyLinkAndExit() {
+      const currentUrl = window.location.href;
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(currentUrl).then(() => {
+          this.$toast.success('链接已复制，请打开浏览器访问');
+          setTimeout(() => this.leaveRoom(), 1000);
+        }).catch(() => {
+          this.$toast.fail('复制失败，请手动复制');
+        });
+      } else {
+        prompt('请复制以下链接到浏览器中打开', currentUrl);
+        this.leaveRoom();
+      }
+    },
+
     navigateTo(path) {
       const department = this.$route.params.department;
       if (department) {
@@ -106,17 +201,21 @@ export default {
       }
     },
 
-    /**
-     * 增强版媒体支持检测，提供详细错误信息
-     */
     checkMediaSupport() {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
+        const isHttps = protocol === 'https:';
         const isSecure = window.isSecureContext;
+
         let errorMsg = '';
-        if (!isSecure) {
-          errorMsg = '当前页面不是 HTTPS 环境（或非 localhost），无法访问摄像头/麦克风';
+        if (!isHttps && !isLocalhost) {
+          errorMsg = '当前页面不是 HTTPS 环境，且非 localhost，无法访问摄像头/麦克风。请使用 HTTPS 访问或在开发环境使用 localhost。';
+        } else if (isHttps && !isSecure) {
+          errorMsg = '页面虽然是 HTTPS，但由于混合内容（HTTP 资源）导致安全上下文无效，无法访问摄像头/麦克风。请确保所有资源均通过 HTTPS 加载。';
         } else {
-          errorMsg = '浏览器不支持 getUserMedia API，请升级浏览器';
+          errorMsg = '浏览器不支持 getUserMedia API，请升级浏览器或检查权限设置。';
         }
         console.warn('⚠️', errorMsg);
         this.$toast.fail(errorMsg);
@@ -144,9 +243,7 @@ export default {
         this.room = new Room({
           adaptiveStream: true,
           dynacast: true,
-          videoCaptureDefaults: {
-            resolution: VideoPresets.h540,
-          },
+          videoCaptureDefaults: { resolution: VideoPresets.h540 },
           audioCaptureDefaults: {
             echoCancellation: true,
             noiseCancellation: true,
@@ -156,12 +253,10 @@ export default {
 
         this.setupRoomEvents();
 
-        // 连接房间
         await this.room.connect(this.wsUrl, token);
         console.log('✅ 成功加入房间:', this.room.name, '作为:', userName);
         this.roomName = this.room.name;
 
-        // 检查媒体支持
         const mediaSupported = this.checkMediaSupport();
 
         if (mediaSupported) {
@@ -195,56 +290,94 @@ export default {
     },
 
     /**
-     * 获取本地媒体并发布到房间，同时显示本地视频
+     * 等待指定来源的轨道发布
+     * @param {string} source - Track.Source.Camera 或 Track.Source.Microphone
+     * @param {number} timeout - 超时时间（毫秒）
+     * @returns {Promise<TrackPublication>}
+     */
+    waitForTrack(source, timeout = 5000) {
+      return new Promise((resolve, reject) => {
+        const startTime = Date.now();
+        const check = () => {
+          const publication = this.room.localParticipant.getTrackPublication(source);
+          if (publication && publication.track) {
+            resolve(publication);
+          } else if (Date.now() - startTime > timeout) {
+            reject(new Error(`等待轨道 ${source} 超时`));
+          } else {
+            setTimeout(check, 100);
+          }
+        };
+        check();
+      });
+    },
+
+    /**
+     * 启用本地媒体（摄像头和麦克风） - 使用官方 API
      */
     async enableMedia(userName) {
       if (this.mediaRequestInProgress) return;
       this.mediaRequestInProgress = true;
 
       try {
-        // 请求音视频权限
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
-        });
+        // 启用摄像头和麦克风
+        let cameraError = null;
+        let micError = null;
 
-        // 发布视频轨道
-        const videoTrack = mediaStream.getVideoTracks()[0];
-        if (videoTrack) {
-          const localVideoTrack = new Track.LocalVideoTrack(videoTrack, {
-            name: 'camera',
-            source: Track.Source.Camera
-          });
-          await this.room.localParticipant.publishTrack(localVideoTrack, {
-            videoEncoding: { maxBitrate: 1500000 }
-          });
+        try {
+          await this.room.localParticipant.setCameraEnabled(true);
+        } catch (err) {
+          cameraError = err;
+          this.cameraEnabled = false;
         }
 
-        // 发布音频轨道
-        const audioTrack = mediaStream.getAudioTracks()[0];
-        if (audioTrack) {
-          const localAudioTrack = new Track.LocalAudioTrack(audioTrack, {
-            name: 'microphone',
-            source: Track.Source.Microphone
-          });
-          await this.room.localParticipant.publishTrack(localAudioTrack);
+        try {
+          await this.room.localParticipant.setMicrophoneEnabled(true);
+        } catch (err) {
+          micError = err;
+          this.microphoneEnabled = false;
         }
 
-        console.log('✅ 本地音视频已发布');
+        // 等待摄像头轨道发布，用于本地预览
+        let cameraPublication = null;
+        try {
+          cameraPublication = await this.waitForTrack(Track.Source.Camera, 5000);
+          if (cameraPublication && cameraPublication.track) {
+            this.localCameraTrack = cameraPublication.track;
+            // 使用 track.attach 创建视频元素
+            this.createLocalVideoElementWithTrack(userName, this.localCameraTrack);
+          }
+        } catch (waitErr) {
+          console.warn('等待摄像头轨道超时', waitErr);
+        }
 
-        // 显示本地视频画面
-        this.createLocalVideoElement(userName, mediaStream);
+        // 获取麦克风轨道（仅保存引用，不用于控制）
+        try {
+          const micPublication = await this.waitForTrack(Track.Source.Microphone, 5000);
+          if (micPublication && micPublication.track) {
+            this.localMicrophoneTrack = micPublication.track;
+          }
+        } catch (waitErr) {
+          console.warn('等待麦克风轨道超时', waitErr);
+        }
+
+        if (!cameraPublication || !cameraPublication.track) {
+          console.warn('无法获取摄像头轨道，显示占位符');
+          this.createLocalPlaceholder(userName);
+        }
+
+        // 显示错误提示（若有）
+        if (cameraError) {
+          this.$toast.fail('摄像头开启失败：' + (cameraError.message || '未知错误'));
+        }
+        if (micError) {
+          this.$toast.fail('麦克风开启失败：' + (micError.message || '未知错误'));
+        }
+
+        console.log('✅ 本地媒体启用完成', { cameraEnabled: this.cameraEnabled, microphoneEnabled: this.microphoneEnabled });
       } catch (error) {
-        console.error('❌ 获取/发布本地媒体失败:', error);
-        let errorMsg = '';
-        if (error.name === 'NotAllowedError') {
-          errorMsg = '用户拒绝了摄像头/麦克风权限，请手动授权后刷新页面';
-        } else if (error.name === 'NotFoundError') {
-          errorMsg = '未检测到摄像头或麦克风设备';
-        } else {
-          errorMsg = '无法访问摄像头/麦克风：' + error.message;
-        }
-        this.$toast.fail(errorMsg);
+        console.error('❌ 启用媒体失败:', error);
+        this.$toast.fail('无法访问摄像头/麦克风，请检查权限');
         throw error;
       } finally {
         this.mediaRequestInProgress = false;
@@ -252,23 +385,20 @@ export default {
     },
 
     /**
-     * 创建本地视频元素并附加到容器
+     * 使用轨道直接创建本地视频元素
      */
-    createLocalVideoElement(userName, mediaStream) {
+    createLocalVideoElementWithTrack(userName, videoTrack) {
       const container = document.getElementById('videoContainer');
       if (!container) return;
 
-      // 避免重复创建
-      if (document.querySelector('.video-item[data-is-local="true"]')) {
-        return;
-      }
+      if (document.querySelector('.video-item[data-is-local="true"]')) return;
 
       const videoEl = document.createElement('video');
       videoEl.autoplay = true;
       videoEl.playsInline = true;
-      videoEl.muted = true; // 避免本地回声
-      videoEl.srcObject = mediaStream;
-      videoEl.onloadedmetadata = () => videoEl.play().catch(e => console.warn('自动播放失败', e));
+      videoEl.muted = true;
+      // 使用 track.attach 将视频流绑定到 video 元素
+      videoTrack.attach(videoEl);
 
       const itemDiv = document.createElement('div');
       itemDiv.className = 'video-item';
@@ -283,12 +413,134 @@ export default {
       container.prepend(itemDiv);
     },
 
+    async toggleCamera() {
+      if (!this.room || !this.room.localParticipant) {
+        this.$toast.fail('未连接房间');
+        return;
+      }
+      const newEnabled = !this.cameraEnabled;
+      try {
+        await this.room.localParticipant.setCameraEnabled(newEnabled);
+        this.cameraEnabled = newEnabled;
+        console.log(`摄像头已${newEnabled ? '开启' : '关闭'}`);
+      } catch (err) {
+        console.error('切换摄像头失败', err);
+        this.$toast.fail('切换摄像头失败: ' + (err.message || '未知错误'));
+      }
+    },
+
+    async toggleMicrophone() {
+      if (!this.room || !this.room.localParticipant) {
+        this.$toast.fail('未连接房间');
+        return;
+      }
+      const newEnabled = !this.microphoneEnabled;
+      try {
+        await this.room.localParticipant.setMicrophoneEnabled(newEnabled);
+        this.microphoneEnabled = newEnabled;
+        console.log(`麦克风已${newEnabled ? '开启' : '关闭'}`);
+      } catch (err) {
+        console.error('切换麦克风失败', err);
+        this.$toast.fail('切换麦克风失败: ' + (err.message || '未知错误'));
+      }
+    },
+
+    async shareScreen() {
+      if (!this.room || !this.room.localParticipant) {
+        this.$toast.fail('未连接房间');
+        return;
+      }
+
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
+        this.$toast.fail('当前浏览器不支持屏幕共享，请使用 Chrome/Edge 等支持屏幕共享的浏览器，并确保在 HTTPS 环境下');
+        return;
+      }
+
+      if (this.screenShareActive) {
+        await this.stopScreenShare();
+        return;
+      }
+
+      try {
+        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const screenVideoTrack = screenStream.getVideoTracks()[0];
+        if (!screenVideoTrack) throw new Error('无法获取屏幕视频轨道');
+
+        screenVideoTrack.onended = () => {
+          console.log('用户通过浏览器停止了屏幕共享');
+          this.stopScreenShare();
+        };
+
+        const localScreenTrack = new Track.LocalVideoTrack(screenVideoTrack, {
+          name: 'screen',
+          source: Track.Source.ScreenShare,
+        });
+
+        await this.room.localParticipant.publishTrack(localScreenTrack);
+        this.screenShareTrack = localScreenTrack;
+        this.screenShareActive = true;
+        this.createLocalScreenShareElement(screenStream);
+        console.log('✅ 屏幕共享已开始');
+        this.$toast.success('屏幕共享已开始');
+      } catch (error) {
+        console.error('屏幕共享失败:', error);
+        if (error.name === 'NotAllowedError') {
+          this.$toast.fail('用户拒绝了屏幕共享权限');
+        } else if (error.name === 'NotFoundError') {
+          this.$toast.fail('未找到可共享的屏幕或窗口');
+        } else {
+          this.$toast.fail('屏幕共享失败: ' + error.message);
+        }
+      }
+    },
+
+    async stopScreenShare() {
+      if (!this.screenShareTrack) return;
+      try {
+        await this.room.localParticipant.unpublishTrack(this.screenShareTrack);
+        this.screenShareTrack.stop();
+        const screenElement = document.querySelector('.video-item[data-is-screen-share="true"]');
+        if (screenElement) screenElement.remove();
+        this.screenShareTrack = null;
+        this.screenShareActive = false;
+        console.log('✅ 屏幕共享已停止');
+        this.$toast.success('屏幕共享已停止');
+      } catch (err) {
+        console.error('停止屏幕共享失败:', err);
+        this.$toast.fail('停止屏幕共享失败');
+      }
+    },
+
+    createLocalScreenShareElement(mediaStream) {
+      const container = document.getElementById('videoContainer');
+      if (!container) return;
+      if (document.querySelector('.video-item[data-is-screen-share="true"]')) return;
+
+      const videoEl = document.createElement('video');
+      videoEl.autoplay = true;
+      videoEl.playsInline = true;
+      videoEl.muted = true;
+      videoEl.srcObject = mediaStream;
+      videoEl.onloadedmetadata = () => videoEl.play().catch(e => console.warn('自动播放失败', e));
+
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'video-item';
+      itemDiv.setAttribute('data-is-screen-share', 'true');
+      itemDiv.setAttribute('data-track-sid', 'screen-share');
+
+      const label = document.createElement('p');
+      label.textContent = '你的屏幕共享';
+
+      itemDiv.appendChild(videoEl);
+      itemDiv.appendChild(label);
+      container.prepend(itemDiv);
+    },
+
     setupRoomEvents() {
       const self = this;
 
       this.room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         console.log('📺 订阅轨道:', participant.identity, track.kind);
-
         if (track.kind === Track.Kind.Video) {
           const videoEl = document.createElement('video');
           videoEl.autoplay = true;
@@ -331,17 +583,10 @@ export default {
       });
     },
 
-    /**
-     * 创建本地占位符，并提供重试按钮
-     */
     createLocalPlaceholder(userName) {
       const container = document.getElementById('videoContainer');
       if (!container) return;
-
-      // 避免重复创建
-      if (document.querySelector('.video-item[data-is-local="true"]')) {
-        return;
-      }
+      if (document.querySelector('.video-item[data-is-local="true"]')) return;
 
       const itemDiv = document.createElement('div');
       itemDiv.className = 'video-item placeholder';
@@ -377,7 +622,7 @@ export default {
         if (!this.checkMediaSupport()) return;
         try {
           await this.enableMedia(userName);
-          itemDiv.remove(); // 移除占位符
+          itemDiv.remove();
         } catch (err) {
           // 错误已在 enableMedia 中提示
         }
@@ -387,11 +632,13 @@ export default {
       itemDiv.appendChild(label);
       itemDiv.appendChild(retryBtn);
       container.prepend(itemDiv);
-
       console.log('✅ 已创建本地占位符（带重试按钮）');
     },
 
     disconnectRoom() {
+      if (this.localCameraTrack) this.localCameraTrack = null;
+      if (this.localMicrophoneTrack) this.localMicrophoneTrack = null;
+      if (this.screenShareActive) this.stopScreenShare();
       if (this.room) {
         this.room.disconnect();
         this.room = null;
@@ -403,7 +650,6 @@ export default {
 </script>
 
 <style scoped>
-/* 样式保持不变，确保原有布局 */
 .video-meeting-container {
   position: fixed;
   top: 0;
@@ -473,7 +719,6 @@ export default {
   right: 0;
 }
 
-/* 占位符样式调整 */
 .video-item.placeholder {
   display: flex;
   flex-direction: column;
@@ -489,43 +734,127 @@ export default {
   color: white;
 }
 
+.video-controls {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 15px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  padding: 10px 20px;
+  border-radius: 50px;
+  z-index: 100;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+.video-controls button {
+  background: #fff;
+  border: none;
+  border-radius: 40px;
+  padding: 8px 16px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: #333;
+}
+
+.video-controls button.active {
+  background: #667eea;
+  color: white;
+}
+
+.video-controls button:active {
+  transform: scale(0.95);
+}
+
+.dingtalk-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.dingtalk-card {
+  background: white;
+  border-radius: 16px;
+  width: 85%;
+  max-width: 320px;
+  padding: 24px 20px;
+  text-align: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.dingtalk-icon {
+  font-size: 48px;
+  margin-bottom: 16px;
+}
+
+.dingtalk-card h3 {
+  font-size: 20px;
+  margin: 0 0 12px 0;
+  color: #333;
+}
+
+.dingtalk-card p {
+  font-size: 14px;
+  color: #666;
+  margin: 8px 0;
+  line-height: 1.5;
+}
+
+.open-browser-btn, .copy-link-btn {
+  width: 100%;
+  padding: 12px;
+  border: none;
+  border-radius: 8px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: 12px;
+}
+
+.open-browser-btn {
+  background: #667eea;
+  color: white;
+}
+
+.copy-link-btn {
+  background: #f0f0f0;
+  color: #333;
+  border: 1px solid #ddd;
+}
+
 @media (max-width: 768px) {
-  .video-header h2 {
-    font-size: 16px;
-  }
-
-  .video-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-    padding: 10px;
-  }
-
-  .video-item {
-    border-radius: 8px;
-  }
-
-  .video-item video {
-    aspect-ratio: 16/9;
-  }
-
-  .video-item p {
+  .video-controls button {
+    padding: 6px 12px;
     font-size: 12px;
-    padding: 6px 10px;
+  }
+  .video-controls {
+    gap: 10px;
+    padding: 8px 16px;
   }
 }
 
 @media (max-width: 480px) {
-  .video-header h2 {
-    font-size: 14px;
+  .video-controls button {
+    padding: 5px 10px;
+    font-size: 10px;
   }
-
-  .video-grid {
+  .video-controls {
     gap: 8px;
-  }
-
-  .video-item p {
-    font-size: 11px;
-    padding: 5px 8px;
+    bottom: 15px;
   }
 }
 
@@ -533,9 +862,11 @@ export default {
   .video-grid {
     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   }
-
   .video-item video {
     aspect-ratio: 16/9;
+  }
+  .video-controls {
+    bottom: 10px;
   }
 }
 </style>
