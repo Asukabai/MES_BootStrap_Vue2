@@ -300,6 +300,12 @@ export default {
     },
 
     updateLocalVideoUI(userName) {
+      // 共享模式下，只更新浮动窗口内容，不操作 videoContainer
+      if (this.screenShareActive) {
+        this.updateFloatingCameraContent();
+        return;
+      }
+
       const container = document.getElementById('videoContainer');
       if (!container) return;
 
@@ -311,19 +317,59 @@ export default {
       } else {
         this.createLocalPlaceholder(userName);
       }
+    },
 
-      if (this.screenShareActive && this.floatingCameraContainer) {
-        this.refreshFloatingCamera();
+    // 更新共享模式下的浮动摄像头窗口内容
+    updateFloatingCameraContent() {
+      if (!this.floatingCameraContainer) {
+        // 如果浮动窗口不存在，尝试重新创建（通常不会发生，但为了健壮）
+        this.recreateFloatingCamera();
+        return;
+      }
+
+      const contentDiv = this.floatingCameraContainer.querySelector('.floating-content');
+      if (!contentDiv) return;
+
+      // 清空当前内容
+      contentDiv.innerHTML = '';
+
+      if (this.cameraEnabled && this.localCameraTrack) {
+        // 显示摄像头视频
+        const videoEl = document.createElement('video');
+        videoEl.autoplay = true;
+        videoEl.playsInline = true;
+        videoEl.muted = true;
+        videoEl.style.width = '100%';
+        videoEl.style.height = '100%';
+        videoEl.style.objectFit = 'cover';
+        this.localCameraTrack.attach(videoEl);
+        contentDiv.appendChild(videoEl);
+      } else {
+        // 显示关闭摄像头占位图片
+        const img = document.createElement('img');
+        img.src = this.cameraOffImage;
+        img.alt = '摄像头已关闭';
+        img.style.maxWidth = '90%';
+        img.style.maxHeight = '90%';
+        img.style.objectFit = 'contain';
+        contentDiv.appendChild(img);
       }
     },
 
-    refreshFloatingCamera() {
-      if (!this.floatingCameraContainer) return;
-
-      const localItem = document.querySelector('.video-item[data-is-local="true"]');
-      if (!localItem) return;
-
-      this.createFloatingCamera(localItem);
+    // 重新创建浮动摄像头窗口（兜底方案）
+    recreateFloatingCamera() {
+      // 获取当前的本地视频元素或创建一个临时占位
+      let localItem = document.querySelector('.video-item[data-is-local="true"]');
+      if (!localItem) {
+        const userName = (this.room && this.room.localParticipant && this.room.localParticipant.identity) || '我';
+        this.createLocalPlaceholder(userName);
+        localItem = document.querySelector('.video-item[data-is-local="true"]');
+      }
+      if (localItem) {
+        this.createFloatingCamera(localItem);
+        // 创建后立即更新内容以确保正确
+        this.updateFloatingCameraContent();
+      }
     },
 
     waitForTrack(source, timeout = 5000) {
@@ -430,12 +476,6 @@ export default {
       itemDiv.appendChild(videoEl);
       itemDiv.appendChild(label);
       container.appendChild(itemDiv);
-
-      if (this.screenShareActive && !this.floatingInitialized) {
-        this.$nextTick(() => {
-          this.enterScreenShareMode();
-        });
-      }
     },
 
     async toggleCamera() {
@@ -457,10 +497,12 @@ export default {
             }
           } catch (err) {
             console.warn('等待摄像头轨道超时', err);
+            this.localCameraTrack = null;
           }
         } else {
           this.localCameraTrack = null;
         }
+        // 统一刷新UI，内部会判断共享模式
         this.updateLocalVideoUI(userName);
 
         console.log(`摄像头已${newEnabled ? '开启' : '关闭'}`);
@@ -625,6 +667,9 @@ export default {
         this.createFloatingCamera(localCameraItem);
       } else if (!localCameraItem && !this.floatingCameraContainer) {
         createFloating();
+      } else if (this.floatingCameraContainer) {
+        // 如果浮窗已存在，更新其内容
+        this.updateFloatingCameraContent();
       }
 
       this.updateGallery(otherParticipants);
@@ -650,7 +695,6 @@ export default {
       contentDiv.className = 'floating-content';
 
       const videoElement = cameraElement.querySelector('video');
-      const label = cameraElement.querySelector('p');
       const isPlaceholder = cameraElement.classList.contains('placeholder');
 
       if (videoElement && !isPlaceholder) {
@@ -907,7 +951,6 @@ export default {
           if (video) {
             newItemDiv.appendChild(video);
           } else if (img) {
-            // 复制图片占位符
             const newImg = img.cloneNode(true);
             newItemDiv.appendChild(newImg);
             newItemDiv.classList.add('placeholder');
@@ -1067,7 +1110,6 @@ export default {
       itemDiv.setAttribute('data-participant-id', participantIdentity);
       itemDiv.setAttribute('data-track-sid', trackSid + '-placeholder');
 
-      // 使用 img 标签
       const img = document.createElement('img');
       img.src = this.cameraOffImage;
       img.alt = '摄像头已关闭';
@@ -1116,7 +1158,6 @@ export default {
       itemDiv.className = 'video-item placeholder';
       itemDiv.setAttribute('data-is-local', 'true');
 
-      // 使用 img 标签
       const img = document.createElement('img');
       img.src = this.cameraOffImage;
       img.alt = '摄像头已关闭';
