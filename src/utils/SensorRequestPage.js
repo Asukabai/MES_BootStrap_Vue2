@@ -74,6 +74,16 @@ const SensorRequestPage = {
           callSuccess(respData);
         }, callFail);
       },
+      MeetingInfoGetFunPage(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("MeetingInfoGetFunPage", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      Ding_GetMeetingToken(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("Ding_GetMeetingToken", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       // 获取当前人库存最后一次记录的库存信息（实现“导入上一篇记录”功能）
       InventoryItemLastGetFunWithPerson(param, callSuccess, callFail) {
         ssDing.PostDataUrlPage("InventoryItemLastGetFunWithPerson", param, true, respData => {

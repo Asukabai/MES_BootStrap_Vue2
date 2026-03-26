@@ -286,6 +286,18 @@ const router = new Router({
       meta: { title: '库存管理V1.0' }
     },
     {
+      path: '/:department/meetingManagement',
+      name: 'MeetingManagement',
+      component: () => import('../views/meeting/MeetingManagement.vue'),
+      meta: { title: '会议管理' }
+    },
+    {
+      path: '/:department/videoMeeting',
+      name: 'VideoMeeting',
+      component: () => import('@/views/meeting/VideoMeeting.vue'),
+      meta: { title: '视频会议' }
+    },
+    {
       path: '/:department/inventoryDetail',
       name: 'InventoryDetail',
       component: () => import('../views/inventory/InventoryDetail.vue'),
