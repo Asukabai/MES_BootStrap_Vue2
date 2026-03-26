@@ -49,7 +49,7 @@
 
 <script>
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
-import { Room, RoomEvent, Track, VideoPresets } from 'livekit-client';
+import { Room, RoomEvent, Track, VideoPresets, LocalVideoTrack } from 'livekit-client';
 
 export default {
   name: 'VideoMeeting',
@@ -471,7 +471,8 @@ export default {
           this.stopScreenShare();
         };
 
-        const localScreenTrack = new Track.LocalVideoTrack(screenVideoTrack, {
+        // 使用直接导入的 LocalVideoTrack 类
+        const localScreenTrack = new LocalVideoTrack(screenVideoTrack, {
           name: 'screen',
           source: Track.Source.ScreenShare,
         });
