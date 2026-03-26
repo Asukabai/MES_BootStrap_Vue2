@@ -22,8 +22,16 @@
         <h2>🎥 晟思视频会议 - 房间号：<span>{{ roomName }}</span></h2>
       </div>
 
-      <!-- 视频容器：普通模式为网格，共享模式为全屏展示区 -->
-      <div id="videoContainer" class="video-container" :class="{ 'grid-mode': !screenShareActive, 'fullscreen-mode': screenShareActive }"></div>
+      <!-- 视频容器 -->
+      <div
+        id="videoContainer"
+        class="video-container"
+        :class="{
+          'grid-mode': !this.screenShareActive,
+          'fullscreen-mode': screenShareActive,
+          'single-mode': isSingleMode
+        }"
+      ></div>
 
       <!-- 画廊容器：共享模式下显示其他参与者视频 -->
       <div v-if="screenShareActive" id="galleryContainer" class="gallery-container">
@@ -49,6 +57,7 @@
 
 <script>
 import { Room, RoomEvent, Track, VideoPresets, LocalVideoTrack } from 'livekit-client';
+import cameraOffImg from '@/assets/摄像头关闭.png';
 
 export default {
   name: 'VideoMeeting',
@@ -63,11 +72,11 @@ export default {
       microphoneEnabled: true,
       screenShareActive: false,
       screenShareTrack: null,
-      screenStream: null, // 保存屏幕流，用于停止时释放
+      screenStream: null,
       localCameraTrack: null,
       localMicrophoneTrack: null,
       isInDingTalk: false,
-      // 共享模式相关
+      remoteParticipantsCount: 0,
       screenShareVideoElement: null,
       floatingCameraContainer: null,
       isDragging: false,
@@ -80,7 +89,13 @@ export default {
       resizeStartHeight: 0,
       floatingInitialized: false,
       galleryParticipantsCount: 0,
+      cameraOffImage: cameraOffImg,
     };
+  },
+  computed: {
+    isSingleMode() {
+      return !this.screenShareActive && this.remoteParticipantsCount === 0;
+    }
   },
   created() {
     this.meetingUrl = decodeURIComponent(this.$route.query.meetingUrl || '');
@@ -144,7 +159,7 @@ export default {
         navigator.clipboard.writeText(url).then(() => {
           this.$toast.success('链接已复制，请打开浏览器访问');
         }).catch(() => {
-          this.$toast.fail('复制失败，请手动复制链接');
+          this.$toast.fail('复制失败，请手动复制');
         });
       } else {
         prompt('请复制以下链接到浏览器中打开', url);
@@ -263,12 +278,12 @@ export default {
             console.error('媒体初始化失败，降级为观看模式', mediaError);
             loadingToast.close();
             this.$toast.fail('摄像头/麦克风不可用，仅能观看');
-            this.createLocalPlaceholder(userName);
+            this.updateLocalVideoUI(userName);
           }
         } else {
           loadingToast.close();
           this.$toast.fail('摄像头/麦克风不可用，仅能观看');
-          this.createLocalPlaceholder(userName);
+          this.updateLocalVideoUI(userName);
         }
       } catch (error) {
         console.error('❌ 连接失败:', error);
@@ -276,12 +291,39 @@ export default {
 
         if (error.message && error.message.includes('getUserMedia')) {
           this.$toast.fail('无法访问摄像头/麦克风，请检查浏览器权限设置');
-          this.createLocalPlaceholder(userName);
+          this.updateLocalVideoUI(userName);
         } else {
           this.$toast.fail('连接会议室失败：' + error.message);
           this.disconnectRoom();
         }
       }
+    },
+
+    updateLocalVideoUI(userName) {
+      const container = document.getElementById('videoContainer');
+      if (!container) return;
+
+      const existingLocal = document.querySelector('.video-item[data-is-local="true"]');
+      if (existingLocal) existingLocal.remove();
+
+      if (this.cameraEnabled && this.localCameraTrack) {
+        this.createLocalVideoElementWithTrack(userName, this.localCameraTrack);
+      } else {
+        this.createLocalPlaceholder(userName);
+      }
+
+      if (this.screenShareActive && this.floatingCameraContainer) {
+        this.refreshFloatingCamera();
+      }
+    },
+
+    refreshFloatingCamera() {
+      if (!this.floatingCameraContainer) return;
+
+      const localItem = document.querySelector('.video-item[data-is-local="true"]');
+      if (!localItem) return;
+
+      this.createFloatingCamera(localItem);
     },
 
     waitForTrack(source, timeout = 5000) {
@@ -311,6 +353,7 @@ export default {
 
         try {
           await this.room.localParticipant.setCameraEnabled(true);
+          this.cameraEnabled = true;
         } catch (err) {
           cameraError = err;
           this.cameraEnabled = false;
@@ -318,6 +361,7 @@ export default {
 
         try {
           await this.room.localParticipant.setMicrophoneEnabled(true);
+          this.microphoneEnabled = true;
         } catch (err) {
           micError = err;
           this.microphoneEnabled = false;
@@ -328,10 +372,10 @@ export default {
           cameraPublication = await this.waitForTrack(Track.Source.Camera, 5000);
           if (cameraPublication && cameraPublication.track) {
             this.localCameraTrack = cameraPublication.track;
-            this.createLocalVideoElementWithTrack(userName, this.localCameraTrack);
           }
         } catch (waitErr) {
           console.warn('等待摄像头轨道超时', waitErr);
+          this.localCameraTrack = null;
         }
 
         try {
@@ -343,10 +387,7 @@ export default {
           console.warn('等待麦克风轨道超时', waitErr);
         }
 
-        if (!cameraPublication || !cameraPublication.track) {
-          console.warn('无法获取摄像头轨道，显示占位符');
-          this.createLocalPlaceholder(userName);
-        }
+        this.updateLocalVideoUI(userName);
 
         if (cameraError) {
           this.$toast.fail('摄像头开启失败：' + (cameraError.message || '未知错误'));
@@ -390,7 +431,6 @@ export default {
       itemDiv.appendChild(label);
       container.appendChild(itemDiv);
 
-      // 如果当前是共享模式，需要将新创建的本地摄像头移动到浮动窗口
       if (this.screenShareActive && !this.floatingInitialized) {
         this.$nextTick(() => {
           this.enterScreenShareMode();
@@ -407,10 +447,26 @@ export default {
       try {
         await this.room.localParticipant.setCameraEnabled(newEnabled);
         this.cameraEnabled = newEnabled;
+
+        const userName = (this.room && this.room.localParticipant && this.room.localParticipant.identity) || '我';
+        if (newEnabled) {
+          try {
+            const publication = await this.waitForTrack(Track.Source.Camera, 3000);
+            if (publication && publication.track) {
+              this.localCameraTrack = publication.track;
+            }
+          } catch (err) {
+            console.warn('等待摄像头轨道超时', err);
+          }
+        } else {
+          this.localCameraTrack = null;
+        }
+        this.updateLocalVideoUI(userName);
+
         console.log(`摄像头已${newEnabled ? '开启' : '关闭'}`);
       } catch (err) {
         console.error('切换摄像头失败', err);
-        this.$toast.fail('切换摄像头失败: ' + (err.message || '未知错误'));
+        this.$toast.fail('切换摄像头失败：' + (err.message || '未知错误'));
       }
     },
 
@@ -426,7 +482,7 @@ export default {
         console.log(`麦克风已${newEnabled ? '开启' : '关闭'}`);
       } catch (err) {
         console.error('切换麦克风失败', err);
-        this.$toast.fail('切换麦克风失败: ' + (err.message || '未知错误'));
+        this.$toast.fail('切换麦克风失败：' + (err.message || '未知错误'));
       }
     },
 
@@ -451,7 +507,6 @@ export default {
         const screenVideoTrack = screenStream.getVideoTracks()[0];
         if (!screenVideoTrack) throw new Error('无法获取屏幕视频轨道');
 
-        // 保存屏幕流引用，以便停止时关闭
         this.screenStream = screenStream;
 
         screenVideoTrack.onended = () => {
@@ -459,7 +514,6 @@ export default {
           this.stopScreenShare();
         };
 
-        // 先创建本地预览元素（确保在发布轨道前存在）
         this.createLocalScreenShareElement(screenStream);
 
         const localScreenTrack = new LocalVideoTrack(screenVideoTrack, {
@@ -471,7 +525,6 @@ export default {
         this.screenShareTrack = localScreenTrack;
         this.screenShareActive = true;
 
-        // 进入共享模式（此时屏幕共享元素已存在）
         this.$nextTick(() => {
           this.enterScreenShareMode();
         });
@@ -485,7 +538,7 @@ export default {
         } else if (error.name === 'NotFoundError') {
           this.$toast.fail('未找到可共享的屏幕或窗口');
         } else {
-          this.$toast.fail('屏幕共享失败: ' + error.message);
+          this.$toast.fail('屏幕共享失败：' + error.message);
         }
       }
     },
@@ -493,25 +546,21 @@ export default {
     async stopScreenShare() {
       if (!this.screenShareTrack) return;
       try {
-        // 先停止轨道
         await this.room.localParticipant.unpublishTrack(this.screenShareTrack);
         this.screenShareTrack.stop();
         this.screenShareTrack = null;
 
-        // 停止屏幕流的所有轨道
         if (this.screenStream) {
           this.screenStream.getTracks().forEach(track => track.stop());
           this.screenStream = null;
         }
 
-        // 移除屏幕共享预览元素
         const screenElement = document.querySelector('.video-item[data-is-screen-share="true"]');
         if (screenElement) screenElement.remove();
         this.screenShareVideoElement = null;
 
         this.screenShareActive = false;
 
-        // 退出共享模式
         this.exitScreenShareMode();
 
         console.log('✅ 屏幕共享已停止');
@@ -522,32 +571,24 @@ export default {
       }
     },
 
-    // 进入屏幕共享模式：屏幕共享全屏，本地摄像头浮动可调，其他参与者进入画廊
     enterScreenShareMode() {
       const container = document.getElementById('videoContainer');
       if (!container) return;
 
-      // 获取屏幕共享视频元素
       const screenShareItem = document.querySelector('.video-item[data-is-screen-share="true"]');
       if (!screenShareItem) {
         console.warn('未找到屏幕共享视频元素');
         return;
       }
 
-      // 保存屏幕共享元素引用
       this.screenShareVideoElement = screenShareItem;
 
-      // 获取本地摄像头元素（可能尚未创建，需等待）
       let localCameraItem = document.querySelector('.video-item[data-is-local="true"]');
-
-      // 获取所有其他参与者视频元素（非屏幕共享、非本地摄像头）
       const otherParticipants = document.querySelectorAll('.video-item:not([data-is-screen-share="true"]):not([data-is-local="true"])');
 
-      // 清空容器，准备重新布局
       const videoContainer = document.getElementById('videoContainer');
       videoContainer.innerHTML = '';
 
-      // 1. 将屏幕共享视频添加到全屏容器
       videoContainer.appendChild(screenShareItem);
       screenShareItem.classList.add('fullscreen-video');
       screenShareItem.style.position = 'absolute';
@@ -557,7 +598,6 @@ export default {
       screenShareItem.style.height = '100%';
       screenShareItem.style.zIndex = '1';
 
-      // 调整屏幕共享视频内的视频元素样式
       const screenVideo = screenShareItem.querySelector('video');
       if (screenVideo) {
         screenVideo.style.width = '100%';
@@ -565,13 +605,11 @@ export default {
         screenVideo.style.objectFit = 'contain';
       }
 
-      // 2. 处理本地摄像头：如果存在则创建浮动窗口，否则尝试创建占位符并稍后创建浮动窗口
       const createFloating = () => {
         const currentLocalItem = document.querySelector('.video-item[data-is-local="true"]');
         if (currentLocalItem && !this.floatingCameraContainer) {
           this.createFloatingCamera(currentLocalItem);
         } else if (!currentLocalItem && !this.floatingCameraContainer) {
-          // 如果没有本地摄像头，创建一个占位符并重试
           const userName = (this.room && this.room.localParticipant && this.room.localParticipant.identity) || '我';
           this.createLocalPlaceholder(userName);
           this.$nextTick(() => {
@@ -589,77 +627,53 @@ export default {
         createFloating();
       }
 
-      // 3. 将其他参与者移到画廊
       this.updateGallery(otherParticipants);
-
-      // 更新画廊计数
       this.galleryParticipantsCount = otherParticipants.length;
     },
 
-    // 创建浮动摄像头窗口
-    // 创建浮动摄像头窗口
     createFloatingCamera(cameraElement) {
       if (this.floatingCameraContainer) return;
 
-      // 创建浮动容器
       const floatingDiv = document.createElement('div');
       floatingDiv.className = 'floating-camera';
       floatingDiv.setAttribute('data-floating', 'true');
 
-      // 创建拖拽手柄
       const dragHandle = document.createElement('div');
       dragHandle.className = 'floating-drag-handle';
       dragHandle.innerHTML = '📷 我的摄像头 <span class="resize-hint">(拖动移动)</span>';
 
-      // 创建缩放手柄
       const resizeHandle = document.createElement('div');
       resizeHandle.className = 'floating-resize-handle';
       resizeHandle.innerHTML = '↘';
 
-      // 创建内容区域
       const contentDiv = document.createElement('div');
       contentDiv.className = 'floating-content';
 
-      // 【关键修改】直接移动原 video 元素，而不是克隆
       const videoElement = cameraElement.querySelector('video');
       const label = cameraElement.querySelector('p');
+      const isPlaceholder = cameraElement.classList.contains('placeholder');
 
-      if (videoElement) {
-        // 移动 video 元素到 contentDiv
+      if (videoElement && !isPlaceholder) {
         contentDiv.appendChild(videoElement);
-        // 重新应用样式（确保在浮动窗口内正确显示）
         videoElement.style.width = '100%';
         videoElement.style.height = '100%';
         videoElement.style.objectFit = 'cover';
-        // 确保视频继续播放
         if (videoElement.paused) videoElement.play();
       } else {
-        // 没有视频元素（比如占位符），显示提示文字
-        const placeholderDiv = document.createElement('div');
-        placeholderDiv.style.display = 'flex';
-        placeholderDiv.style.alignItems = 'center';
-        placeholderDiv.style.justifyContent = 'center';
-        placeholderDiv.style.height = '100%';
-        placeholderDiv.style.backgroundColor = '#333';
-        placeholderDiv.style.color = '#fff';
-        placeholderDiv.textContent = '摄像头未开启';
-        contentDiv.appendChild(placeholderDiv);
-      }
-
-      // 添加名称标签（可克隆或直接移动，但标签没有轨道问题）
-      if (label) {
-        const newLabel = label.cloneNode(true);
-        newLabel.style.margin = '4px 0 0 0';
-        newLabel.style.fontSize = '12px';
-        newLabel.style.textAlign = 'center';
-        contentDiv.appendChild(newLabel);
+        // 摄像头关闭时显示图片
+        const img = document.createElement('img');
+        img.src = this.cameraOffImage;
+        img.alt = '摄像头已关闭';
+        img.style.maxWidth = '90%';
+        img.style.maxHeight = '90%';
+        img.style.objectFit = 'contain';
+        contentDiv.appendChild(img);
       }
 
       floatingDiv.appendChild(dragHandle);
       floatingDiv.appendChild(contentDiv);
       floatingDiv.appendChild(resizeHandle);
 
-      // 设置默认位置和大小（右下角）
       floatingDiv.style.position = 'fixed';
       floatingDiv.style.bottom = '120px';
       floatingDiv.style.right = '20px';
@@ -672,7 +686,6 @@ export default {
       floatingDiv.style.overflow = 'hidden';
       floatingDiv.style.cursor = 'default';
 
-      // 应用样式
       dragHandle.style.padding = '8px 12px';
       dragHandle.style.background = 'rgba(0,0,0,0.7)';
       dragHandle.style.color = 'white';
@@ -697,23 +710,21 @@ export default {
       contentDiv.style.height = 'calc(100% - 40px)';
       contentDiv.style.padding = '8px';
       contentDiv.style.display = 'flex';
-      contentDiv.style.flexDirection = 'column';
+      contentDiv.style.alignItems = 'center';
+      contentDiv.style.justifyContent = 'center';
 
       document.body.appendChild(floatingDiv);
       this.floatingCameraContainer = floatingDiv;
 
-      // 移除原摄像头容器（cameraElement 本身，它现在只包含标签，但 video 已被移动）
       if (cameraElement && cameraElement.parentNode) {
         cameraElement.remove();
       }
-      // 添加拖拽事件
+
       this.initDragging(floatingDiv, dragHandle);
-      // 添加缩放事件
       this.initResizing(floatingDiv, resizeHandle);
       this.floatingInitialized = true;
     },
 
-    // 初始化拖拽功能
     initDragging(element, handle) {
       let startX, startY, startLeft, startTop;
 
@@ -724,7 +735,6 @@ export default {
         let newLeft = startLeft + dx;
         let newTop = startTop + dy;
 
-        // 边界限制
         const maxX = window.innerWidth - element.offsetWidth;
         const maxY = window.innerHeight - element.offsetHeight;
         newLeft = Math.max(0, Math.min(maxX, newLeft));
@@ -754,7 +764,6 @@ export default {
       });
     },
 
-    // 初始化缩放功能
     initResizing(element, handle) {
       let startX, startY, startWidth, startHeight;
 
@@ -765,7 +774,6 @@ export default {
         let newWidth = startWidth + dx;
         let newHeight = startHeight + dy;
 
-        // 限制最小和最大尺寸
         newWidth = Math.max(150, Math.min(500, newWidth));
         newHeight = Math.max(120, Math.min(400, newHeight));
 
@@ -792,7 +800,6 @@ export default {
       });
     },
 
-    // 更新画廊（其他参与者视频）
     updateGallery(participants) {
       const galleryScroll = document.querySelector('#galleryContainer .gallery-scroll');
       if (!galleryScroll) return;
@@ -804,25 +811,24 @@ export default {
         galleryItem.className = 'gallery-item';
         galleryItem.setAttribute('data-original-id', participant.getAttribute('data-track-sid') || `participant-${index}`);
 
-        // 克隆视频元素
         const video = participant.querySelector('video');
-        const label = participant.querySelector('p');
+        const isPlaceholder = participant.classList.contains('placeholder');
 
-        if (video) {
+        if (video && !isPlaceholder) {
           const newVideo = video.cloneNode(true);
           newVideo.style.width = '100%';
           newVideo.style.height = 'auto';
           newVideo.style.objectFit = 'cover';
           galleryItem.appendChild(newVideo);
-        }
-
-        if (label) {
-          const newLabel = document.createElement('p');
-          newLabel.textContent = label.textContent;
-          newLabel.style.margin = '4px 0 0 0';
-          newLabel.style.fontSize = '12px';
-          newLabel.style.textAlign = 'center';
-          galleryItem.appendChild(newLabel);
+        } else {
+          // 画廊占位符显示图片
+          const img = document.createElement('img');
+          img.src = this.cameraOffImage;
+          img.alt = '摄像头已关闭';
+          img.style.maxWidth = '60%';
+          img.style.maxHeight = '60%';
+          img.style.objectFit = 'contain';
+          galleryItem.appendChild(img);
         }
 
         galleryScroll.appendChild(galleryItem);
@@ -831,33 +837,26 @@ export default {
       this.galleryParticipantsCount = participants.length;
     },
 
-    // 退出屏幕共享模式，恢复网格布局
-    // 退出屏幕共享模式，恢复网格布局
     exitScreenShareMode() {
       const container = document.getElementById('videoContainer');
       if (!container) return;
 
-      // 移除浮动摄像头
       if (this.floatingCameraContainer) {
-        // 【关键修改】直接移动 video 元素回容器，而不是克隆
         const videoElement = this.floatingCameraContainer.querySelector('.floating-content video');
+        const imgElement = this.floatingCameraContainer.querySelector('.floating-content img');
         const label = this.floatingCameraContainer.querySelector('.floating-content p');
 
         if (videoElement) {
-          // 创建新的容器元素
           const newItemDiv = document.createElement('div');
           newItemDiv.className = 'video-item';
           newItemDiv.setAttribute('data-is-local', 'true');
           newItemDiv.setAttribute('data-track-sid', 'local');
 
-          // 移动 video 元素
           newItemDiv.appendChild(videoElement);
-          // 恢复 video 样式（网格模式）
           videoElement.style.width = '';
           videoElement.style.height = '';
           videoElement.style.objectFit = 'cover';
 
-          // 处理标签
           const newLabel = label ? label.cloneNode(true) : document.createElement('p');
           if (!label) newLabel.textContent = '我 (你)';
           newLabel.style.margin = '';
@@ -866,6 +865,9 @@ export default {
           newItemDiv.appendChild(newLabel);
 
           container.appendChild(newItemDiv);
+        } else if (imgElement) {
+          const userName = (this.room && this.room.localParticipant && this.room.localParticipant.identity) || '我';
+          this.createLocalPlaceholder(userName);
         }
 
         this.floatingCameraContainer.remove();
@@ -873,7 +875,6 @@ export default {
         this.floatingInitialized = false;
       }
 
-      // 恢复屏幕共享视频为普通网格项（如果存在）
       const screenShareItem = this.screenShareVideoElement;
       if (screenShareItem) {
         screenShareItem.classList.remove('fullscreen-video');
@@ -892,23 +893,26 @@ export default {
         container.appendChild(screenShareItem);
       }
 
-      // 清空画廊并恢复其他参与者视频（此处原有逻辑不变，但注意视频也是通过 track.attach 绑定的，不需要克隆）
-      // 为了保持轨道，也应该直接移动而不是克隆。但为了简化，暂时保持原有克隆逻辑（因为其他参与者的视频轨道在移动后可能也需要重新 attach）
-      // 如果其他参与者视频也出现黑屏，可以采用同样的移动方式。这里先按原逻辑处理。
       const galleryScroll = document.querySelector('#galleryContainer .gallery-scroll');
       if (galleryScroll) {
         const galleryItems = galleryScroll.querySelectorAll('.gallery-item');
         galleryItems.forEach(item => {
           const video = item.querySelector('video');
+          const img = item.querySelector('img');
           const label = item.querySelector('p');
 
           const newItemDiv = document.createElement('div');
           newItemDiv.className = 'video-item';
 
           if (video) {
-            // 直接移动 video 元素
             newItemDiv.appendChild(video);
+          } else if (img) {
+            // 复制图片占位符
+            const newImg = img.cloneNode(true);
+            newItemDiv.appendChild(newImg);
+            newItemDiv.classList.add('placeholder');
           }
+
           if (label) {
             const newLabel = label.cloneNode(true);
             newItemDiv.appendChild(newLabel);
@@ -919,7 +923,6 @@ export default {
         galleryScroll.innerHTML = '';
       }
 
-      // 重新整理网格布局（简单刷新样式）
       this.$nextTick(() => {
         const containerDiv = document.getElementById('videoContainer');
         if (containerDiv) {
@@ -952,7 +955,6 @@ export default {
       itemDiv.appendChild(label);
       container.appendChild(itemDiv);
 
-      // 如果已经处于共享模式，需要立即调整布局
       if (this.screenShareActive) {
         this.$nextTick(() => {
           this.enterScreenShareMode();
@@ -983,12 +985,12 @@ export default {
           container.appendChild(label);
 
           if (this.screenShareActive) {
-            // 共享模式下，新参与者添加到画廊
             const galleryScroll = document.querySelector('#galleryContainer .gallery-scroll');
             if (galleryScroll) {
               const galleryItem = document.createElement('div');
               galleryItem.className = 'gallery-item';
               galleryItem.setAttribute('data-track-sid', track.sid);
+              galleryItem.setAttribute('data-participant-id', participant.identity);
 
               const newVideo = videoEl.cloneNode(true);
               const newLabel = label.cloneNode(true);
@@ -1000,47 +1002,109 @@ export default {
           } else {
             document.getElementById('videoContainer').appendChild(container);
           }
+          this.updateRemoteParticipantsCount();
         } else if (track.kind === Track.Kind.Audio) {
           track.attach();
         }
       });
 
-      this.room.on(RoomEvent.TrackUnsubscribed, (track) => {
-        const el = document.querySelector(`.video-item[data-track-sid="${track.sid}"]`);
-        if (el) el.remove();
+      this.room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        console.log('📺 取消订阅轨道:', participant.identity, track.kind);
+        if (track.kind === Track.Kind.Video && participant.identity !== (this.room && this.room.localParticipant && this.room.localParticipant.identity)) {
+          const el = document.querySelector(`.video-item[data-track-sid="${track.sid}"]`);
+          if (el) el.remove();
 
-        // 如果是在共享模式下，也从画廊中移除
-        const galleryItem = document.querySelector(`.gallery-item[data-track-sid="${track.sid}"]`);
-        if (galleryItem) {
-          galleryItem.remove();
-          this.galleryParticipantsCount--;
+          const galleryItem = document.querySelector(`.gallery-item[data-track-sid="${track.sid}"]`);
+          if (galleryItem) {
+            galleryItem.remove();
+            this.galleryParticipantsCount--;
+          }
+
+          this.createRemotePlaceholder(participant.identity, track.sid);
+
+          track.detach();
+          this.updateRemoteParticipantsCount();
+        } else if (track.kind === Track.Kind.Video && participant.identity === (this.room && this.room.localParticipant && this.room.localParticipant.identity)) {
+          const userName = participant.identity || '我';
+          this.localCameraTrack = null;
+          this.updateLocalVideoUI(userName);
         }
-
-        track.detach();
       });
 
       this.room.on(RoomEvent.ParticipantConnected, (participant) => {
         console.log('✅ 参与者加入:', participant.identity);
+        this.updateRemoteParticipantsCount();
       });
 
       this.room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         console.log('❌ 参与者离开:', participant.identity);
-        // 从画廊中移除该参与者的所有视频
-        const items = document.querySelectorAll(`.gallery-item[data-participant-id="${participant.identity}"]`);
+        const items = document.querySelectorAll(`.gallery-item[data-participant-id="${participant.identity}"], .video-item[data-participant-id="${participant.identity}"]`);
         items.forEach(item => item.remove());
         this.galleryParticipantsCount = document.querySelectorAll('.gallery-item').length;
+        this.updateRemoteParticipantsCount();
       });
 
       this.room.on(RoomEvent.Disconnected, () => {
         console.log('👋 房间已断开');
         document.getElementById('videoContainer').innerHTML = '';
         self.roomName = '未连接';
-        // 清理浮动窗口
         if (self.floatingCameraContainer) {
           self.floatingCameraContainer.remove();
           self.floatingCameraContainer = null;
         }
+        self.remoteParticipantsCount = 0;
       });
+    },
+
+    createRemotePlaceholder(participantIdentity, trackSid) {
+      if (document.querySelector(`.video-placeholder[data-participant-id="${participantIdentity}"]`)) return;
+
+      const container = document.getElementById('videoContainer');
+      if (!container) return;
+
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'video-item placeholder';
+      itemDiv.setAttribute('data-participant-id', participantIdentity);
+      itemDiv.setAttribute('data-track-sid', trackSid + '-placeholder');
+
+      // 使用 img 标签
+      const img = document.createElement('img');
+      img.src = this.cameraOffImage;
+      img.alt = '摄像头已关闭';
+      img.style.maxWidth = '60%';
+      img.style.maxHeight = '60%';
+      img.style.objectFit = 'contain';
+      itemDiv.appendChild(img);
+
+      if (this.screenShareActive) {
+        const galleryScroll = document.querySelector('#galleryContainer .gallery-scroll');
+        if (galleryScroll) {
+          const galleryItem = document.createElement('div');
+          galleryItem.className = 'gallery-item placeholder';
+          galleryItem.setAttribute('data-participant-id', participantIdentity);
+
+          const img2 = document.createElement('img');
+          img2.src = this.cameraOffImage;
+          img2.alt = '摄像头已关闭';
+          img2.style.maxWidth = '60%';
+          img2.style.maxHeight = '60%';
+          img2.style.objectFit = 'contain';
+          galleryItem.appendChild(img2);
+
+          galleryScroll.appendChild(galleryItem);
+          this.galleryParticipantsCount++;
+          return;
+        }
+      }
+
+      container.appendChild(itemDiv);
+    },
+
+    updateRemoteParticipantsCount() {
+      if (!this.room) return;
+      const participants = Array.from(this.room.participants.values());
+      const remoteParticipants = participants.filter(p => p.identity !== this.room.localParticipant.identity);
+      this.remoteParticipantsCount = remoteParticipants.length;
     },
 
     createLocalPlaceholder(userName) {
@@ -1051,48 +1115,18 @@ export default {
       const itemDiv = document.createElement('div');
       itemDiv.className = 'video-item placeholder';
       itemDiv.setAttribute('data-is-local', 'true');
-      itemDiv.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-      itemDiv.style.display = 'flex';
-      itemDiv.style.flexDirection = 'column';
-      itemDiv.style.alignItems = 'center';
-      itemDiv.style.justifyContent = 'center';
 
-      const icon = document.createElement('div');
-      icon.innerHTML = '🎥';
-      icon.style.fontSize = '48px';
-      icon.style.marginBottom = '12px';
+      // 使用 img 标签
+      const img = document.createElement('img');
+      img.src = this.cameraOffImage;
+      img.alt = '摄像头已关闭';
+      img.style.maxWidth = '80%';
+      img.style.maxHeight = '80%';
+      img.style.objectFit = 'contain';
+      itemDiv.appendChild(img);
 
-      const label = document.createElement('p');
-      label.textContent = `${userName} (你)`;
-      label.style.background = 'transparent';
-      label.style.position = 'static';
-      label.style.margin = '0 0 12px 0';
-
-      const retryBtn = document.createElement('button');
-      retryBtn.textContent = '开启摄像头/麦克风';
-      retryBtn.style.padding = '8px 16px';
-      retryBtn.style.border = 'none';
-      retryBtn.style.borderRadius = '20px';
-      retryBtn.style.backgroundColor = '#fff';
-      retryBtn.style.color = '#667eea';
-      retryBtn.style.cursor = 'pointer';
-      retryBtn.style.fontSize = '14px';
-      retryBtn.onclick = async (e) => {
-        e.stopPropagation();
-        if (!this.checkMediaSupport()) return;
-        try {
-          await this.enableMedia(userName);
-          itemDiv.remove();
-        } catch (err) {
-          // 错误已在 enableMedia 中提示
-        }
-      };
-
-      itemDiv.appendChild(icon);
-      itemDiv.appendChild(label);
-      itemDiv.appendChild(retryBtn);
       container.appendChild(itemDiv);
-      console.log('✅ 已创建本地占位符（带重试按钮）');
+      console.log('✅ 已创建本地占位符（仅图片）');
     },
 
     disconnectRoom() {
@@ -1144,7 +1178,6 @@ export default {
   font-weight: bold;
 }
 
-/* 普通网格模式 */
 .video-container.grid-mode {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
@@ -1154,7 +1187,41 @@ export default {
   position: relative;
 }
 
-/* 全屏共享模式 */
+/* 单人模式 - 视频画面放大显示 */
+.video-container.single-mode {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: calc(100vh - 140px);
+  padding: 20px;
+}
+
+.video-container.single-mode .video-item {
+  width: 90%;
+  max-width: 1200px;
+  height: auto;
+  min-height: 500px;
+  max-height: calc(100vh - 180px);
+  border-radius: 16px;
+  margin: 0;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+}
+
+.video-container.single-mode .video-item video,
+.video-container.single-mode .video-item .placeholder {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 16px;
+}
+
+.video-container.single-mode .video-item p {
+  background: rgba(0, 0, 0, 0.7);
+  font-size: 18px;
+  padding: 14px;
+  font-weight: 500;
+}
+
 .video-container.fullscreen-mode {
   position: relative;
   width: 100%;
@@ -1170,6 +1237,8 @@ export default {
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   position: relative;
   min-height: 200px;
+  display: flex;
+  flex-direction: column;
 }
 
 .video-item video {
@@ -1192,24 +1261,26 @@ export default {
   bottom: 0;
   left: 0;
   right: 0;
+  z-index: 2;
 }
 
+/* 摄像头关闭占位符样式 */
 .video-item.placeholder {
   display: flex;
-  flex-direction: column;
   align-items: center;
   justify-content: center;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
+  background-color: #2d2d2d;
+  min-height: 200px;
+  width: 100%;
 }
 
-.video-item.placeholder p {
-  position: static;
-  background: transparent;
-  color: white;
+.video-item.placeholder img {
+  display: block;
+  max-width: 80%;
+  max-height: 80%;
+  object-fit: contain;
 }
 
-/* 画廊容器样式 */
 .gallery-container {
   position: fixed;
   bottom: 80px;
@@ -1260,6 +1331,10 @@ export default {
   position: relative;
   cursor: pointer;
   transition: transform 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 16/9;
 }
 
 .gallery-item:hover {
@@ -1269,8 +1344,17 @@ export default {
 .gallery-item video {
   width: 100%;
   height: auto;
-  aspect-ratio: 16/9;
   object-fit: cover;
+}
+
+.gallery-item.placeholder {
+  background-color: #2c2c2c;
+}
+
+.gallery-item img {
+  max-width: 60%;
+  max-height: 60%;
+  object-fit: contain;
 }
 
 .gallery-item p {
@@ -1325,7 +1409,6 @@ export default {
   transform: scale(0.95);
 }
 
-/* 钉钉提示层样式 */
 .dingtalk-overlay {
   position: fixed;
   top: 0;
@@ -1389,7 +1472,40 @@ export default {
   border: 1px solid #ddd;
 }
 
-/* 响应式调整 */
+.floating-camera {
+  border-radius: 12px;
+  overflow: hidden;
+  transition: box-shadow 0.2s;
+}
+
+.floating-camera:hover {
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
+}
+
+.floating-drag-handle {
+  cursor: move;
+}
+
+.floating-resize-handle {
+  cursor: nw-resize;
+}
+
+.floating-content {
+  overflow: hidden;
+  background: #1e1e1e;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  width: 100%;
+}
+
+.floating-content img {
+  max-width: 90%;
+  max-height: 90%;
+  object-fit: contain;
+}
+
 @media (max-width: 768px) {
   .video-controls button {
     padding: 6px 12px;
@@ -1408,6 +1524,17 @@ export default {
     width: 180px !important;
     height: 135px !important;
   }
+
+  .video-container.single-mode {
+    height: calc(100vh - 120px);
+    padding: 15px;
+  }
+
+  .video-container.single-mode .video-item {
+    width: 95%;
+    min-height: 400px;
+    max-height: calc(100vh - 160px);
+  }
 }
 
 @media (max-width: 480px) {
@@ -1422,6 +1549,20 @@ export default {
 
   .gallery-item {
     width: 100px;
+  }
+
+  .video-container.single-mode .video-item p {
+    font-size: 12px;
+    padding: 8px;
+  }
+
+  .video-container.single-mode {
+    height: calc(100vh - 110px);
+  }
+
+  .video-container.single-mode .video-item {
+    min-height: 350px;
+    max-height: calc(100vh - 150px);
   }
 }
 
@@ -1438,6 +1579,15 @@ export default {
 
   .gallery-container {
     bottom: 60px;
+  }
+
+  .video-container.single-mode {
+    height: calc(100vh - 100px);
+  }
+
+  .video-container.single-mode .video-item {
+    min-height: 300px;
+    max-height: calc(100vh - 130px);
   }
 }
 </style>
