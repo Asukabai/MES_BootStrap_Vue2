@@ -50,6 +50,18 @@
         <button @click="shareScreen" :class="{ active: screenShareActive }">
           🖥️ {{ screenShareActive ? '停止共享' : '共享屏幕' }}
         </button>
+        <button @click="switchView" class="view-btn">
+          🔄 切换视图
+        </button>
+        <button @click="showMemberList" class="member-btn">
+          👥 成员列表
+        </button>
+        <button @click="inviteMember" class="invite-btn">
+          ➕ 邀请成员
+        </button>
+        <button @click="leaveRoom" class="leave-btn">
+          🚪 离开房间
+        </button>
       </div>
     </div>
   </div>
@@ -90,6 +102,9 @@ export default {
       floatingInitialized: false,
       galleryParticipantsCount: 0,
       cameraOffImage: cameraOffImg,
+      currentViewMode: 'grid', // grid: 网格视图，speaker: 演讲者视图，screen: 共享屏幕视图
+      availableScreens: [], // 可用的屏幕共享列表
+      selectedScreenId: null, // 当前选中的屏幕 ID
     };
   },
   computed: {
@@ -341,7 +356,7 @@ export default {
         videoEl.muted = true;
         videoEl.style.width = '100%';
         videoEl.style.height = '100%';
-        videoEl.style.objectFit = 'cover';
+        // 移除内联 object-fit，交由 CSS 控制，确保移动端等比例显示
         this.localCameraTrack.attach(videoEl);
         contentDiv.appendChild(videoEl);
       } else {
@@ -462,6 +477,7 @@ export default {
       videoEl.autoplay = true;
       videoEl.playsInline = true;
       videoEl.muted = true;
+      // 移除内联 object-fit 样式，统一由 CSS 控制，确保移动端不裁剪
       videoTrack.attach(videoEl);
 
       const itemDiv = document.createElement('div');
@@ -526,6 +542,220 @@ export default {
         console.error('切换麦克风失败', err);
         this.$toast.fail('切换麦克风失败：' + (err.message || '未知错误'));
       }
+    },
+
+    // 切换视图功能
+    switchView() {
+      if (!this.room || !this.remoteParticipantsCount) {
+        this.$toast.fail('当前没有其他成员的屏幕可切换');
+        return;
+      }
+
+      // 获取所有远程参与者
+      const participants = Array.from(this.room.participants.values());
+      const remoteParticipants = participants.filter(p => p.identity !== this.room.localParticipant.identity);
+
+      if (remoteParticipants.length === 0) {
+        this.$toast.fail('当前没有其他成员');
+        return;
+      }
+
+      // 收集所有可用的屏幕共享
+      const screens = [];
+      remoteParticipants.forEach(participant => {
+        const trackPublications = participant.trackPublications;
+        trackPublications.forEach(publication => {
+          if (publication.isSubscribed && publication.track && publication.track.kind === 'video') {
+            // 检查是否是屏幕共享轨道
+            const isScreenShare = publication.source === 'SCREEN_SHARE' ||
+              publication.track.name === 'screen' ||
+              publication.sid.includes('screen');
+            if (isScreenShare) {
+              screens.push({
+                participantIdentity: participant.identity,
+                track: publication.track,
+                sid: publication.sid,
+                source: publication.source
+              });
+            }
+          }
+        });
+      });
+
+      if (screens.length === 0) {
+        this.$toast.fail('当前没有成员共享屏幕');
+        return;
+      }
+
+      // 循环切换到下一个屏幕
+      let currentIndex = -1;
+      if (this.selectedScreenId) {
+        currentIndex = screens.findIndex(s => s.sid === this.selectedScreenId);
+      }
+
+      let nextIndex = currentIndex + 1;
+      if (nextIndex >= screens.length) {
+        nextIndex = 0; // 循环回到第一个
+      }
+
+      const targetScreen = screens[nextIndex];
+      this.selectedScreenId = targetScreen.sid;
+
+      // 显示选中的屏幕
+      this.displayRemoteScreen(targetScreen);
+
+      this.$toast.success(`已切换到 ${targetScreen.participantIdentity} 的屏幕`);
+      console.log(`切换视图：${targetScreen.participantIdentity}`, targetScreen);
+    },
+
+    // 显示远程成员的屏幕
+    displayRemoteScreen(screenInfo) {
+      const container = document.getElementById('videoContainer');
+      if (!container) return;
+
+      // 清除现有内容
+      container.innerHTML = '';
+
+      // 创建屏幕共享视频元素
+      const videoEl = document.createElement('video');
+      videoEl.autoplay = true;
+      videoEl.playsInline = true;
+      videoEl.muted = true;
+
+      if (screenInfo.track) {
+        screenInfo.track.attach(videoEl);
+      }
+
+      const itemDiv = document.createElement('div');
+      itemDiv.className = 'video-item';
+      itemDiv.setAttribute('data-is-screen-share', 'true');
+      itemDiv.setAttribute('data-track-sid', screenInfo.sid);
+      itemDiv.setAttribute('data-participant-id', screenInfo.participantIdentity);
+      itemDiv.style.position = 'absolute';
+      itemDiv.style.top = '0';
+      itemDiv.style.left = '0';
+      itemDiv.style.width = '100%';
+      itemDiv.style.height = '100%';
+      itemDiv.style.zIndex = '1';
+
+      const label = document.createElement('p');
+      label.textContent = `${screenInfo.participantIdentity} 的屏幕共享`;
+      label.style.background = 'rgba(0, 0, 0, 0.7)';
+      label.style.position = 'absolute';
+      label.style.bottom = '0';
+      label.style.left = '0';
+      label.style.right = '0';
+      label.style.zIndex = '2';
+
+      itemDiv.appendChild(videoEl);
+      itemDiv.appendChild(label);
+      container.appendChild(itemDiv);
+
+      const screenVideo = itemDiv.querySelector('video');
+      if (screenVideo) {
+        screenVideo.style.width = '100%';
+        screenVideo.style.height = '100%';
+        // 屏幕共享使用 contain 保证内容完整显示
+        screenVideo.style.objectFit = 'contain';
+      }
+
+      // 更新视图模式
+      this.currentViewMode = 'screen';
+      this.screenShareActive = true;
+    },
+
+    // 显示成员列表
+    showMemberList() {
+      if (!this.room) {
+        this.$toast.fail('未连接房间');
+        return;
+      }
+
+      const participants = Array.from(this.room.participants.values());
+      const localIdentity = this.room.localParticipant ? this.room.localParticipant.identity : null;
+      const remoteParticipants = participants.filter(p => p.identity !== localIdentity);
+
+      let memberListHtml = `
+        <div style="padding: 20px;">
+          <h3 style="margin-bottom: 15px; font-size: 18px;">参会成员 (${remoteParticipants.length + 1})</h3>
+          <div style="border-top: 1px solid #eee; padding-top: 10px;">
+            <div style="padding: 10px; background: #f5f5f5; border-radius: 8px; margin-bottom: 10px;">
+              <span style="font-weight: 500;">👤 ${localIdentity || '我'} (我)</span>
+            </div>
+      `;
+
+      remoteParticipants.forEach((participant, index) => {
+        const statusIcon = participant.state === 'connected' ? '🟢' : '🔴';
+        memberListHtml += `
+          <div style="padding: 10px; border-bottom: 1px solid #eee; ${index === remoteParticipants.length - 1 ? '' : 'margin-bottom: 10px;'}">
+            <span>${statusIcon} ${participant.identity}</span>
+          </div>
+        `;
+      });
+
+      memberListHtml += `</div></div>`;
+
+      this.$dialog.alert({
+        title: '成员列表',
+        message: memberListHtml,
+        confirmButtonText: '关闭',
+        theme: 'round-button',
+        allowHtml: true
+      }).catch(() => {});
+    },
+
+    // 邀请成员
+    inviteMember() {
+      this.$toast.loading({
+        message: '正在生成邀请链接...',
+        forbidClick: true,
+        duration: 1000
+      });
+
+      setTimeout(() => {
+        const currentUrl = window.location.href;
+
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(currentUrl).then(() => {
+            this.$dialog.confirm({
+              title: '邀请成员',
+              message: '会议链接已复制到剪贴板，您可以分享给其他人。<br><br>' +
+                '<span style="color: #667eea; font-size: 12px;">提示：将链接发送给需要邀请的成员即可</span>',
+              confirmButtonText: '确定',
+              cancelButtonText: '取消',
+              allowHtml: true
+            }).then(() => {
+              // 确认
+            }).catch(() => {
+              // 取消
+            });
+          }).catch(err => {
+            this.$toast.fail('复制失败，请手动复制');
+            prompt('请复制以下会议链接:', currentUrl);
+          });
+        } else {
+          prompt('请复制以下会议链接:', currentUrl);
+        }
+      }, 1000);
+    },
+
+    // 离开房间
+    leaveRoom() {
+      this.$dialog.confirm({
+        title: '确认离开',
+        message: '确定要离开当前会议室吗？',
+        confirmButtonText: '确定',
+        cancelButtonText: '取消',
+        theme: 'round-button'
+      }).then(() => {
+        this.disconnectRoom();
+        this.$toast.success('已离开会议室');
+        setTimeout(() => {
+          this.$router.back();
+        }, 1000);
+      }).catch(() => {
+        // 取消
+      });
     },
 
     async shareScreen() {
@@ -644,6 +874,7 @@ export default {
       if (screenVideo) {
         screenVideo.style.width = '100%';
         screenVideo.style.height = '100%';
+        // 屏幕共享内容使用 contain 保持完整显示
         screenVideo.style.objectFit = 'contain';
       }
 
@@ -698,10 +929,11 @@ export default {
       const isPlaceholder = cameraElement.classList.contains('placeholder');
 
       if (videoElement && !isPlaceholder) {
+        // 移除可能的内联 object-fit，让 CSS 统一控制
+        videoElement.style.objectFit = '';
         contentDiv.appendChild(videoElement);
         videoElement.style.width = '100%';
         videoElement.style.height = '100%';
-        videoElement.style.objectFit = 'cover';
         if (videoElement.paused) videoElement.play();
       } else {
         // 摄像头关闭时显示图片
@@ -862,7 +1094,7 @@ export default {
           const newVideo = video.cloneNode(true);
           newVideo.style.width = '100%';
           newVideo.style.height = 'auto';
-          newVideo.style.objectFit = 'cover';
+          // 画廊中视频保持 cover 可以更好利用空间，但为了避免裁剪，移动端将用 contain，由 CSS 控制
           galleryItem.appendChild(newVideo);
         } else {
           // 画廊占位符显示图片
@@ -899,7 +1131,8 @@ export default {
           newItemDiv.appendChild(videoElement);
           videoElement.style.width = '';
           videoElement.style.height = '';
-          videoElement.style.objectFit = 'cover';
+          // 恢复由 CSS 控制 object-fit
+          videoElement.style.objectFit = '';
 
           const newLabel = label ? label.cloneNode(true) : document.createElement('p');
           if (!label) newLabel.textContent = '我 (你)';
@@ -931,7 +1164,7 @@ export default {
 
         const screenVideo = screenShareItem.querySelector('video');
         if (screenVideo) {
-          screenVideo.style.objectFit = 'cover';
+          screenVideo.style.objectFit = 'cover'; // 退出共享后恢复默认（PC 用 cover）
         }
 
         container.appendChild(screenShareItem);
@@ -1221,46 +1454,66 @@ export default {
 
 .video-container.grid-mode {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-  gap: 15px;
-  padding: 15px;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  padding: 12px;
   width: 100%;
   position: relative;
 }
 
-/* 单人模式 - 视频画面放大显示 */
 .video-container.single-mode {
   display: flex;
   align-items: center;
   justify-content: center;
   height: calc(100vh - 140px);
-  padding: 20px;
+  padding: 15px;
 }
 
 .video-container.single-mode .video-item {
-  width: 90%;
-  max-width: 1200px;
-  height: auto;
-  min-height: 500px;
+  width: 100%;
+  max-width: 900px;
+  aspect-ratio: 16/9;
   max-height: calc(100vh - 180px);
   border-radius: 16px;
   margin: 0;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
 }
 
-.video-container.single-mode .video-item video,
+.video-container.single-mode .video-item video {
+  width: 100%;
+  height: 100%;
+  border-radius: 16px;
+  background: #000;
+}
+
 .video-container.single-mode .video-item .placeholder {
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   border-radius: 16px;
+  background-color: #2d2d2d;
+}
+
+.video-container.single-mode .video-item .placeholder img {
+  max-width: 60%;
+  max-height: 60%;
+  object-fit: contain;
 }
 
 .video-container.single-mode .video-item p {
   background: rgba(0, 0, 0, 0.7);
-  font-size: 18px;
-  padding: 14px;
+  font-size: 16px;
+  padding: 12px;
   font-weight: 500;
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  border-radius: 0 0 16px 16px;
 }
 
 .video-container.fullscreen-mode {
@@ -1280,14 +1533,15 @@ export default {
   min-height: 200px;
   display: flex;
   flex-direction: column;
+  aspect-ratio: 16/9;
 }
 
 .video-item video {
   width: 100%;
-  height: auto;
+  height: 100%;
   display: block;
   background: #1e1e1e;
-  aspect-ratio: 16/9;
+  /* 默认 PC 端使用 cover 保持填满 */
   object-fit: cover;
 }
 
@@ -1305,20 +1559,19 @@ export default {
   z-index: 2;
 }
 
-/* 摄像头关闭占位符样式 */
 .video-item.placeholder {
   display: flex;
   align-items: center;
   justify-content: center;
   background-color: #2d2d2d;
-  min-height: 200px;
   width: 100%;
+  height: 100%;
 }
 
 .video-item.placeholder img {
   display: block;
-  max-width: 80%;
-  max-height: 80%;
+  max-width: 60%;
+  max-height: 60%;
   object-fit: contain;
 }
 
@@ -1365,7 +1618,7 @@ export default {
 
 .gallery-item {
   flex-shrink: 0;
-  width: 160px;
+  width: 140px;
   background: #1e1e1e;
   border-radius: 8px;
   overflow: hidden;
@@ -1373,29 +1626,19 @@ export default {
   cursor: pointer;
   transition: transform 0.2s;
   display: flex;
-  align-items: center;
-  justify-content: center;
-  aspect-ratio: 16/9;
+  flex-direction: column;
 }
 
 .gallery-item:hover {
   transform: scale(1.05);
 }
 
-.gallery-item video {
-  width: 100%;
-  height: auto;
-  object-fit: cover;
-}
-
-.gallery-item.placeholder {
-  background-color: #2c2c2c;
-}
-
+.gallery-item video,
 .gallery-item img {
-  max-width: 60%;
-  max-height: 60%;
-  object-fit: contain;
+  width: 100%;
+  height: 100px;
+  object-fit: cover;
+  background: #000;
 }
 
 .gallery-item p {
@@ -1405,10 +1648,7 @@ export default {
   text-align: center;
   background: rgba(0, 0, 0, 0.6);
   color: white;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
+  position: static;
 }
 
 .video-controls {
@@ -1417,37 +1657,61 @@ export default {
   left: 50%;
   transform: translateX(-50%);
   display: flex;
-  gap: 15px;
+  gap: 8px;
   background: rgba(0, 0, 0, 0.6);
   backdrop-filter: blur(10px);
-  padding: 10px 20px;
+  padding: 8px 15px;
   border-radius: 50px;
   z-index: 200;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: 95%;
 }
 
 .video-controls button {
   background: #fff;
   border: none;
   border-radius: 40px;
-  padding: 8px 16px;
-  font-size: 14px;
+  padding: 6px 12px;
+  font-size: 12px;
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 5px;
   color: #333;
+  white-space: nowrap;
 }
 
 .video-controls button.active {
-  background: #667eea;
+  background: #3f83f8;
   color: white;
 }
 
 .video-controls button:active {
   transform: scale(0.95);
+}
+
+.video-controls .view-btn {
+  background: #3f83f8;
+  color: white;
+}
+
+.video-controls .member-btn {
+  background: #3f83f8;
+  color: white;
+}
+
+.video-controls .invite-btn {
+  background: #3f83f8;
+  color: white;
+}
+
+.video-controls .leave-btn {
+  background: #3f83f8;
+  color: white;
 }
 
 .dingtalk-overlay {
@@ -1541,85 +1805,178 @@ export default {
   width: 100%;
 }
 
+.floating-content video {
+  width: 100%;
+  height: 100%;
+  /* 移动端等比例显示，避免裁剪人脸 */
+  object-fit: contain;
+}
+
 .floating-content img {
   max-width: 90%;
   max-height: 90%;
   object-fit: contain;
 }
 
+/* ========= 移动端样式优化 ========= */
 @media (max-width: 768px) {
-  .video-controls button {
-    padding: 6px 12px;
-    font-size: 12px;
-  }
-  .video-controls {
+  .video-container.grid-mode {
+    grid-template-columns: 1fr;
     gap: 10px;
-    padding: 8px 16px;
-  }
-
-  .gallery-item {
-    width: 120px;
-  }
-
-  .floating-camera {
-    width: 180px !important;
-    height: 135px !important;
+    padding: 10px;
+    padding-bottom: 20px;
   }
 
   .video-container.single-mode {
     height: calc(100vh - 120px);
-    padding: 15px;
+    padding: 10px;
   }
 
   .video-container.single-mode .video-item {
-    width: 95%;
-    min-height: 400px;
+    max-width: 100%;
     max-height: calc(100vh - 160px);
   }
-}
 
-@media (max-width: 480px) {
-  .video-controls button {
-    padding: 5px 10px;
-    font-size: 10px;
+  /* 移动端所有视频元素使用 contain 保证画面完整不裁剪 */
+  .video-item video {
+    object-fit: contain;
   }
-  .video-controls {
-    gap: 8px;
-    bottom: 15px;
+
+  /* 画廊容器适配移动端，避免遮挡按钮 */
+  .gallery-container {
+    bottom: 90px;
+    padding: 6px;
   }
 
   .gallery-item {
     width: 100px;
   }
 
-  .video-container.single-mode .video-item p {
-    font-size: 12px;
-    padding: 8px;
+  .gallery-item video,
+  .gallery-item img {
+    height: 75px;
+    object-fit: contain;
+    background: #000;
   }
 
-  .video-container.single-mode {
-    height: calc(100vh - 110px);
+  /* 控制栏移动端布局优化 - 网格布局防止拥挤 */
+  .video-controls {
+    bottom: 15px;
+    padding: 8px 12px;
+    gap: 8px;
+    border-radius: 28px;
+    max-width: 96%;
+    background: rgba(0, 0, 0, 0.75);
+    /* 使用网格布局自动换行，最多每行4个按钮 */
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(70px, auto));
+    justify-items: center;
+    align-items: center;
+    width: auto;
   }
 
-  .video-container.single-mode .video-item {
-    min-height: 350px;
-    max-height: calc(100vh - 150px);
+  .video-controls button {
+    padding: 5px 8px;
+    font-size: 11px;
+    white-space: nowrap;
+    margin: 2px;
+    background: rgba(255, 255, 255, 0.95);
+  }
+
+  /* 增加底部安全区域适配 */
+  .video-meeting-container {
+    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
+  }
+
+  /* 浮动摄像头移动端稍小一些 */
+  .floating-camera {
+    width: 160px !important;
+    height: 120px !important;
+    bottom: 100px !important;
+    right: 10px !important;
+  }
+
+  .floating-content video {
+    object-fit: contain;
+  }
+
+  /* 共享模式下的全屏视频确保完整显示 */
+  .video-container.fullscreen-mode .video-item video {
+    object-fit: contain;
   }
 }
 
+/* 小屏手机进一步调整 */
+@media (max-width: 480px) {
+  .video-header h2 {
+    font-size: 16px;
+  }
+
+  .video-container.grid-mode {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  .video-item {
+    min-height: 180px;
+  }
+
+  .video-controls {
+    grid-template-columns: repeat(auto-fit, minmax(64px, auto));
+    gap: 6px;
+    padding: 6px 10px;
+  }
+
+  .video-controls button {
+    padding: 4px 6px;
+    font-size: 10px;
+    gap: 3px;
+  }
+
+  .gallery-item {
+    width: 85px;
+  }
+
+  .gallery-item video,
+  .gallery-item img {
+    height: 65px;
+  }
+
+  .gallery-item p {
+    font-size: 9px;
+    padding: 2px 4px;
+  }
+
+  .floating-camera {
+    width: 140px !important;
+    height: 105px !important;
+  }
+
+  .floating-drag-handle {
+    font-size: 10px;
+    padding: 4px 8px !important;
+  }
+}
+
+/* 横屏模式适配 */
 @media (max-height: 500px) and (orientation: landscape) {
   .video-container.grid-mode {
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    padding: 8px;
   }
-  .video-item video {
-    aspect-ratio: 16/9;
+
+  .video-item {
+    min-height: 150px;
   }
+
   .video-controls {
     bottom: 10px;
+    grid-template-columns: repeat(auto-fit, minmax(70px, auto));
   }
 
   .gallery-container {
-    bottom: 60px;
+    bottom: 70px;
   }
 
   .video-container.single-mode {
@@ -1627,7 +1984,6 @@ export default {
   }
 
   .video-container.single-mode .video-item {
-    min-height: 300px;
     max-height: calc(100vh - 130px);
   }
 }
