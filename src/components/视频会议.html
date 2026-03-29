@@ -1,263 +1,553 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>🎥 晟思视频会议</title>
-    <style>
-        * {
-            box-sizing: border-box;
-        }
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>🎥 晟思视频会议</title>
+  <style>
+    /* 全局样式：设置所有元素使用 border-box 盒模型，方便计算宽高 */
+    * {
+      box-sizing: border-box;
+    }
 
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
-            max-width: 1200px;
-            margin: 0 auto;
-            padding: 15px;
-            background: #f5f5f5;
-        }
+    /* 页面主体样式：设置字体、最大宽度、背景色等 */
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 15px;
+      background: #f5f5f5;
+    }
 
-        h2 {
-            font-size: 20px;
-            margin: 0 0 15px 0;
-            text-align: center;
-            color: #333;
-        }
+    /* 标题样式：设置字体大小、颜色、居中对齐 */
+    h2 {
+      font-size: 20px;
+      margin: 0 0 15px 0;
+      text-align: center;
+      color: #333;
+    }
 
-        #roomTitle {
-            color: #2196F3;
-            font-weight: bold;
-        }
+    /* 房间号标题样式：设置为蓝色加粗 */
+    #roomTitle {
+      color: #2196F3;
+      font-weight: bold;
+    }
 
-        .video-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-            gap: 15px;
-            width: 100%;
-        }
+    /* 视频网格布局：使用 CSS Grid 实现响应式布局 */
+    .video-grid {
+      display: grid;
+      /* 自动适应列数，每列最小 300px，最大 1fr（均分剩余空间） */
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 15px; /* 网格间距 */
+      width: 100%;
+    }
 
-        .video-item {
-            background: #fff;
-            border-radius: 12px;
-            overflow: hidden;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
-            position: relative;
-        }
+    /* 单个视频项样式：白色背景、圆角、阴影、相对定位 */
+    .video-item {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+      position: relative;
+    }
 
-        .video-item video {
-            width: 100%;
-            height: auto;
-            display: block;
-            background: #1e1e1e;
-            aspect-ratio: 16/9;
-            object-fit: cover;
-        }
+    /* 视频元素样式：占满容器、黑色背景、16:9 宽高比 */
+    .video-item video {
+      width: 100%;
+      height: auto;
+      display: block;
+      background: #1e1e1e;
+      aspect-ratio: 16/9;
+      object-fit: cover; /* 保持比例填充，可能裁剪 */
+    }
 
-        .video-item p {
-            margin: 0;
-            padding: 8px 12px;
-            font-size: 14px;
-            text-align: center;
-            background: rgba(0,0,0,0.7);
-            color: #fff;
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-        }
+    /* 参与者名称标签样式：半透明黑色背景、白色文字、绝对定位在底部 */
+    .video-item p {
+      margin: 0;
+      padding: 8px 12px;
+      font-size: 14px;
+      text-align: center;
+      background: rgba(0,0,0,0.7);
+      color: #fff;
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+    }
 
-        /* 移动端适配 */
-        @media (max-width: 768px) {
-            body {
-                padding: 10px;
-            }
+    /* 移动端适配（屏幕宽度 ≤ 768px） */
+    @media (max-width: 768px) {
+      body {
+        padding: 10px;
+      }
 
-            h2 {
-                font-size: 16px;
-                margin-bottom: 10px;
-            }
+      h2 {
+        font-size: 16px;
+        margin-bottom: 10px;
+      }
 
-            .video-grid {
-                grid-template-columns: 1fr;
-                gap: 10px;
-            }
+      .video-grid {
+        /* 单列布局 */
+        grid-template-columns: 1fr;
+        gap: 10px;
+      }
 
-            .video-item {
-                border-radius: 8px;
-            }
+      .video-item {
+        border-radius: 8px;
+      }
 
-            .video-item video {
-                aspect-ratio: 16/9;
-            }
+      .video-item video {
+        aspect-ratio: 16/9;
+      }
 
-            .video-item p {
-                font-size: 12px;
-                padding: 6px 10px;
-            }
-        }
+      .video-item p {
+        font-size: 12px;
+        padding: 6px 10px;
+      }
+    }
 
-        /* 小屏手机适配 */
-        @media (max-width: 480px) {
-            body {
-                padding: 8px;
-            }
+    /* 小屏手机适配（屏幕宽度 ≤ 480px） */
+    @media (max-width: 480px) {
+      body {
+        padding: 8px;
+      }
 
-            h2 {
-                font-size: 14px;
-            }
+      h2 {
+        font-size: 14px;
+      }
 
-            .video-grid {
-                gap: 8px;
-            }
+      .video-grid {
+        gap: 8px;
+      }
 
-            .video-item p {
-                font-size: 11px;
-                padding: 5px 8px;
-            }
-        }
+      .video-item p {
+        font-size: 11px;
+        padding: 5px 8px;
+      }
+    }
 
-        /* 横屏模式适配 */
-        @media (max-height: 500px) and (orientation: landscape) {
-            .video-grid {
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            }
+    /* 横屏模式适配（高度 ≤ 500px 且横向） */
+    @media (max-height: 500px) and (orientation: landscape) {
+      .video-grid {
+        /* 减小最小宽度以适应横屏 */
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      }
 
-            .video-item video {
-                aspect-ratio: 16/9;
-            }
-        }
-    </style>
+      .video-item video {
+        aspect-ratio: 16/9;
+      }
+    }
+  </style>
 </head>
 <body>
+<!-- 页面标题：显示会议室名称 -->
 <h2>🎥 晟思视频会议 - 房间号：<span id="roomTitle">未连接</span></h2>
+<!-- 视频容器：用于动态插入所有参与者的视频画面 -->
 <div id="videoContainer" class="video-grid"></div>
 
 <script type="module">
-    import { Room, RoomEvent, Track } from 'https://esm.sh/livekit-client@2.5.9';
+  /**
+   * ============================================================================
+   * LiveKit SDK 导入与核心概念说明
+   * ============================================================================
+   *
+   * LiveKit 是一个开源的实时音视频通信平台，基于 WebRTC 技术构建。
+   * 它提供了简洁的 API 来实现复杂的音视频通信功能。
+   *
+   * 核心概念：
+   * 1. Room（房间）：代表一个虚拟会议室，多个参与者可以在同一个房间内音视频通话
+   * 2. Participant（参与者）：加入房间的用户，分为本地参与者（local）和远程参与者（remote）
+   * 3. Track（轨道）：音视频数据流，分为：
+   *    - Video Track：视频轨道
+   *    - Audio Track：音频轨道
+   * 4. Publication（发布）：将本地的音视频轨道发布到房间，让其他人能看到/听到
+   * 5. Subscription（订阅）：订阅其他参与者的音视频轨道，以便播放
+   * 6. SFU（Selective Forwarding Unit）：LiveKit 服务器负责接收所有参与者的媒体流，
+   *    然后根据需求转发给其他参与者，而不是简单的 P2P 连接
+   *
+   * 工作流程：
+   * 1. 客户端通过 Token 连接到 LiveKit 服务器
+   * 2. 加入指定的房间（Room）
+   * 3. 本地参与者发布自己的音视频轨道（Camera/Microphone）
+   * 4. 订阅房间内其他参与者的音视频轨道
+   * 5. LiveKit 服务器负责媒体流的路由和转发
+   * 6. 当有人离开时，自动取消订阅并清理资源
+   */
 
-    const urlParams = new URLSearchParams(window.location.search);
-    const DEFAULT_WS_URL = 'wss://api-v2.sensor-smart.cn:29028/livechat';
+  // 从 CDN 导入 LiveKit 客户端 SDK（ES 模块格式）
+  // 版本：2.5.9，这是一个较新的稳定版本
+  import { Room, RoomEvent, Track } from 'https://esm.sh/livekit-client@2.5.9';
 
-    let WS_URL = DEFAULT_WS_URL;
-    let TOKEN = urlParams.get('token');
-    let ROOM_NAME_FROM_URL = urlParams.get('room');
-    let USER_NAME_FROM_URL = urlParams.get('user');
+  // ============================================================================
+  // URL 参数解析与配置
+  // ============================================================================
 
-    let room = null;
-    const videoContainer = document.getElementById('videoContainer');
-    const roomTitleSpan = document.getElementById('roomTitle');
+  // 解析当前页面 URL 的查询参数
+  // 例如：?token=xxx&room=meeting1&user=张三
+  const urlParams = new URLSearchParams(window.location.search);
 
-    if (ROOM_NAME_FROM_URL) {
-        roomTitleSpan.textContent = ROOM_NAME_FROM_URL;
+  // 默认的 WebSocket 服务器地址（LiveKit 信令服务器）
+  // 信令服务器用于协调参与者之间的连接建立
+  const DEFAULT_WS_URL = 'wss://api-v2.sensor-smart.cn:29028/livechat';
+
+  // 初始化配置变量
+  let WS_URL = DEFAULT_WS_URL;  // WebSocket 服务器地址
+  let TOKEN = urlParams.get('token');  // 访问令牌（由后端生成，包含权限信息）
+  let ROOM_NAME_FROM_URL = urlParams.get('room');  // 会议室名称
+  let USER_NAME_FROM_URL = urlParams.get('user');  // 用户昵称
+
+  // 全局变量：存储当前房间实例
+  let room = null;
+
+  // 获取 DOM 元素引用
+  const videoContainer = document.getElementById('videoContainer');  // 视频容器
+  const roomTitleSpan = document.getElementById('roomTitle');  // 房间号显示元素
+
+  // 如果 URL 中有房间号，立即显示在页面上
+  if (ROOM_NAME_FROM_URL) {
+    roomTitleSpan.textContent = ROOM_NAME_FROM_URL;
+  }
+
+  /**
+   * ============================================================================
+   * 加入房间的核心函数
+   * ============================================================================
+   *
+   * 这个函数实现了完整的视频会议加入流程：
+   * 1. 验证必要参数（房间号、用户名、Token）
+   * 2. 创建 Room 实例并配置参数
+   * 3. 注册各种事件监听器（处理远端视频、参与者进出等）
+   * 4. 连接到 LiveKit 服务器
+   * 5. 发布本地摄像头和麦克风
+   * 6. 将本地视频显示在页面上
+   */
+  async function joinRoom() {
+    // 从全局变量获取房间名和用户名
+    const roomName = ROOM_NAME_FROM_URL;
+    const userName = USER_NAME_FROM_URL;
+
+    // 参数验证：缺少任何一个都无法加入会议
+    if (!roomName || !userName || !TOKEN) {
+      console.error('缺少必要参数：需要 token、room 和 user 参数');
+      return;
     }
 
-    async function joinRoom() {
-        const roomName = ROOM_NAME_FROM_URL;
-        const userName = USER_NAME_FROM_URL;
+    // 日志输出：显示正在尝试连接
+    console.log(`⏳ 正在连接房间 "${roomName}" 作为 "${userName}"...`);
 
-        if (!roomName || !userName || !TOKEN) {
-            console.error('缺少必要参数');
-            return;
+    /**
+     * ========================================================================
+     * 创建 Room 实例
+     * ========================================================================
+     *
+     * Room 是 LiveKit 最核心的类，代表一个虚拟会议室
+     * 配置选项说明：
+     * - adaptiveStream: true
+     *   自适应码流：根据网络状况和可见性自动调整视频质量
+     *   例如：当视频不可见时降低分辨率以节省带宽
+     *
+     * - dynacast: true
+     *   动态多播：智能管理多个订阅者的视频流
+     *   可以为每个订阅者提供最适合的视频质量
+     *
+     * - videoCaptureDefaults: 设置本地视频采集的默认参数
+     *   resolution: { width: 1280, height: 720 }
+     *   默认采集 720p 高清视频（1280x720）
+     *   LiveKit 会自动协商最佳分辨率
+     */
+    room = new Room({
+      adaptiveStream: true,  // 启用自适应码流
+      dynacast: true,        // 启用动态多播
+      videoCaptureDefaults: {
+        resolution: {
+          width: 1280,   // 宽度 1280 像素
+          height: 720    // 高度 720 像素（720p）
         }
+      }
+    });
 
-        console.log(`⏳ 正在连接房间 "${roomName}" 作为 "${userName}"...`);
+    /**
+     * ========================================================================
+     * 事件监听器注册
+     * ========================================================================
+     *
+     * LiveKit 使用事件驱动架构，通过监听各种事件来响应状态变化
+     */
 
-        room = new Room({
-            adaptiveStream: true,
-            dynacast: true,
-            videoCaptureDefaults: { resolution: { width: 1280, height: 720 } }
-        });
+    /**
+     * 事件 1：TrackSubscribed（订阅远端轨道成功）
+     *
+     * 触发时机：当成功订阅到其他参与者的音视频轨道时
+     * 这是视频会议中最核心的事件，用于显示其他人的视频
+     *
+     * 参数说明：
+     * - track: 轨道对象（可能是视频或音频）
+     * - publication: 发布信息（包含轨道的元数据）
+     * - participant: 发布者（远端参与者对象）
+     */
+    room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      // 日志输出：显示订阅了谁的什么类型的轨道
+      console.log('📺 订阅轨道:', participant.identity, track.kind);
 
-        room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-            console.log('📺 订阅轨道:', participant.identity, track.kind);
-            if (track.kind === Track.Kind.Video) {
-                const videoEl = document.createElement('video');
-                videoEl.autoplay = true;
-                videoEl.playsInline = true;
-                track.attach(videoEl);
+      // 判断轨道类型：视频轨道
+      if (track.kind === Track.Kind.Video) {
+        /**
+         * 创建视频元素并绑定轨道
+         *
+         * track.attach(videoEl) 的作用：
+         * 1. 将远端的视频流附加到 video 元素上
+         * 2. 自动处理 WebRTC 的复杂连接逻辑
+         * 3. 开始播放视频
+         */
+        const videoEl = document.createElement('video');
+        videoEl.autoplay = true;      // 自动播放
+        videoEl.playsInline = true;   // 在移动端内联播放（不全屏）
+        track.attach(videoEl);        // 关键：将轨道绑定到视频元素
 
-                const container = document.createElement('div');
-                container.className = 'video-item';
-                container.dataset.trackSid = track.sid;
-                const label = document.createElement('p');
-                label.textContent = participant.identity;
-                container.appendChild(label);
-                container.appendChild(videoEl);
-                videoContainer.appendChild(container);
-            } else if (track.kind === Track.Kind.Audio) {
-                track.attach();
-            }
-        });
+        /**
+         * 创建视频容器并添加到页面
+         *
+         * 结构：
+         * <div class="video-item" data-track-sid="xxx">
+         *   <p>参与者名称</p>
+         *   <video>...</video>
+         * </div>
+         */
+        const container = document.createElement('div');
+        container.className = 'video-item';
+        container.dataset.trackSid = track.sid;  // 记录轨道 ID，便于后续查找
 
-        room.on(RoomEvent.TrackUnsubscribed, (track) => {
-            const el = document.querySelector(`.video-item[data-track-sid="${track.sid}"]`);
-            if (el) el.remove();
-            track.detach();
-        });
+        // 创建参与者名称标签
+        const label = document.createElement('p');
+        label.textContent = participant.identity;  // 显示参与者身份
+        container.appendChild(label);
+        container.appendChild(videoEl);
 
-        room.on(RoomEvent.ParticipantConnected, (participant) => {
-            console.log('✅ 参与者加入:', participant.identity);
-        });
+        // 添加到视频容器（网格布局会自动排列）
+        videoContainer.appendChild(container);
 
-        room.on(RoomEvent.ParticipantDisconnected, (participant) => {
-            console.log('❌ 参与者离开:', participant.identity);
-        });
+      } else if (track.kind === Track.Kind.Audio) {
+        /**
+         * 音频轨道处理
+         *
+         * 音频不需要创建可视化元素，直接 attach() 即可
+         * 浏览器会自动创建 AudioContext 并播放声音
+         */
+        track.attach();
+      }
+    });
 
-        room.on(RoomEvent.Disconnected, () => {
-            console.log('👋 房间已断开');
-            videoContainer.innerHTML = '';
-            roomTitleSpan.textContent = '未连接';
-        });
+    /**
+     * 事件 2：TrackUnsubscribed（取消订阅轨道）
+     *
+     * 触发时机：当其他参与者离开房间或停止发布轨道时
+     * 需要清理对应的 DOM 元素，释放资源
+     */
+    room.on(RoomEvent.TrackUnsubscribed, (track) => {
+      // 根据轨道 SID 查找对应的视频容器
+      const el = document.querySelector(`.video-item[data-track-sid="${track.sid}"]`);
+      if (el) el.remove();  // 从页面移除
 
-        try {
-            await room.connect(WS_URL, TOKEN);
-            console.log('✅ 成功加入房间:', room.name, '作为:', userName);
+      track.detach();  // 断开轨道连接，释放资源
+    });
 
-            roomTitleSpan.textContent = room.name;
+    /**
+     * 事件 3：ParticipantConnected（参与者加入）
+     *
+     * 触发时机：当有新的参与者加入房间时
+     * 可用于显示通知或更新参与者列表
+     */
+    room.on(RoomEvent.ParticipantConnected, (participant) => {
+      console.log('✅ 参与者加入:', participant.identity);
+      // 注意：此时还未订阅该参与者的轨道
+      // TrackSubscribed 事件会在之后触发
+    });
 
-            await room.localParticipant.enableCameraAndMicrophone();
+    /**
+     * 事件 4：ParticipantDisconnected（参与者离开）
+     *
+     * 触发时机：当有参与者离开房间时
+     * 可用于显示通知或清理相关状态
+     */
+    room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+      console.log('❌ 参与者离开:', participant.identity);
+      // 注意：TrackUnsubscribed 事件会先于这个事件触发
+    });
 
-            const localVideoPublication = room.localParticipant.getTrackPublication(Track.Source.Camera);
-            if (localVideoPublication?.videoTrack) {
-                const videoEl = document.createElement('video');
-                videoEl.autoplay = true;
-                videoEl.muted = true;
-                videoEl.playsInline = true;
-                localVideoPublication.videoTrack.attach(videoEl);
+    /**
+     * 事件 5：Disconnected（房间断开）
+     *
+     * 触发时机：当本地参与者断开与房间的连接时
+     * 需要清理所有视频元素和状态
+     */
+    room.on(RoomEvent.Disconnected, () => {
+      console.log('👋 房间已断开');
+      videoContainer.innerHTML = '';  // 清空所有视频
+      roomTitleSpan.textContent = '未连接';  // 更新标题
+    });
 
-                const container = document.createElement('div');
-                container.className = 'video-item';
-                container.dataset.trackSid = 'local';
-                const label = document.createElement('p');
-                label.textContent = `${userName} (你)`;
-                container.appendChild(label);
-                container.appendChild(videoEl);
-                videoContainer.prepend(container);
-            }
-        } catch (error) {
-            console.error('❌ 连接失败', error);
-            if (room) {
-                await room.disconnect();
-                room = null;
-            }
-            roomTitleSpan.textContent = '未连接';
-        }
+    /**
+     * ========================================================================
+     * 连接到 LiveKit 服务器
+     * ========================================================================
+     *
+     * room.connect() 是异步操作，返回 Promise
+     * 参数：
+     * - WS_URL: WebSocket 服务器地址（信令层）
+     * - TOKEN: 访问令牌（包含用户身份和权限）
+     *
+     * 连接过程：
+     * 1. 通过 WebSocket 连接到 LiveKit 服务器
+     * 2. 验证 Token 的有效性
+     * 3. 加入指定的房间
+     * 4. 与房间内其他参与者建立 WebRTC 连接
+     * 5. 开始交换媒体流
+     */
+    try {
+      await room.connect(WS_URL, TOKEN);
+
+      // 连接成功后的日志输出
+      console.log('✅ 成功加入房间:', room.name, '作为:', userName);
+
+      // 更新页面标题显示实际房间名
+      roomTitleSpan.textContent = room.name;
+
+      /**
+       * ====================================================================
+       * 启用本地摄像头和麦克风
+       * ====================================================================
+       *
+       * enableCameraAndMicrophone() 方法：
+       * 1. 调用浏览器的 getUserMedia API 请求权限
+       * 2. 获取摄像头和麦克风的媒体流
+       * 3. 自动创建本地轨道并发布到房间
+       * 4. 其他参与者可以订阅这些轨道
+       *
+       * 这个过程会自动弹出浏览器权限请求对话框
+       */
+      await room.localParticipant.enableCameraAndMicrophone();
+
+      /**
+       * ====================================================================
+       * 获取并显示本地视频
+       * ====================================================================
+       *
+       * 从本地参与者对象中获取已发布的摄像头轨道
+       *
+       * getTrackPublication(Track.Source.Camera):
+       * - Track.Source.Camera 表示摄像头来源
+       * - 返回一个 Publication 对象，包含轨道的引用
+       *
+       * 可选链操作符（?.）确保即使获取失败也不会报错
+       */
+      const localVideoPublication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+
+      // 检查是否成功获取到本地视频轨道
+      if (localVideoPublication?.videoTrack) {
+        /**
+         * 创建本地视频元素
+         *
+         * 与远端视频的区别：
+         * - videoEl.muted = true：必须静音，否则会啸叫（音频回环）
+         * - 使用 prepend() 放在最前面，让自己始终看到自己
+         */
+        const videoEl = document.createElement('video');
+        videoEl.autoplay = true;
+        videoEl.muted = true;           // 关键：本地视频必须静音
+        videoEl.playsInline = true;
+
+        // 绑定本地视频轨道
+        localVideoPublication.videoTrack.attach(videoEl);
+
+        /**
+         * 创建本地视频容器
+         *
+         * 与远端视频容器的区别：
+         * - dataset.trackSid = 'local'：标记为本地视频
+         * - 标签显示 "(你)" 提示这是自己
+         * - 使用 prepend() 添加到容器开头
+         */
+        const container = document.createElement('div');
+        container.className = 'video-item';
+        container.dataset.trackSid = 'local';  // 标记为本地轨道
+
+        const label = document.createElement('p');
+        label.textContent = `${userName} (你)`;  // 显示"自己"标识
+
+        container.appendChild(label);
+        container.appendChild(videoEl);
+
+        // 插入到容器最前面（让自己在左上角）
+        videoContainer.prepend(container);
+      }
+
+    } catch (error) {
+      /**
+       * ====================================================================
+       * 错误处理
+       * ====================================================================
+       *
+       * 可能的错误场景：
+       * 1. Token 无效或过期
+       * 2. 房间不存在或已满
+       * 3. 网络问题导致连接失败
+       * 4. 用户拒绝摄像头/麦克风权限
+       * 5. WebSocket 服务器不可达
+       */
+      console.error('❌ 连接失败', error);
+
+      // 如果连接失败，清理房间实例
+      if (room) {
+        await room.disconnect();
+        room = null;
+      }
+
+      // 更新 UI 状态
+      roomTitleSpan.textContent = '未连接';
     }
+  }
 
-    window.addEventListener('beforeunload', () => {
-        if (room) {
-            room.disconnect();
-        }
-    });
+  /**
+   * ============================================================================
+   * 页面卸载时的清理工作
+   * ============================================================================
+   *
+   * beforeunload 事件：当用户关闭页面或标签页时触发
+   *
+   * 重要性：
+   * - 如果不主动断开连接，服务器会认为用户还在房间
+   * - 需要等待超时（通常 30 秒）才会清理资源
+   * - 主动 disconnect() 可以立即通知服务器和其他参与者
+   */
+  window.addEventListener('beforeunload', () => {
+    if (room) {
+      room.disconnect();  // 优雅地离开房间
+    }
+  });
 
-    window.addEventListener('DOMContentLoaded', () => {
-        if (TOKEN && ROOM_NAME_FROM_URL && USER_NAME_FROM_URL) {
-            console.log('🚀 检测到完整 URL 参数，自动加入房间...');
-            setTimeout(() => {
-                joinRoom();
-            }, 500);
-        }
-    });
+  /**
+   * ============================================================================
+   * 页面加载完成后的自动加入逻辑
+   * ============================================================================
+   *
+   * DOMContentLoaded 事件：当 HTML 文档完全加载并解析完成后触发
+   *
+   * 自动加入流程：
+   * 1. 检查 URL 参数是否完整（token、room、user）
+   * 2. 如果参数齐全，延迟 500ms 后自动调用 joinRoom()
+   * 3. 延迟是为了确保页面完全渲染，提升用户体验
+   */
+  window.addEventListener('DOMContentLoaded', () => {
+    // 验证三个必要参数都存在
+    if (TOKEN && ROOM_NAME_FROM_URL && USER_NAME_FROM_URL) {
+      console.log('🚀 检测到完整 URL 参数，自动加入房间...');
+
+      // 延迟 500ms 执行，给页面渲染留出时间
+      setTimeout(() => {
+        joinRoom();
+      }, 500);
+    }
+  });
 </script>
 </body>
 </html>
