@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>🎥 晟思视频会议</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 15px;
+            background: #f5f5f5;
+        }
+
+        h2 {
+            font-size: 20px;
+            margin: 0 0 15px 0;
+            text-align: center;
+            color: #333;
+        }
+
+        #roomTitle {
+            color: #2196F3;
+            font-weight: bold;
+        }
+
+        .video-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 15px;
+            width: 100%;
+        }
+
+        .video-item {
+            background: #fff;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+            position: relative;
+        }
+
+        .video-item video {
+            width: 100%;
+            height: auto;
+            display: block;
+            background: #1e1e1e;
+            aspect-ratio: 16/9;
+            object-fit: cover;
+        }
+
+        .video-item p {
+            margin: 0;
+            padding: 8px 12px;
+            font-size: 14px;
+            text-align: center;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+
+        /* 移动端适配 */
+        @media (max-width: 768px) {
+            body {
+                padding: 10px;
+            }
+
+            h2 {
+                font-size: 16px;
+                margin-bottom: 10px;
+            }
+
+            .video-grid {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .video-item {
+                border-radius: 8px;
+            }
+
+            .video-item video {
+                aspect-ratio: 16/9;
+            }
+
+            .video-item p {
+                font-size: 12px;
+                padding: 6px 10px;
+            }
+        }
+
+        /* 小屏手机适配 */
+        @media (max-width: 480px) {
+            body {
+                padding: 8px;
+            }
+
+            h2 {
+                font-size: 14px;
+            }
+
+            .video-grid {
+                gap: 8px;
+            }
+
+            .video-item p {
+                font-size: 11px;
+                padding: 5px 8px;
+            }
+        }
+
+        /* 横屏模式适配 */
+        @media (max-height: 500px) and (orientation: landscape) {
+            .video-grid {
+                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            }
+
+            .video-item video {
+                aspect-ratio: 16/9;
+            }
+        }
+    </style>
+</head>
+<body>
+<h2>🎥 晟思视频会议 - 房间号：<span id="roomTitle">未连接</span></h2>
+<div id="videoContainer" class="video-grid"></div>
+
+<script type="module">
+    import { Room, RoomEvent, Track } from 'https://esm.sh/livekit-client@2.5.9';
+
+    const urlParams = new URLSearchParams(window.location.search);
+    const DEFAULT_WS_URL = 'wss://api-v2.sensor-smart.cn:29028/livechat';
+
+    let WS_URL = DEFAULT_WS_URL;
+    let TOKEN = urlParams.get('token');
+    let ROOM_NAME_FROM_URL = urlParams.get('room');
+    let USER_NAME_FROM_URL = urlParams.get('user');
+
+    let room = null;
+    const videoContainer = document.getElementById('videoContainer');
+    const roomTitleSpan = document.getElementById('roomTitle');
+
+    if (ROOM_NAME_FROM_URL) {
+        roomTitleSpan.textContent = ROOM_NAME_FROM_URL;
+    }
+
+    async function joinRoom() {
+        const roomName = ROOM_NAME_FROM_URL;
+        const userName = USER_NAME_FROM_URL;
+
+        if (!roomName || !userName || !TOKEN) {
+            console.error('缺少必要参数');
+            return;
+        }
+
+        console.log(`⏳ 正在连接房间 "${roomName}" 作为 "${userName}"...`);
+
+        room = new Room({
+            adaptiveStream: true,
+            dynacast: true,
+            videoCaptureDefaults: { resolution: { width: 1280, height: 720 } }
+        });
+
+        room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+            console.log('📺 订阅轨道:', participant.identity, track.kind);
+            if (track.kind === Track.Kind.Video) {
+                const videoEl = document.createElement('video');
+                videoEl.autoplay = true;
+                videoEl.playsInline = true;
+                track.attach(videoEl);
+
+                const container = document.createElement('div');
+                container.className = 'video-item';
+                container.dataset.trackSid = track.sid;
+                const label = document.createElement('p');
+                label.textContent = participant.identity;
+                container.appendChild(label);
+                container.appendChild(videoEl);
+                videoContainer.appendChild(container);
+            } else if (track.kind === Track.Kind.Audio) {
+                track.attach();
+            }
+        });
+
+        room.on(RoomEvent.TrackUnsubscribed, (track) => {
+            const el = document.querySelector(`.video-item[data-track-sid="${track.sid}"]`);
+            if (el) el.remove();
+            track.detach();
+        });
+
+        room.on(RoomEvent.ParticipantConnected, (participant) => {
+            console.log('✅ 参与者加入:', participant.identity);
+        });
+
+        room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+            console.log('❌ 参与者离开:', participant.identity);
+        });
+
+        room.on(RoomEvent.Disconnected, () => {
+            console.log('👋 房间已断开');
+            videoContainer.innerHTML = '';
+            roomTitleSpan.textContent = '未连接';
+        });
+
+        try {
+            await room.connect(WS_URL, TOKEN);
+            console.log('✅ 成功加入房间:', room.name, '作为:', userName);
+
+            roomTitleSpan.textContent = room.name;
+
+            await room.localParticipant.enableCameraAndMicrophone();
+
+            const localVideoPublication = room.localParticipant.getTrackPublication(Track.Source.Camera);
+            if (localVideoPublication?.videoTrack) {
+                const videoEl = document.createElement('video');
+                videoEl.autoplay = true;
+                videoEl.muted = true;
+                videoEl.playsInline = true;
+                localVideoPublication.videoTrack.attach(videoEl);
+
+                const container = document.createElement('div');
+                container.className = 'video-item';
+                container.dataset.trackSid = 'local';
+                const label = document.createElement('p');
+                label.textContent = `${userName} (你)`;
+                container.appendChild(label);
+                container.appendChild(videoEl);
+                videoContainer.prepend(container);
+            }
+        } catch (error) {
+            console.error('❌ 连接失败', error);
+            if (room) {
+                await room.disconnect();
+                room = null;
+            }
+            roomTitleSpan.textContent = '未连接';
+        }
+    }
+
+    window.addEventListener('beforeunload', () => {
+        if (room) {
+            room.disconnect();
+        }
+    });
+
+    window.addEventListener('DOMContentLoaded', () => {
+        if (TOKEN && ROOM_NAME_FROM_URL && USER_NAME_FROM_URL) {
+            console.log('🚀 检测到完整 URL 参数，自动加入房间...');
+            setTimeout(() => {
+                joinRoom();
+            }, 500);
+        }
+    });
+</script>
+</body>
+</html>
