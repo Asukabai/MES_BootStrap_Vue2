@@ -356,7 +356,7 @@ export default {
         videoEl.muted = true;
         videoEl.style.width = '100%';
         videoEl.style.height = '100%';
-        // 移除内联 object-fit，交由 CSS 控制，确保移动端等比例显示
+        videoEl.style.objectFit = 'cover';
         this.localCameraTrack.attach(videoEl);
         contentDiv.appendChild(videoEl);
       } else {
@@ -477,7 +477,6 @@ export default {
       videoEl.autoplay = true;
       videoEl.playsInline = true;
       videoEl.muted = true;
-      // 移除内联 object-fit 样式，统一由 CSS 控制，确保移动端不裁剪
       videoTrack.attach(videoEl);
 
       const itemDiv = document.createElement('div');
@@ -655,7 +654,6 @@ export default {
       if (screenVideo) {
         screenVideo.style.width = '100%';
         screenVideo.style.height = '100%';
-        // 屏幕共享使用 contain 保证内容完整显示
         screenVideo.style.objectFit = 'contain';
       }
 
@@ -874,7 +872,6 @@ export default {
       if (screenVideo) {
         screenVideo.style.width = '100%';
         screenVideo.style.height = '100%';
-        // 屏幕共享内容使用 contain 保持完整显示
         screenVideo.style.objectFit = 'contain';
       }
 
@@ -929,11 +926,10 @@ export default {
       const isPlaceholder = cameraElement.classList.contains('placeholder');
 
       if (videoElement && !isPlaceholder) {
-        // 移除可能的内联 object-fit，让 CSS 统一控制
-        videoElement.style.objectFit = '';
         contentDiv.appendChild(videoElement);
         videoElement.style.width = '100%';
         videoElement.style.height = '100%';
+        videoElement.style.objectFit = 'cover';
         if (videoElement.paused) videoElement.play();
       } else {
         // 摄像头关闭时显示图片
@@ -1094,7 +1090,7 @@ export default {
           const newVideo = video.cloneNode(true);
           newVideo.style.width = '100%';
           newVideo.style.height = 'auto';
-          // 画廊中视频保持 cover 可以更好利用空间，但为了避免裁剪，移动端将用 contain，由 CSS 控制
+          newVideo.style.objectFit = 'cover';
           galleryItem.appendChild(newVideo);
         } else {
           // 画廊占位符显示图片
@@ -1131,8 +1127,7 @@ export default {
           newItemDiv.appendChild(videoElement);
           videoElement.style.width = '';
           videoElement.style.height = '';
-          // 恢复由 CSS 控制 object-fit
-          videoElement.style.objectFit = '';
+          videoElement.style.objectFit = 'cover';
 
           const newLabel = label ? label.cloneNode(true) : document.createElement('p');
           if (!label) newLabel.textContent = '我 (你)';
@@ -1164,7 +1159,7 @@ export default {
 
         const screenVideo = screenShareItem.querySelector('video');
         if (screenVideo) {
-          screenVideo.style.objectFit = 'cover'; // 退出共享后恢复默认（PC 用 cover）
+          screenVideo.style.objectFit = 'cover';
         }
 
         container.appendChild(screenShareItem);
@@ -1484,6 +1479,7 @@ export default {
 .video-container.single-mode .video-item video {
   width: 100%;
   height: 100%;
+  object-fit: contain;
   border-radius: 16px;
   background: #000;
 }
@@ -1541,7 +1537,6 @@ export default {
   height: 100%;
   display: block;
   background: #1e1e1e;
-  /* 默认 PC 端使用 cover 保持填满 */
   object-fit: cover;
 }
 
@@ -1808,8 +1803,7 @@ export default {
 .floating-content video {
   width: 100%;
   height: 100%;
-  /* 移动端等比例显示，避免裁剪人脸 */
-  object-fit: contain;
+  object-fit: cover;
 }
 
 .floating-content img {
@@ -1818,13 +1812,11 @@ export default {
   object-fit: contain;
 }
 
-/* ========= 移动端样式优化 ========= */
 @media (max-width: 768px) {
   .video-container.grid-mode {
     grid-template-columns: 1fr;
     gap: 10px;
     padding: 10px;
-    padding-bottom: 20px;
   }
 
   .video-container.single-mode {
@@ -1837,76 +1829,32 @@ export default {
     max-height: calc(100vh - 160px);
   }
 
-  /* 移动端所有视频元素使用 contain 保证画面完整不裁剪 */
-  .video-item video {
-    object-fit: contain;
+  .video-controls button {
+    padding: 5px 10px;
+    font-size: 11px;
   }
 
-  /* 画廊容器适配移动端，避免遮挡按钮 */
-  .gallery-container {
-    bottom: 90px;
-    padding: 6px;
+  .video-controls {
+    gap: 6px;
+    padding: 6px 12px;
+    bottom: 15px;
   }
 
   .gallery-item {
-    width: 100px;
+    width: 120px;
   }
 
   .gallery-item video,
   .gallery-item img {
-    height: 75px;
-    object-fit: contain;
-    background: #000;
+    height: 85px;
   }
 
-  /* 控制栏移动端布局优化 - 网格布局防止拥挤 */
-  .video-controls {
-    bottom: 15px;
-    padding: 8px 12px;
-    gap: 8px;
-    border-radius: 28px;
-    max-width: 96%;
-    background: rgba(0, 0, 0, 0.75);
-    /* 使用网格布局自动换行，最多每行4个按钮 */
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(70px, auto));
-    justify-items: center;
-    align-items: center;
-    width: auto;
-  }
-
-  .video-controls button {
-    padding: 5px 8px;
-    font-size: 11px;
-    white-space: nowrap;
-    margin: 2px;
-    background: rgba(255, 255, 255, 0.95);
-  }
-
-  /* 增加底部安全区域适配 */
-  .video-meeting-container {
-    padding-bottom: calc(80px + env(safe-area-inset-bottom, 0px));
-  }
-
-  /* 浮动摄像头移动端稍小一些 */
   .floating-camera {
-    width: 160px !important;
-    height: 120px !important;
-    bottom: 100px !important;
-    right: 10px !important;
-  }
-
-  .floating-content video {
-    object-fit: contain;
-  }
-
-  /* 共享模式下的全屏视频确保完整显示 */
-  .video-container.fullscreen-mode .video-item video {
-    object-fit: contain;
+    width: 180px !important;
+    height: 135px !important;
   }
 }
 
-/* 小屏手机进一步调整 */
 @media (max-width: 480px) {
   .video-header h2 {
     font-size: 16px;
@@ -1922,43 +1870,38 @@ export default {
   }
 
   .video-controls {
-    grid-template-columns: repeat(auto-fit, minmax(64px, auto));
-    gap: 6px;
-    padding: 6px 10px;
+    gap: 4px;
+    padding: 5px 10px;
+    bottom: 10px;
+    max-width: 98%;
   }
 
   .video-controls button {
-    padding: 4px 6px;
+    padding: 4px 8px;
     font-size: 10px;
-    gap: 3px;
+    gap: 4px;
   }
 
   .gallery-item {
-    width: 85px;
+    width: 100px;
   }
 
   .gallery-item video,
   .gallery-item img {
-    height: 65px;
+    height: 70px;
   }
 
   .gallery-item p {
-    font-size: 9px;
-    padding: 2px 4px;
+    font-size: 10px;
+    padding: 3px 6px;
   }
 
   .floating-camera {
-    width: 140px !important;
-    height: 105px !important;
-  }
-
-  .floating-drag-handle {
-    font-size: 10px;
-    padding: 4px 8px !important;
+    width: 160px !important;
+    height: 120px !important;
   }
 }
 
-/* 横屏模式适配 */
 @media (max-height: 500px) and (orientation: landscape) {
   .video-container.grid-mode {
     grid-template-columns: repeat(2, 1fr);
@@ -1972,11 +1915,10 @@ export default {
 
   .video-controls {
     bottom: 10px;
-    grid-template-columns: repeat(auto-fit, minmax(70px, auto));
   }
 
   .gallery-container {
-    bottom: 70px;
+    bottom: 60px;
   }
 
   .video-container.single-mode {
