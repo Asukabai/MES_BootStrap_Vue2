@@ -7,188 +7,305 @@
         <h3>检测到当前在钉钉内打开</h3>
         <p>由于钉钉小程序不支持摄像头/麦克风权限，视频会议无法正常运行。</p>
         <p>请点击下方按钮，在系统浏览器中打开，即可正常加入会议。</p>
-        <button @click="openInBrowser" class="open-browser-btn">
-          在浏览器中打开
-        </button>
-        <button @click="copyLinkAndExit" class="copy-link-btn">
-          复制链接并退出
-        </button>
+        <button @click="openInBrowser" class="open-browser-btn">在浏览器中打开</button>
+        <button @click="copyLinkAndExit" class="copy-link-btn">复制链接并退出</button>
       </div>
     </div>
 
-    <!-- 正常视频会议界面（仅在非钉钉环境显示） -->
-    <div v-else>
-      <div class="video-header">
-        <h2>🎥 晟思视频会议 - 房间号：<span>{{ roomName }}</span></h2>
+    <!-- 正常视频会议界面 -->
+    <div v-else class="meeting-main">
+      <!-- 顶部标题栏 -->
+      <div class="meeting-header">
+        <div class="room-info">
+          <span class="room-name">{{ roomName }}</span>
+          <span class="member-count">{{ totalParticipants }}人</span>
+        </div>
+        <div class="header-actions">
+          <button @click="showMemberList" class="icon-btn" title="成员列表">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" fill="currentColor"/>
+            </svg>
+          </button>
+          <button @click="inviteMember" class="icon-btn" title="邀请">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+              <path d="M16 8c0-2.21-1.79-4-4-4S8 5.79 8 8s1.79 4 4 4 4-1.79 4-4zm-7 6c-2.21 0-8 1.79-8 4v2h16v-2c0-2.21-5.79-4-8-4h-4z" fill="currentColor"/>
+              <path d="M20 12v-3h-2v3h-3v2h3v3h2v-3h3v-2z" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
       </div>
 
-      <!-- 视频容器 -->
-      <div
-        id="videoContainer"
-        class="video-container"
-        :class="{
-          'grid-mode': !this.screenShareActive,
-          'fullscreen-mode': screenShareActive,
-          'single-mode': isSingleMode
-        }"
-      ></div>
+      <!-- 主视频区域 -->
+      <div class="video-area" ref="videoArea">
+        <!-- 共享屏幕视图 -->
+        <div v-if="activeScreenShare" class="screen-share-view">
+          <div class="screen-share-content">
+            <video ref="screenShareVideo" autoplay playsinline class="screen-video"></video>
+            <div class="screen-share-label">正在共享屏幕</div>
+          </div>
+        </div>
 
-      <!-- 画廊容器：共享模式下显示其他参与者视频 -->
-      <div v-if="screenShareActive" id="galleryContainer" class="gallery-container">
-        <div class="gallery-title">参会者 ({{ galleryParticipantsCount }})</div>
-        <div class="gallery-scroll"></div>
+        <!-- 视频网格视图 -->
+        <div v-else :class="['video-grid', { 'single-mode': videoItems.length === 1 }]">
+          <div
+            v-for="item in videoItems"
+            :key="item.id"
+            class="video-card"
+            :class="{ 'is-local': item.isLocal, 'muted': !item.hasVideo }"
+          >
+            <div class="video-wrapper">
+              <video
+                :ref="(el) => setVideoRef(item.id, el)"
+                :data-participant-id="item.id"
+                autoplay
+                playsinline
+                :muted="item.isLocal"
+                class="participant-video"
+              ></video>
+              <div v-if="!item.hasVideo" class="avatar-placeholder">
+                <div class="avatar-icon">{{ item.name.charAt(0).toUpperCase() }}</div>
+              </div>
+              <div class="participant-name">
+                {{ item.name }}{{ item.isLocal ? ' (我)' : '' }}
+              </div>
+              <div v-if="!item.hasAudio" class="audio-mute-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                  <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z" fill="currentColor"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
-      <!-- 控制栏 -->
-      <div class="video-controls">
-        <button @click="toggleCamera" :class="{ active: cameraEnabled }">
-          📷 {{ cameraEnabled ? '摄像头开' : '摄像头关' }}
+      <!-- 底部工具栏 -->
+      <div class="control-bar">
+        <button @click="toggleMicrophone" :class="['control-btn', { active: microphoneEnabled }]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M12 16c-2.21 0-4-1.79-4-4V6c0-2.21 1.79-4 4-4s4 1.79 4 4v6c0 2.21-1.79 4-4 4zm-6-4c0 3.31 2.69 6 6 6s6-2.69 6-6h-2c0 2.21-1.79 4-4 4s-4-1.79-4-4H6z" fill="currentColor"/>
+          </svg>
+          <span>{{ microphoneEnabled ? '静音' : '取消静音' }}</span>
         </button>
-        <button @click="toggleMicrophone" :class="{ active: microphoneEnabled }">
-          🎤 {{ microphoneEnabled ? '麦克风开' : '麦克风关' }}
+
+        <button @click="toggleCamera" :class="['control-btn', { active: cameraEnabled }]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M15 8v8H5V8h10m1-2H4c-.55 0-1 .45-1 1v10c0 .55.45 1 1 1h12c.55 0 1-.45 1-1v-3.5l4 4v-11l-4 4V7c0-.55-.45-1-1-1z" fill="currentColor"/>
+          </svg>
+          <span>{{ cameraEnabled ? '关闭视频' : '开启视频' }}</span>
         </button>
-        <button @click="shareScreen" :class="{ active: screenShareActive }">
-          🖥️ {{ screenShareActive ? '停止共享' : '共享屏幕' }}
+
+        <button @click="shareScreen" :class="['control-btn', { active: screenShareActive }]">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z" fill="currentColor"/>
+          </svg>
+          <span>{{ screenShareActive ? '停止共享' : '共享屏幕' }}</span>
         </button>
-        <button @click="switchView" class="view-btn">
-          🔄 切换视图
+
+        <button @click="leaveRoom" class="control-btn leave-btn">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+            <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" fill="currentColor"/>
+          </svg>
+          <span>离开</span>
         </button>
-        <button @click="showMemberList" class="member-btn">
-          👥 成员列表
-        </button>
-        <button @click="inviteMember" class="invite-btn">
-          ➕ 邀请成员
-        </button>
-        <button @click="leaveRoom" class="leave-btn">
-          🚪 离开房间
-        </button>
+      </div>
+
+      <!-- 画廊容器（共享屏幕模式下的小窗列表） -->
+      <div v-if="screenShareActive && galleryItems.length" class="gallery-dock">
+        <div class="gallery-scroll">
+          <div
+            v-for="item in galleryItems"
+            :key="item.id"
+            class="gallery-item"
+            @click="switchToParticipant(item)"
+          >
+            <video :ref="(el) => setGalleryVideoRef(item.id, el)" autoplay playsinline class="gallery-video"></video>
+            <div class="gallery-name">{{ item.name }}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 本地摄像头浮窗（共享模式下） -->
+      <div v-if="screenShareActive && localVideoItem" class="floating-camera" ref="floatingCamera">
+        <div class="floating-header" @mousedown="startDrag">
+          <span>我的视频</span>
+          <button @click="toggleCamera" class="float-cam-btn">
+            {{ cameraEnabled ? '📷' : '📷❌' }}
+          </button>
+        </div>
+        <div class="floating-content">
+          <video ref="floatingVideo" autoplay playsinline muted class="floating-video"></video>
+          <div v-if="!cameraEnabled" class="floating-placeholder">
+            <div class="avatar-icon-small">{{ localParticipantName.charAt(0).toUpperCase() }}</div>
+          </div>
+        </div>
+        <div class="floating-resize" @mousedown="startResize"></div>
       </div>
     </div>
   </div>
 </template>
 
 <script>
-import { Room, RoomEvent, Track, VideoPresets, LocalVideoTrack } from 'livekit-client';
-import cameraOffImg from '@/assets/摄像头关闭.png';
+import { Room, RoomEvent, Track, VideoPresets, LocalVideoTrack, createLocalTracks } from 'livekit-client';
 
 export default {
   name: 'VideoMeeting',
   data() {
     return {
+      // 连接相关
       meetingUrl: '',
       roomName: '未连接',
       room: null,
       wsUrl: 'wss://api-v2.sensor-smart.cn:29028',
-      mediaRequestInProgress: false,
+
+      // 媒体状态
       cameraEnabled: true,
       microphoneEnabled: true,
       screenShareActive: false,
       screenShareTrack: null,
       screenStream: null,
       localCameraTrack: null,
-      localMicrophoneTrack: null,
+      activeScreenShare: false, // 是否有屏幕共享（本地或远程）
+      remoteScreenTrack: null,
+
+      // 参与者管理（改为普通对象，确保响应式）
+      participants: {}, // key: participantId, value: { id, name, isLocal, hasVideo, hasAudio, videoTrack, audioTrack, screenTrack }
+      localParticipantId: null,
+
+      // 钉钉环境
       isInDingTalk: false,
-      remoteParticipantsCount: 0,
-      screenShareVideoElement: null,
-      floatingCameraContainer: null,
+
+      // 浮动窗口拖拽/缩放
       isDragging: false,
       isResizing: false,
       dragStartX: 0,
       dragStartY: 0,
+      dragStartLeft: 0,
+      dragStartTop: 0,
       resizeStartX: 0,
       resizeStartY: 0,
       resizeStartWidth: 0,
       resizeStartHeight: 0,
-      floatingInitialized: false,
-      galleryParticipantsCount: 0,
-      cameraOffImage: cameraOffImg,
-      currentViewMode: 'grid', // grid: 网格视图，speaker: 演讲者视图，screen: 共享屏幕视图
-      availableScreens: [], // 可用的屏幕共享列表
-      selectedScreenId: null, // 当前选中的屏幕 ID
+
+      // 视频元素映射
+      videoRefs: new Map(),
+      galleryVideoRefs: new Map(),
+
+      // 当前视图模式
+      currentViewMode: 'grid',
     };
   },
   computed: {
-    isSingleMode() {
-      return !this.screenShareActive && this.remoteParticipantsCount === 0;
-    }
+    // 所有视频项（非共享模式下显示）
+    videoItems() {
+      const items = [];
+      for (const [id, p] of Object.entries(this.participants)) {
+        // 共享模式下，只有远程屏幕共享者不在网格中显示
+        if (this.screenShareActive && this.activeScreenShare === id) {
+          continue;
+        }
+        items.push({
+          id,
+          name: p.name,
+          isLocal: p.isLocal,
+          hasVideo: p.hasVideo,
+          hasAudio: p.hasAudio,
+        });
+      }
+      return items;
+    },
+
+    // 画廊模式下的参与者（共享模式下除共享者外的其他人）
+    galleryItems() {
+      if (!this.screenShareActive) return [];
+      const items = [];
+      for (const [id, p] of Object.entries(this.participants)) {
+        if (!p.isLocal && id !== this.activeScreenShare) {
+          items.push({ id, name: p.name });
+        }
+      }
+      return items;
+    },
+
+    // 本地参与者信息
+    localVideoItem() {
+      if (!this.localParticipantId) return null;
+      const p = this.participants[this.localParticipantId];
+      if (!p) return null;
+      return {
+        id: p.id,
+        name: p.name,
+        hasVideo: p.hasVideo,
+      };
+    },
+
+    localParticipantName() {
+      const p = this.participants[this.localParticipantId];
+      return p ? p.name : '我';
+    },
+
+    totalParticipants() {
+      return Object.keys(this.participants).length;
+    },
   },
   created() {
     this.meetingUrl = decodeURIComponent(this.$route.query.meetingUrl || '');
     this.roomName = decodeURIComponent(this.$route.query.meetingName || '未命名会议');
     document.title = this.roomName;
-
-    console.log('=== 视频会议页面初始化 ===');
-    console.log('会议 URL:', this.meetingUrl);
-    console.log('会议名称:', this.roomName);
-    console.log('当前协议:', window.location.protocol);
-    console.log('安全上下文:', window.isSecureContext);
-    console.log('是否支持 mediaDevices:', !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia));
   },
   mounted() {
     this.checkDingTalkEnvironment();
-
     if (this.isInDingTalk) return;
 
     if (this.meetingUrl) {
       this.parseAndJoinRoom();
     } else {
       this.$toast.fail('缺少会议链接参数');
-      setTimeout(() => {
-        this.leaveRoom();
-      }, 1500);
+      setTimeout(() => this.leaveRoom(), 1500);
     }
+
+    // 调试：检查视频 refs
+    setTimeout(() => {
+      console.log('视频元素 refs:', this.videoRefs);
+    }, 3000);
   },
   beforeDestroy() {
     this.disconnectRoom();
     document.title = '工作助手';
   },
   methods: {
+    // ==================== 钉钉环境 ====================
     checkDingTalkEnvironment() {
       const ua = navigator.userAgent.toLowerCase();
-      const isDingTalkUA = ua.includes('dingtalk');
-      const hasDD = typeof window.dd !== 'undefined';
-      this.isInDingTalk = isDingTalkUA || hasDD;
-      if (this.isInDingTalk) {
-        console.log('⚠️ 检测到钉钉环境，将引导用户跳转至浏览器');
-      }
+      this.isInDingTalk = ua.includes('dingtalk') || typeof window.dd !== 'undefined';
     },
-
     openInBrowser() {
       const currentUrl = window.location.href;
       if (window.dd && window.dd.biz && window.dd.biz.util && window.dd.biz.util.openLink) {
-        window.dd.biz.util.openLink({
-          url: currentUrl,
-          onSuccess: () => console.log('跳转成功'),
-          onFail: (err) => {
-            console.error('钉钉跳转失败', err);
-            this.fallbackOpenLink(currentUrl);
-          }
-        });
+        window.dd.biz.util.openLink({ url: currentUrl });
       } else {
         this.fallbackOpenLink(currentUrl);
       }
     },
-
     fallbackOpenLink(url) {
-      if (navigator.clipboard) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(url).then(() => {
           this.$toast.success('链接已复制，请打开浏览器访问');
         }).catch(() => {
-          this.$toast.fail('复制失败，请手动复制');
+          prompt('请复制以下链接到浏览器中打开', url);
         });
       } else {
         prompt('请复制以下链接到浏览器中打开', url);
       }
     },
-
     copyLinkAndExit() {
       const currentUrl = window.location.href;
-      if (navigator.clipboard) {
+      if (navigator.clipboard && navigator.clipboard.writeText) {
         navigator.clipboard.writeText(currentUrl).then(() => {
           this.$toast.success('链接已复制，请打开浏览器访问');
           setTimeout(() => this.leaveRoom(), 1000);
         }).catch(() => {
-          this.$toast.fail('复制失败，请手动复制');
+          prompt('请复制以下链接到浏览器中打开', currentUrl);
+          this.leaveRoom();
         });
       } else {
         prompt('请复制以下链接到浏览器中打开', currentUrl);
@@ -196,194 +313,107 @@ export default {
       }
     },
 
+    // ==================== 房间连接 ====================
     parseAndJoinRoom() {
       try {
         const url = new URL(this.meetingUrl);
-        const params = new URLSearchParams(url.search);
-        const dataParam = params.get('data');
-
-        if (!dataParam) {
-          console.error('❌ 缺少 data 参数');
-          this.$toast.fail('会议链接格式错误');
-          return;
-        }
-
+        const dataParam = new URLSearchParams(url.search).get('data');
+        if (!dataParam) throw new Error('缺少 data 参数');
         const decodedData = JSON.parse(decodeURIComponent(dataParam));
-        const token = decodedData.token;
-        const room = decodedData.room;
-        const user = decodedData.user || '参会者';
-
-        console.log('✅ 解析成功:', {
-          token: token.substring(0, 20) + '...',
-          room: room,
-          user: user
-        });
-
-        this.joinRoom(room, user, token);
+        this.joinRoom(decodedData.room, decodedData.user || '参会者', decodedData.token);
       } catch (error) {
-        console.error('❌ 解析会议链接失败:', error);
+        console.error('解析会议链接失败:', error);
         this.$toast.fail('会议链接解析失败');
       }
     },
-
-    checkMediaSupport() {
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        const protocol = window.location.protocol;
-        const hostname = window.location.hostname;
-        const isLocalhost = hostname === 'localhost' || hostname === '127.0.0.1';
-        const isHttps = protocol === 'https:';
-        const isSecure = window.isSecureContext;
-
-        let errorMsg = '';
-        if (!isHttps && !isLocalhost) {
-          errorMsg = '当前页面不是 HTTPS 环境，且非 localhost，无法访问摄像头/麦克风。请使用 HTTPS 访问或在开发环境使用 localhost。';
-        } else if (isHttps && !isSecure) {
-          errorMsg = '页面虽然是 HTTPS，但由于混合内容（HTTP 资源）导致安全上下文无效，无法访问摄像头/麦克风。请确保所有资源均通过 HTTPS 加载。';
-        } else {
-          errorMsg = '浏览器不支持 getUserMedia API，请升级浏览器或检查权限设置。';
-        }
-        console.warn('⚠️', errorMsg);
-        this.$toast.fail(errorMsg);
-        return false;
-      }
-      return true;
-    },
-
     async joinRoom(roomName, userName, token) {
-      if (!roomName || !userName || !token) {
-        console.error('❌ 缺少必要参数');
-        this.$toast.fail('会议参数不完整');
-        return;
-      }
-
-      console.log(`⏳ 正在连接房间 "${roomName}" 作为 "${userName}"...`);
-
-      const loadingToast = this.$toast.loading({
-        message: '正在加入会议室...',
-        forbidClick: true,
-        duration: 0
-      });
-
+      const loadingToast = this.$toast.loading({ message: '正在加入会议室...', forbidClick: true, duration: 0 });
       try {
         this.room = new Room({
           adaptiveStream: true,
           dynacast: true,
           videoCaptureDefaults: { resolution: VideoPresets.h540 },
-          audioCaptureDefaults: {
+          audioCaptureDefaults: { echoCancellation: true, noiseCancellation: true, autoGainControl: true }
+        });
+        this.setupRoomEvents();
+        await this.room.connect(this.wsUrl, token);
+        this.roomName = this.room.name;
+
+        // 添加本地参与者（使用 $set 确保响应式）
+        this.localParticipantId = this.room.localParticipant.identity;
+        this.$set(this.participants, this.localParticipantId, {
+          id: this.localParticipantId,
+          name: userName,
+          isLocal: true,
+          hasVideo: false,
+          hasAudio: false,
+          videoTrack: null,
+          audioTrack: null,
+        });
+
+        await this.enableMedia();
+        loadingToast.close();
+        this.$toast.success('已进入会议室');
+      } catch (error) {
+        console.error('连接失败:', error);
+        loadingToast.close();
+        this.$toast.fail('连接失败：' + error.message);
+      }
+    },
+
+    async enableMedia() {
+      try {
+        // 使用 livekit 的 createLocalTracks 创建本地轨道
+        const tracks = await createLocalTracks({
+          video: {
+            resolution: VideoPresets.h540,
+            facingMode: 'user'
+          },
+          audio: {
             echoCancellation: true,
             noiseCancellation: true,
             autoGainControl: true
           }
         });
 
-        this.setupRoomEvents();
+        console.log('获取到的轨道:', tracks);
 
-        await this.room.connect(this.wsUrl, token);
-        console.log('✅ 成功加入房间:', this.room.name, '作为:', userName);
-        this.roomName = this.room.name;
-
-        const mediaSupported = this.checkMediaSupport();
-
-        if (mediaSupported) {
-          try {
-            await this.enableMedia(userName);
-            loadingToast.close();
-            this.$toast.success('已进入会议室');
-          } catch (mediaError) {
-            console.error('媒体初始化失败，降级为观看模式', mediaError);
-            loadingToast.close();
-            this.$toast.fail('摄像头/麦克风不可用，仅能观看');
-            this.updateLocalVideoUI(userName);
-          }
-        } else {
-          loadingToast.close();
-          this.$toast.fail('摄像头/麦克风不可用，仅能观看');
-          this.updateLocalVideoUI(userName);
+        // 逐个发布轨道到房间
+        const publishPromises = [];
+        for (const track of tracks) {
+          const pubPromise = this.room.localParticipant.publishTrack(track).then((publication) => {
+            console.log('轨道发布成功:', publication.trackSid, publication.track ? publication.track.kind : null);
+            return publication;
+          });
+          publishPromises.push(pubPromise);
         }
+
+        // 等待所有轨道发布完成
+        const publications = await Promise.all(publishPromises);
+        console.log('所有轨道发布完成:', publications);
+
+        // 更新本地参与者状态
+        const cameraPub = publications.find(pub => pub.track && pub.track.kind === Track.Kind.Video);
+        const micPub = publications.find(pub => pub.track && pub.track.kind === Track.Kind.Audio);
+
+        if (cameraPub && cameraPub.track) {
+          this.localCameraTrack = cameraPub.track;
+          this.updateParticipantVideo(this.localParticipantId, true, this.localCameraTrack);
+          console.log('摄像头轨道已设置:', cameraPub.trackSid);
+        }
+
+        if (micPub && micPub.track) {
+          this.updateParticipantAudio(this.localParticipantId, true);
+          console.log('麦克风轨道已设置:', micPub.trackSid);
+        }
+
+        this.cameraEnabled = true;
+        this.microphoneEnabled = true;
+        console.log('摄像头和麦克风已启用');
       } catch (error) {
-        console.error('❌ 连接失败:', error);
-        loadingToast.close();
-
-        if (error.message && error.message.includes('getUserMedia')) {
-          this.$toast.fail('无法访问摄像头/麦克风，请检查浏览器权限设置');
-          this.updateLocalVideoUI(userName);
-        } else {
-          this.$toast.fail('连接会议室失败：' + error.message);
-          this.disconnectRoom();
-        }
-      }
-    },
-
-    updateLocalVideoUI(userName) {
-      // 共享模式下，只更新浮动窗口内容，不操作 videoContainer
-      if (this.screenShareActive) {
-        this.updateFloatingCameraContent();
-        return;
-      }
-
-      const container = document.getElementById('videoContainer');
-      if (!container) return;
-
-      const existingLocal = document.querySelector('.video-item[data-is-local="true"]');
-      if (existingLocal) existingLocal.remove();
-
-      if (this.cameraEnabled && this.localCameraTrack) {
-        this.createLocalVideoElementWithTrack(userName, this.localCameraTrack);
-      } else {
-        this.createLocalPlaceholder(userName);
-      }
-    },
-
-    // 更新共享模式下的浮动摄像头窗口内容
-    updateFloatingCameraContent() {
-      if (!this.floatingCameraContainer) {
-        // 如果浮动窗口不存在，尝试重新创建（通常不会发生，但为了健壮）
-        this.recreateFloatingCamera();
-        return;
-      }
-
-      const contentDiv = this.floatingCameraContainer.querySelector('.floating-content');
-      if (!contentDiv) return;
-
-      // 清空当前内容
-      contentDiv.innerHTML = '';
-
-      if (this.cameraEnabled && this.localCameraTrack) {
-        // 显示摄像头视频
-        const videoEl = document.createElement('video');
-        videoEl.autoplay = true;
-        videoEl.playsInline = true;
-        videoEl.muted = true;
-        videoEl.style.width = '100%';
-        videoEl.style.height = '100%';
-        videoEl.style.objectFit = 'cover';
-        this.localCameraTrack.attach(videoEl);
-        contentDiv.appendChild(videoEl);
-      } else {
-        // 显示关闭摄像头占位图片
-        const img = document.createElement('img');
-        img.src = this.cameraOffImage;
-        img.alt = '摄像头已关闭';
-        img.style.maxWidth = '90%';
-        img.style.maxHeight = '90%';
-        img.style.objectFit = 'contain';
-        contentDiv.appendChild(img);
-      }
-    },
-
-    // 重新创建浮动摄像头窗口（兜底方案）
-    recreateFloatingCamera() {
-      // 获取当前的本地视频元素或创建一个临时占位
-      let localItem = document.querySelector('.video-item[data-is-local="true"]');
-      if (!localItem) {
-        const userName = (this.room && this.room.localParticipant && this.room.localParticipant.identity) || '我';
-        this.createLocalPlaceholder(userName);
-        localItem = document.querySelector('.video-item[data-is-local="true"]');
-      }
-      if (localItem) {
-        this.createFloatingCamera(localItem);
-        // 创建后立即更新内容以确保正确
-        this.updateFloatingCameraContent();
+        console.warn('媒体初始化失败:', error);
+        this.$toast.fail('无法访问摄像头/麦克风：' + (error.message || '请检查权限设置'));
+        this.updateParticipantVideo(this.localParticipantId, false, null);
       }
     },
 
@@ -391,1542 +421,805 @@ export default {
       return new Promise((resolve, reject) => {
         const startTime = Date.now();
         const check = () => {
-          const publication = this.room.localParticipant.getTrackPublication(source);
-          if (publication && publication.track) {
-            resolve(publication);
-          } else if (Date.now() - startTime > timeout) {
-            reject(new Error(`等待轨道 ${source} 超时`));
-          } else {
-            setTimeout(check, 100);
-          }
+          const pub = this.room.localParticipant.getTrackPublication(source);
+          if (pub && pub.track) resolve(pub);
+          else if (Date.now() - startTime > timeout) reject(new Error(`等待轨道 ${source} 超时`));
+          else setTimeout(check, 100);
         };
         check();
       });
     },
 
-    async enableMedia(userName) {
-      if (this.mediaRequestInProgress) return;
-      this.mediaRequestInProgress = true;
+    // ==================== 参与者管理 ====================
+    updateParticipantVideo(participantId, hasVideo, track) {
+      const p = this.participants[participantId];
+      if (!p) return;
+      // 直接修改对象属性，Vue 能检测到（对象本身是响应式的）
+      p.hasVideo = hasVideo;
+      p.videoTrack = track;
+      // 触发视图更新（可选，因为对象属性变化 Vue 会自动检测）
+      // 但为了保险，可以手动 $set，不过直接赋值通常足够
+      this.$set(this.participants, participantId, p);
 
-      try {
-        let cameraError = null;
-        let micError = null;
-
-        try {
-          await this.room.localParticipant.setCameraEnabled(true);
-          this.cameraEnabled = true;
-        } catch (err) {
-          cameraError = err;
-          this.cameraEnabled = false;
+      // 尝试通过 videoRefs 获取元素并绑定/清理
+      const videoEl = this.videoRefs.get(participantId);
+      if (videoEl) {
+        if (hasVideo && track) {
+          // 有视频轨道且元素存在，先清理旧流（避免残留）
+          if (videoEl.srcObject) videoEl.srcObject = null;
+          track.attach(videoEl);
+          console.log(`视频轨道已绑定到元素 (通过 videoRefs): ${participantId}`);
+        } else if (!hasVideo) {
+          // 无视频时清空元素内容
+          if (videoEl.srcObject) videoEl.srcObject = null;
         }
-
-        try {
-          await this.room.localParticipant.setMicrophoneEnabled(true);
-          this.microphoneEnabled = true;
-        } catch (err) {
-          micError = err;
-          this.microphoneEnabled = false;
-        }
-
-        let cameraPublication = null;
-        try {
-          cameraPublication = await this.waitForTrack(Track.Source.Camera, 5000);
-          if (cameraPublication && cameraPublication.track) {
-            this.localCameraTrack = cameraPublication.track;
+      } else {
+        // 降级：通过 data 属性查找（可能元素尚未被 ref 回调收集，但这种情况较少）
+        this.$nextTick(() => {
+          const fallbackEl = document.querySelector(`video[data-participant-id="${participantId}"]`);
+          if (fallbackEl) {
+            if (hasVideo && track) {
+              if (fallbackEl.srcObject) fallbackEl.srcObject = null;
+              track.attach(fallbackEl);
+              console.log(`视频轨道已绑定到元素 (通过降级查询): ${participantId}`);
+            } else if (!hasVideo && fallbackEl.srcObject) {
+              fallbackEl.srcObject = null;
+            }
           }
-        } catch (waitErr) {
-          console.warn('等待摄像头轨道超时', waitErr);
-          this.localCameraTrack = null;
-        }
-
-        try {
-          const micPublication = await this.waitForTrack(Track.Source.Microphone, 5000);
-          if (micPublication && micPublication.track) {
-            this.localMicrophoneTrack = micPublication.track;
-          }
-        } catch (waitErr) {
-          console.warn('等待麦克风轨道超时', waitErr);
-        }
-
-        this.updateLocalVideoUI(userName);
-
-        if (cameraError) {
-          this.$toast.fail('摄像头开启失败：' + (cameraError.message || '未知错误'));
-        }
-        if (micError) {
-          this.$toast.fail('麦克风开启失败：' + (micError.message || '未知错误'));
-        }
-
-        console.log('✅ 本地媒体启用完成', { cameraEnabled: this.cameraEnabled, microphoneEnabled: this.microphoneEnabled });
-      } catch (error) {
-        console.error('❌ 启用媒体失败:', error);
-        this.$toast.fail('无法访问摄像头/麦克风，请检查权限');
-        throw error;
-      } finally {
-        this.mediaRequestInProgress = false;
+        });
       }
     },
 
-    createLocalVideoElementWithTrack(userName, videoTrack) {
-      const container = document.getElementById('videoContainer');
-      if (!container) return;
-
-      if (document.querySelector('.video-item[data-is-local="true"]')) return;
-
-      const videoEl = document.createElement('video');
-      videoEl.autoplay = true;
-      videoEl.playsInline = true;
-      videoEl.muted = true;
-      videoTrack.attach(videoEl);
-
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'video-item';
-      itemDiv.setAttribute('data-is-local', 'true');
-      itemDiv.setAttribute('data-track-sid', 'local');
-      itemDiv.setAttribute('data-participant-name', userName);
-
-      const label = document.createElement('p');
-      label.textContent = `${userName} (你)`;
-
-      itemDiv.appendChild(videoEl);
-      itemDiv.appendChild(label);
-      container.appendChild(itemDiv);
+    updateParticipantAudio(participantId, hasAudio) {
+      const p = this.participants[participantId];
+      if (p) {
+        p.hasAudio = hasAudio;
+        this.$set(this.participants, participantId, p);
+      }
     },
 
+    setVideoRef(id, el) {
+      console.log('setVideoRef 被调用:', id, el);
+      if (el) {
+        this.videoRefs.set(id, el);
+        console.log('设置视频 ref:', id, '元素:', el);
+        // 如果已经有轨道，立即绑定
+        const p = this.participants[id];
+        if (p && p.videoTrack && el) {
+          try {
+            // 避免重复绑定：如果元素已经附加了相同的轨道，无需重复
+            if (el.srcObject !== p.videoTrack.mediaStream) {
+              p.videoTrack.attach(el);
+              console.log('视频轨道在 ref 设定时已绑定:', id);
+            }
+          } catch (err) {
+            console.error('视频轨道绑定失败:', err);
+          }
+        }
+      } else {
+        this.videoRefs.delete(id);
+      }
+    },
+
+    setGalleryVideoRef(id, el) {
+      if (el) this.galleryVideoRefs.set(id, el);
+      else this.galleryVideoRefs.delete(id);
+      const p = this.participants[id];
+      if (p && p.videoTrack && el) {
+        p.videoTrack.attach(el);
+      }
+    },
+
+    // ==================== 房间事件 ====================
+    setupRoomEvents() {
+      this.room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        const participantId = participant.identity;
+        let p = this.participants[participantId];
+        if (!p) {
+          // 新参与者，使用 $set 添加
+          this.$set(this.participants, participantId, {
+            id: participantId,
+            name: participant.identity,
+            isLocal: false,
+            hasVideo: false,
+            hasAudio: false,
+            videoTrack: null,
+            audioTrack: null,
+          });
+          p = this.participants[participantId];
+        }
+
+        if (track.kind === Track.Kind.Video) {
+          const isScreenShare = publication.source === Track.Source.ScreenShare;
+          if (isScreenShare) {
+            this.activeScreenShare = participantId;
+            this.remoteScreenTrack = track;
+            // 显示共享屏幕
+            this.$nextTick(() => {
+              const screenVideo = this.$refs.screenShareVideo;
+              if (screenVideo) track.attach(screenVideo);
+            });
+          } else {
+            this.updateParticipantVideo(participantId, true, track);
+          }
+        } else if (track.kind === Track.Kind.Audio) {
+          this.updateParticipantAudio(participantId, true);
+          track.attach(); // 播放音频
+        }
+      });
+
+      this.room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        const participantId = participant.identity;
+        if (track.kind === Track.Kind.Video) {
+          const isScreenShare = publication.source === Track.Source.ScreenShare;
+          if (isScreenShare) {
+            this.activeScreenShare = false;
+            this.remoteScreenTrack = null;
+          } else {
+            this.updateParticipantVideo(participantId, false, null);
+          }
+        } else if (track.kind === Track.Kind.Audio) {
+          this.updateParticipantAudio(participantId, false);
+        }
+      });
+
+      this.room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        this.$delete(this.participants, participant.identity);
+        if (this.activeScreenShare === participant.identity) {
+          this.activeScreenShare = false;
+        }
+      });
+
+      this.room.on(RoomEvent.Disconnected, () => {
+        // 清空参与者对象
+        Object.keys(this.participants).forEach(key => {
+          this.$delete(this.participants, key);
+        });
+        this.activeScreenShare = false;
+        this.roomName = '未连接';
+      });
+    },
+
+    // ==================== 控制方法 ====================
     async toggleCamera() {
-      if (!this.room || !this.room.localParticipant) {
-        this.$toast.fail('未连接房间');
-        return;
-      }
+      if (!this.room || !this.room.localParticipant) return;
       const newEnabled = !this.cameraEnabled;
       try {
         await this.room.localParticipant.setCameraEnabled(newEnabled);
         this.cameraEnabled = newEnabled;
-
-        const userName = (this.room && this.room.localParticipant && this.room.localParticipant.identity) || '我';
         if (newEnabled) {
-          try {
-            const publication = await this.waitForTrack(Track.Source.Camera, 3000);
-            if (publication && publication.track) {
-              this.localCameraTrack = publication.track;
-            }
-          } catch (err) {
-            console.warn('等待摄像头轨道超时', err);
-            this.localCameraTrack = null;
-          }
+          const pub = await this.waitForTrack(Track.Source.Camera, 3000);
+          this.localCameraTrack = (pub && pub.track) || null;
+          this.updateParticipantVideo(this.localParticipantId, !!this.localCameraTrack, this.localCameraTrack);
         } else {
           this.localCameraTrack = null;
+          this.updateParticipantVideo(this.localParticipantId, false, null);
         }
-        // 统一刷新UI，内部会判断共享模式
-        this.updateLocalVideoUI(userName);
-
-        console.log(`摄像头已${newEnabled ? '开启' : '关闭'}`);
       } catch (err) {
-        console.error('切换摄像头失败', err);
-        this.$toast.fail('切换摄像头失败：' + (err.message || '未知错误'));
+        this.$toast.fail('切换摄像头失败');
       }
     },
 
     async toggleMicrophone() {
-      if (!this.room || !this.room.localParticipant) {
-        this.$toast.fail('未连接房间');
-        return;
-      }
+      if (!this.room || !this.room.localParticipant) return;
       const newEnabled = !this.microphoneEnabled;
       try {
         await this.room.localParticipant.setMicrophoneEnabled(newEnabled);
         this.microphoneEnabled = newEnabled;
-        console.log(`麦克风已${newEnabled ? '开启' : '关闭'}`);
+        this.updateParticipantAudio(this.localParticipantId, newEnabled);
       } catch (err) {
-        console.error('切换麦克风失败', err);
-        this.$toast.fail('切换麦克风失败：' + (err.message || '未知错误'));
+        this.$toast.fail('切换麦克风失败');
       }
     },
 
-    // 切换视图功能
-    switchView() {
-      if (!this.room || !this.remoteParticipantsCount) {
-        this.$toast.fail('当前没有其他成员的屏幕可切换');
+    async shareScreen() {
+      if (!this.room || !this.room.localParticipant) return;
+      if (this.screenShareActive) {
+        await this.stopScreenShare();
         return;
       }
+      try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        const videoTrack = stream.getVideoTracks()[0];
+        if (!videoTrack) throw new Error('无法获取屏幕视频轨道');
+        this.screenStream = stream;
+        videoTrack.onended = () => this.stopScreenShare();
 
-      // 获取所有远程参与者
-      const participants = Array.from(this.room.participants.values());
-      const remoteParticipants = participants.filter(p => p.identity !== this.room.localParticipant.identity);
-
-      if (remoteParticipants.length === 0) {
-        this.$toast.fail('当前没有其他成员');
-        return;
-      }
-
-      // 收集所有可用的屏幕共享
-      const screens = [];
-      remoteParticipants.forEach(participant => {
-        const trackPublications = participant.trackPublications;
-        trackPublications.forEach(publication => {
-          if (publication.isSubscribed && publication.track && publication.track.kind === 'video') {
-            // 检查是否是屏幕共享轨道
-            const isScreenShare = publication.source === 'SCREEN_SHARE' ||
-              publication.track.name === 'screen' ||
-              publication.sid.includes('screen');
-            if (isScreenShare) {
-              screens.push({
-                participantIdentity: participant.identity,
-                track: publication.track,
-                sid: publication.sid,
-                source: publication.source
-              });
-            }
-          }
+        const localScreenTrack = new LocalVideoTrack(videoTrack, {
+          name: 'screen',
+          source: Track.Source.ScreenShare,
         });
-      });
+        await this.room.localParticipant.publishTrack(localScreenTrack);
+        this.screenShareTrack = localScreenTrack;
+        this.screenShareActive = true;
+        this.activeScreenShare = this.localParticipantId;
 
-      if (screens.length === 0) {
-        this.$toast.fail('当前没有成员共享屏幕');
-        return;
+        // 创建本地共享视频显示
+        this.$nextTick(() => {
+          const screenVideo = this.$refs.screenShareVideo;
+          if (screenVideo) screenVideo.srcObject = stream;
+        });
+
+        this.$toast.success('屏幕共享已开始');
+      } catch (error) {
+        console.error('屏幕共享失败:', error);
+        this.$toast.fail('屏幕共享失败');
       }
-
-      // 循环切换到下一个屏幕
-      let currentIndex = -1;
-      if (this.selectedScreenId) {
-        currentIndex = screens.findIndex(s => s.sid === this.selectedScreenId);
-      }
-
-      let nextIndex = currentIndex + 1;
-      if (nextIndex >= screens.length) {
-        nextIndex = 0; // 循环回到第一个
-      }
-
-      const targetScreen = screens[nextIndex];
-      this.selectedScreenId = targetScreen.sid;
-
-      // 显示选中的屏幕
-      this.displayRemoteScreen(targetScreen);
-
-      this.$toast.success(`已切换到 ${targetScreen.participantIdentity} 的屏幕`);
-      console.log(`切换视图：${targetScreen.participantIdentity}`, targetScreen);
     },
 
-    // 显示远程成员的屏幕
-    displayRemoteScreen(screenInfo) {
-      const container = document.getElementById('videoContainer');
-      if (!container) return;
-
-      // 清除现有内容
-      container.innerHTML = '';
-
-      // 创建屏幕共享视频元素
-      const videoEl = document.createElement('video');
-      videoEl.autoplay = true;
-      videoEl.playsInline = true;
-      videoEl.muted = true;
-
-      if (screenInfo.track) {
-        screenInfo.track.attach(videoEl);
+    async stopScreenShare() {
+      if (this.screenShareTrack) {
+        await this.room.localParticipant.unpublishTrack(this.screenShareTrack);
+        this.screenShareTrack.stop();
+        this.screenShareTrack = null;
       }
-
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'video-item';
-      itemDiv.setAttribute('data-is-screen-share', 'true');
-      itemDiv.setAttribute('data-track-sid', screenInfo.sid);
-      itemDiv.setAttribute('data-participant-id', screenInfo.participantIdentity);
-      itemDiv.style.position = 'absolute';
-      itemDiv.style.top = '0';
-      itemDiv.style.left = '0';
-      itemDiv.style.width = '100%';
-      itemDiv.style.height = '100%';
-      itemDiv.style.zIndex = '1';
-
-      const label = document.createElement('p');
-      label.textContent = `${screenInfo.participantIdentity} 的屏幕共享`;
-      label.style.background = 'rgba(0, 0, 0, 0.7)';
-      label.style.position = 'absolute';
-      label.style.bottom = '0';
-      label.style.left = '0';
-      label.style.right = '0';
-      label.style.zIndex = '2';
-
-      itemDiv.appendChild(videoEl);
-      itemDiv.appendChild(label);
-      container.appendChild(itemDiv);
-
-      const screenVideo = itemDiv.querySelector('video');
-      if (screenVideo) {
-        screenVideo.style.width = '100%';
-        screenVideo.style.height = '100%';
-        screenVideo.style.objectFit = 'contain';
+      if (this.screenStream) {
+        this.screenStream.getTracks().forEach(t => t.stop());
+        this.screenStream = null;
       }
-
-      // 更新视图模式
-      this.currentViewMode = 'screen';
-      this.screenShareActive = true;
+      this.screenShareActive = false;
+      if (this.activeScreenShare === this.localParticipantId) {
+        this.activeScreenShare = false;
+      }
+      this.$toast.success('屏幕共享已停止');
     },
 
-    // 显示成员列表
+    switchToParticipant(item) {
+      // 切换到指定参与者的视频（简化版，聚焦该参与者）
+      const p = this.participants[item.id];
+      if (p && p.videoTrack) {
+        // 可扩展：切换主视图
+      }
+    },
+
     showMemberList() {
-      if (!this.room) {
-        this.$toast.fail('未连接房间');
-        return;
-      }
-
-      const participants = Array.from(this.room.participants.values());
-      const localIdentity = this.room.localParticipant ? this.room.localParticipant.identity : null;
-      const remoteParticipants = participants.filter(p => p.identity !== localIdentity);
-
-      let memberListHtml = `
-        <div style="padding: 20px;">
-          <h3 style="margin-bottom: 15px; font-size: 18px;">参会成员 (${remoteParticipants.length + 1})</h3>
-          <div style="border-top: 1px solid #eee; padding-top: 10px;">
-            <div style="padding: 10px; background: #f5f5f5; border-radius: 8px; margin-bottom: 10px;">
-              <span style="font-weight: 500;">👤 ${localIdentity || '我'} (我)</span>
-            </div>
-      `;
-
-      remoteParticipants.forEach((participant, index) => {
-        const statusIcon = participant.state === 'connected' ? '🟢' : '🔴';
-        memberListHtml += `
-          <div style="padding: 10px; border-bottom: 1px solid #eee; ${index === remoteParticipants.length - 1 ? '' : 'margin-bottom: 10px;'}">
-            <span>${statusIcon} ${participant.identity}</span>
-          </div>
-        `;
+      const members = Object.values(this.participants).map(p => ({
+        name: p.name,
+        isLocal: p.isLocal,
+      }));
+      let html = '<div style="padding: 12px;"><div style="max-height: 400px; overflow-y: auto;">';
+      members.forEach(m => {
+        html += `<div style="padding: 8px 0; border-bottom: 1px solid #eee;">${m.isLocal ? '👤 ' : '👥 '}${m.name}${m.isLocal ? ' (我)' : ''}</div>`;
       });
-
-      memberListHtml += `</div></div>`;
-
-      this.$dialog.alert({
-        title: '成员列表',
-        message: memberListHtml,
-        confirmButtonText: '关闭',
-        theme: 'round-button',
-        allowHtml: true
-      }).catch(() => {});
+      html += '</div></div>';
+      this.$dialog.alert({ title: '成员列表', message: html, confirmButtonText: '关闭', allowHtml: true });
     },
 
-    // 邀请成员
     inviteMember() {
-      this.$toast.loading({
-        message: '正在生成邀请链接...',
-        forbidClick: true,
-        duration: 1000
-      });
-
-      setTimeout(() => {
-        const currentUrl = window.location.href;
-
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(currentUrl).then(() => {
-            this.$dialog.confirm({
-              title: '邀请成员',
-              message: '会议链接已复制到剪贴板，您可以分享给其他人。<br><br>' +
-                '<span style="color: #667eea; font-size: 12px;">提示：将链接发送给需要邀请的成员即可</span>',
-              confirmButtonText: '确定',
-              cancelButtonText: '取消',
-              allowHtml: true
-            }).then(() => {
-              // 确认
-            }).catch(() => {
-              // 取消
-            });
-          }).catch(err => {
-            this.$toast.fail('复制失败，请手动复制');
-            prompt('请复制以下会议链接:', currentUrl);
-          });
-        } else {
-          prompt('请复制以下会议链接:', currentUrl);
-        }
-      }, 1000);
+      const url = window.location.href;
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(url).then(() => {
+          this.$dialog.alert({ title: '邀请成员', message: '会议链接已复制，可分享给其他人' });
+        }).catch(() => {
+          prompt('请复制以下会议链接:', url);
+        });
+      } else {
+        prompt('请复制以下会议链接:', url);
+      }
     },
 
-    // 离开房间
     leaveRoom() {
       this.$dialog.confirm({
         title: '确认离开',
         message: '确定要离开当前会议室吗？',
         confirmButtonText: '确定',
         cancelButtonText: '取消',
-        theme: 'round-button'
       }).then(() => {
         this.disconnectRoom();
         this.$toast.success('已离开会议室');
-        setTimeout(() => {
-          this.$router.back();
-        }, 1000);
-      }).catch(() => {
-        // 取消
+        setTimeout(() => this.$router.back(), 1000);
       });
-    },
-
-    async shareScreen() {
-      if (!this.room || !this.room.localParticipant) {
-        this.$toast.fail('未连接房间');
-        return;
-      }
-
-      if (!navigator.mediaDevices || !navigator.mediaDevices.getDisplayMedia) {
-        this.$toast.fail('当前浏览器不支持屏幕共享，请使用 Chrome/Edge 等支持屏幕共享的浏览器，并确保在 HTTPS 环境下');
-        return;
-      }
-
-      if (this.screenShareActive) {
-        await this.stopScreenShare();
-        return;
-      }
-
-      try {
-        const screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true });
-        const screenVideoTrack = screenStream.getVideoTracks()[0];
-        if (!screenVideoTrack) throw new Error('无法获取屏幕视频轨道');
-
-        this.screenStream = screenStream;
-
-        screenVideoTrack.onended = () => {
-          console.log('用户通过浏览器停止了屏幕共享');
-          this.stopScreenShare();
-        };
-
-        this.createLocalScreenShareElement(screenStream);
-
-        const localScreenTrack = new LocalVideoTrack(screenVideoTrack, {
-          name: 'screen',
-          source: Track.Source.ScreenShare,
-        });
-
-        await this.room.localParticipant.publishTrack(localScreenTrack);
-        this.screenShareTrack = localScreenTrack;
-        this.screenShareActive = true;
-
-        this.$nextTick(() => {
-          this.enterScreenShareMode();
-        });
-
-        console.log('✅ 屏幕共享已开始');
-        this.$toast.success('屏幕共享已开始');
-      } catch (error) {
-        console.error('屏幕共享失败:', error);
-        if (error.name === 'NotAllowedError') {
-          this.$toast.fail('用户拒绝了屏幕共享权限');
-        } else if (error.name === 'NotFoundError') {
-          this.$toast.fail('未找到可共享的屏幕或窗口');
-        } else {
-          this.$toast.fail('屏幕共享失败：' + error.message);
-        }
-      }
-    },
-
-    async stopScreenShare() {
-      if (!this.screenShareTrack) return;
-      try {
-        await this.room.localParticipant.unpublishTrack(this.screenShareTrack);
-        this.screenShareTrack.stop();
-        this.screenShareTrack = null;
-
-        if (this.screenStream) {
-          this.screenStream.getTracks().forEach(track => track.stop());
-          this.screenStream = null;
-        }
-
-        const screenElement = document.querySelector('.video-item[data-is-screen-share="true"]');
-        if (screenElement) screenElement.remove();
-        this.screenShareVideoElement = null;
-
-        this.screenShareActive = false;
-
-        this.exitScreenShareMode();
-
-        console.log('✅ 屏幕共享已停止');
-        this.$toast.success('屏幕共享已停止');
-      } catch (err) {
-        console.error('停止屏幕共享失败:', err);
-        this.$toast.fail('停止屏幕共享失败');
-      }
-    },
-
-    enterScreenShareMode() {
-      const container = document.getElementById('videoContainer');
-      if (!container) return;
-
-      const screenShareItem = document.querySelector('.video-item[data-is-screen-share="true"]');
-      if (!screenShareItem) {
-        console.warn('未找到屏幕共享视频元素');
-        return;
-      }
-
-      this.screenShareVideoElement = screenShareItem;
-
-      let localCameraItem = document.querySelector('.video-item[data-is-local="true"]');
-      const otherParticipants = document.querySelectorAll('.video-item:not([data-is-screen-share="true"]):not([data-is-local="true"])');
-
-      const videoContainer = document.getElementById('videoContainer');
-      videoContainer.innerHTML = '';
-
-      videoContainer.appendChild(screenShareItem);
-      screenShareItem.classList.add('fullscreen-video');
-      screenShareItem.style.position = 'absolute';
-      screenShareItem.style.top = '0';
-      screenShareItem.style.left = '0';
-      screenShareItem.style.width = '100%';
-      screenShareItem.style.height = '100%';
-      screenShareItem.style.zIndex = '1';
-
-      const screenVideo = screenShareItem.querySelector('video');
-      if (screenVideo) {
-        screenVideo.style.width = '100%';
-        screenVideo.style.height = '100%';
-        screenVideo.style.objectFit = 'contain';
-      }
-
-      const createFloating = () => {
-        const currentLocalItem = document.querySelector('.video-item[data-is-local="true"]');
-        if (currentLocalItem && !this.floatingCameraContainer) {
-          this.createFloatingCamera(currentLocalItem);
-        } else if (!currentLocalItem && !this.floatingCameraContainer) {
-          const userName = (this.room && this.room.localParticipant && this.room.localParticipant.identity) || '我';
-          this.createLocalPlaceholder(userName);
-          this.$nextTick(() => {
-            const newLocalItem = document.querySelector('.video-item[data-is-local="true"]');
-            if (newLocalItem && !this.floatingCameraContainer) {
-              this.createFloatingCamera(newLocalItem);
-            }
-          });
-        }
-      };
-
-      if (localCameraItem && !this.floatingCameraContainer) {
-        this.createFloatingCamera(localCameraItem);
-      } else if (!localCameraItem && !this.floatingCameraContainer) {
-        createFloating();
-      } else if (this.floatingCameraContainer) {
-        // 如果浮窗已存在，更新其内容
-        this.updateFloatingCameraContent();
-      }
-
-      this.updateGallery(otherParticipants);
-      this.galleryParticipantsCount = otherParticipants.length;
-    },
-
-    createFloatingCamera(cameraElement) {
-      if (this.floatingCameraContainer) return;
-
-      const floatingDiv = document.createElement('div');
-      floatingDiv.className = 'floating-camera';
-      floatingDiv.setAttribute('data-floating', 'true');
-
-      const dragHandle = document.createElement('div');
-      dragHandle.className = 'floating-drag-handle';
-      dragHandle.innerHTML = '📷 我的摄像头 <span class="resize-hint">(拖动移动)</span>';
-
-      const resizeHandle = document.createElement('div');
-      resizeHandle.className = 'floating-resize-handle';
-      resizeHandle.innerHTML = '↘';
-
-      const contentDiv = document.createElement('div');
-      contentDiv.className = 'floating-content';
-
-      const videoElement = cameraElement.querySelector('video');
-      const isPlaceholder = cameraElement.classList.contains('placeholder');
-
-      if (videoElement && !isPlaceholder) {
-        contentDiv.appendChild(videoElement);
-        videoElement.style.width = '100%';
-        videoElement.style.height = '100%';
-        videoElement.style.objectFit = 'cover';
-        if (videoElement.paused) videoElement.play();
-      } else {
-        // 摄像头关闭时显示图片
-        const img = document.createElement('img');
-        img.src = this.cameraOffImage;
-        img.alt = '摄像头已关闭';
-        img.style.maxWidth = '90%';
-        img.style.maxHeight = '90%';
-        img.style.objectFit = 'contain';
-        contentDiv.appendChild(img);
-      }
-
-      floatingDiv.appendChild(dragHandle);
-      floatingDiv.appendChild(contentDiv);
-      floatingDiv.appendChild(resizeHandle);
-
-      floatingDiv.style.position = 'fixed';
-      floatingDiv.style.bottom = '120px';
-      floatingDiv.style.right = '20px';
-      floatingDiv.style.width = '240px';
-      floatingDiv.style.height = '180px';
-      floatingDiv.style.zIndex = '1000';
-      floatingDiv.style.background = '#1e1e1e';
-      floatingDiv.style.borderRadius = '12px';
-      floatingDiv.style.boxShadow = '0 4px 20px rgba(0,0,0,0.3)';
-      floatingDiv.style.overflow = 'hidden';
-      floatingDiv.style.cursor = 'default';
-
-      dragHandle.style.padding = '8px 12px';
-      dragHandle.style.background = 'rgba(0,0,0,0.7)';
-      dragHandle.style.color = 'white';
-      dragHandle.style.cursor = 'move';
-      dragHandle.style.fontSize = '12px';
-      dragHandle.style.userSelect = 'none';
-
-      resizeHandle.style.position = 'absolute';
-      resizeHandle.style.bottom = '0';
-      resizeHandle.style.right = '0';
-      resizeHandle.style.width = '20px';
-      resizeHandle.style.height = '20px';
-      resizeHandle.style.backgroundColor = 'rgba(255,255,255,0.5)';
-      resizeHandle.style.cursor = 'nw-resize';
-      resizeHandle.style.display = 'flex';
-      resizeHandle.style.alignItems = 'center';
-      resizeHandle.style.justifyContent = 'center';
-      resizeHandle.style.fontSize = '14px';
-      resizeHandle.style.borderRadius = '12px 0 12px 0';
-      resizeHandle.style.userSelect = 'none';
-
-      contentDiv.style.height = 'calc(100% - 40px)';
-      contentDiv.style.padding = '8px';
-      contentDiv.style.display = 'flex';
-      contentDiv.style.alignItems = 'center';
-      contentDiv.style.justifyContent = 'center';
-
-      document.body.appendChild(floatingDiv);
-      this.floatingCameraContainer = floatingDiv;
-
-      if (cameraElement && cameraElement.parentNode) {
-        cameraElement.remove();
-      }
-
-      this.initDragging(floatingDiv, dragHandle);
-      this.initResizing(floatingDiv, resizeHandle);
-      this.floatingInitialized = true;
-    },
-
-    initDragging(element, handle) {
-      let startX, startY, startLeft, startTop;
-
-      const onMouseMove = (e) => {
-        if (!this.isDragging) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        let newLeft = startLeft + dx;
-        let newTop = startTop + dy;
-
-        const maxX = window.innerWidth - element.offsetWidth;
-        const maxY = window.innerHeight - element.offsetHeight;
-        newLeft = Math.max(0, Math.min(maxX, newLeft));
-        newTop = Math.max(0, Math.min(maxY, newTop));
-
-        element.style.left = newLeft + 'px';
-        element.style.top = newTop + 'px';
-        element.style.right = 'auto';
-        element.style.bottom = 'auto';
-      };
-
-      const onMouseUp = () => {
-        this.isDragging = false;
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-      };
-
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        this.isDragging = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        startLeft = element.offsetLeft;
-        startTop = element.offsetTop;
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
-      });
-    },
-
-    initResizing(element, handle) {
-      let startX, startY, startWidth, startHeight;
-
-      const onMouseMove = (e) => {
-        if (!this.isResizing) return;
-        const dx = e.clientX - startX;
-        const dy = e.clientY - startY;
-        let newWidth = startWidth + dx;
-        let newHeight = startHeight + dy;
-
-        newWidth = Math.max(150, Math.min(500, newWidth));
-        newHeight = Math.max(120, Math.min(400, newHeight));
-
-        element.style.width = newWidth + 'px';
-        element.style.height = newHeight + 'px';
-      };
-
-      const onMouseUp = () => {
-        this.isResizing = false;
-        document.removeEventListener('mousemove', onMouseMove);
-        document.removeEventListener('mouseup', onMouseUp);
-      };
-
-      handle.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        this.isResizing = true;
-        startX = e.clientX;
-        startY = e.clientY;
-        startWidth = element.offsetWidth;
-        startHeight = element.offsetHeight;
-        document.addEventListener('mousemove', onMouseMove);
-        document.addEventListener('mouseup', onMouseUp);
-      });
-    },
-
-    updateGallery(participants) {
-      const galleryScroll = document.querySelector('#galleryContainer .gallery-scroll');
-      if (!galleryScroll) return;
-
-      galleryScroll.innerHTML = '';
-
-      participants.forEach((participant, index) => {
-        const galleryItem = document.createElement('div');
-        galleryItem.className = 'gallery-item';
-        galleryItem.setAttribute('data-original-id', participant.getAttribute('data-track-sid') || `participant-${index}`);
-
-        const video = participant.querySelector('video');
-        const isPlaceholder = participant.classList.contains('placeholder');
-
-        if (video && !isPlaceholder) {
-          const newVideo = video.cloneNode(true);
-          newVideo.style.width = '100%';
-          newVideo.style.height = 'auto';
-          newVideo.style.objectFit = 'cover';
-          galleryItem.appendChild(newVideo);
-        } else {
-          // 画廊占位符显示图片
-          const img = document.createElement('img');
-          img.src = this.cameraOffImage;
-          img.alt = '摄像头已关闭';
-          img.style.maxWidth = '60%';
-          img.style.maxHeight = '60%';
-          img.style.objectFit = 'contain';
-          galleryItem.appendChild(img);
-        }
-
-        galleryScroll.appendChild(galleryItem);
-      });
-
-      this.galleryParticipantsCount = participants.length;
-    },
-
-    exitScreenShareMode() {
-      const container = document.getElementById('videoContainer');
-      if (!container) return;
-
-      if (this.floatingCameraContainer) {
-        const videoElement = this.floatingCameraContainer.querySelector('.floating-content video');
-        const imgElement = this.floatingCameraContainer.querySelector('.floating-content img');
-        const label = this.floatingCameraContainer.querySelector('.floating-content p');
-
-        if (videoElement) {
-          const newItemDiv = document.createElement('div');
-          newItemDiv.className = 'video-item';
-          newItemDiv.setAttribute('data-is-local', 'true');
-          newItemDiv.setAttribute('data-track-sid', 'local');
-
-          newItemDiv.appendChild(videoElement);
-          videoElement.style.width = '';
-          videoElement.style.height = '';
-          videoElement.style.objectFit = 'cover';
-
-          const newLabel = label ? label.cloneNode(true) : document.createElement('p');
-          if (!label) newLabel.textContent = '我 (你)';
-          newLabel.style.margin = '';
-          newLabel.style.fontSize = '';
-          newLabel.style.textAlign = '';
-          newItemDiv.appendChild(newLabel);
-
-          container.appendChild(newItemDiv);
-        } else if (imgElement) {
-          const userName = (this.room && this.room.localParticipant && this.room.localParticipant.identity) || '我';
-          this.createLocalPlaceholder(userName);
-        }
-
-        this.floatingCameraContainer.remove();
-        this.floatingCameraContainer = null;
-        this.floatingInitialized = false;
-      }
-
-      const screenShareItem = this.screenShareVideoElement;
-      if (screenShareItem) {
-        screenShareItem.classList.remove('fullscreen-video');
-        screenShareItem.style.position = '';
-        screenShareItem.style.top = '';
-        screenShareItem.style.left = '';
-        screenShareItem.style.width = '';
-        screenShareItem.style.height = '';
-        screenShareItem.style.zIndex = '';
-
-        const screenVideo = screenShareItem.querySelector('video');
-        if (screenVideo) {
-          screenVideo.style.objectFit = 'cover';
-        }
-
-        container.appendChild(screenShareItem);
-      }
-
-      const galleryScroll = document.querySelector('#galleryContainer .gallery-scroll');
-      if (galleryScroll) {
-        const galleryItems = galleryScroll.querySelectorAll('.gallery-item');
-        galleryItems.forEach(item => {
-          const video = item.querySelector('video');
-          const img = item.querySelector('img');
-          const label = item.querySelector('p');
-
-          const newItemDiv = document.createElement('div');
-          newItemDiv.className = 'video-item';
-
-          if (video) {
-            newItemDiv.appendChild(video);
-          } else if (img) {
-            const newImg = img.cloneNode(true);
-            newItemDiv.appendChild(newImg);
-            newItemDiv.classList.add('placeholder');
-          }
-
-          if (label) {
-            const newLabel = label.cloneNode(true);
-            newItemDiv.appendChild(newLabel);
-          }
-
-          container.appendChild(newItemDiv);
-        });
-        galleryScroll.innerHTML = '';
-      }
-
-      this.$nextTick(() => {
-        const containerDiv = document.getElementById('videoContainer');
-        if (containerDiv) {
-          containerDiv.classList.add('grid-mode');
-        }
-      });
-    },
-
-    createLocalScreenShareElement(mediaStream) {
-      const container = document.getElementById('videoContainer');
-      if (!container) return;
-      if (document.querySelector('.video-item[data-is-screen-share="true"]')) return;
-
-      const videoEl = document.createElement('video');
-      videoEl.autoplay = true;
-      videoEl.playsInline = true;
-      videoEl.muted = true;
-      videoEl.srcObject = mediaStream;
-      videoEl.onloadedmetadata = () => videoEl.play().catch(e => console.warn('自动播放失败', e));
-
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'video-item';
-      itemDiv.setAttribute('data-is-screen-share', 'true');
-      itemDiv.setAttribute('data-track-sid', 'screen-share');
-
-      const label = document.createElement('p');
-      label.textContent = '你的屏幕共享';
-
-      itemDiv.appendChild(videoEl);
-      itemDiv.appendChild(label);
-      container.appendChild(itemDiv);
-
-      if (this.screenShareActive) {
-        this.$nextTick(() => {
-          this.enterScreenShareMode();
-        });
-      }
-    },
-
-    setupRoomEvents() {
-      const self = this;
-
-      this.room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
-        console.log('📺 订阅轨道:', participant.identity, track.kind);
-        if (track.kind === Track.Kind.Video && participant.identity !== (this.room && this.room.localParticipant && this.room.localParticipant.identity)) {
-          const videoEl = document.createElement('video');
-          videoEl.autoplay = true;
-          videoEl.playsInline = true;
-          track.attach(videoEl);
-
-          const container = document.createElement('div');
-          container.className = 'video-item';
-          container.dataset.trackSid = track.sid;
-          container.setAttribute('data-participant-id', participant.identity);
-
-          const label = document.createElement('p');
-          label.textContent = participant.identity;
-
-          container.appendChild(videoEl);
-          container.appendChild(label);
-
-          if (this.screenShareActive) {
-            const galleryScroll = document.querySelector('#galleryContainer .gallery-scroll');
-            if (galleryScroll) {
-              const galleryItem = document.createElement('div');
-              galleryItem.className = 'gallery-item';
-              galleryItem.setAttribute('data-track-sid', track.sid);
-              galleryItem.setAttribute('data-participant-id', participant.identity);
-
-              const newVideo = videoEl.cloneNode(true);
-              const newLabel = label.cloneNode(true);
-              galleryItem.appendChild(newVideo);
-              galleryItem.appendChild(newLabel);
-              galleryScroll.appendChild(galleryItem);
-              this.galleryParticipantsCount++;
-            }
-          } else {
-            document.getElementById('videoContainer').appendChild(container);
-          }
-          this.updateRemoteParticipantsCount();
-        } else if (track.kind === Track.Kind.Audio) {
-          track.attach();
-        }
-      });
-
-      this.room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
-        console.log('📺 取消订阅轨道:', participant.identity, track.kind);
-        if (track.kind === Track.Kind.Video && participant.identity !== (this.room && this.room.localParticipant && this.room.localParticipant.identity)) {
-          const el = document.querySelector(`.video-item[data-track-sid="${track.sid}"]`);
-          if (el) el.remove();
-
-          const galleryItem = document.querySelector(`.gallery-item[data-track-sid="${track.sid}"]`);
-          if (galleryItem) {
-            galleryItem.remove();
-            this.galleryParticipantsCount--;
-          }
-
-          this.createRemotePlaceholder(participant.identity, track.sid);
-
-          track.detach();
-          this.updateRemoteParticipantsCount();
-        } else if (track.kind === Track.Kind.Video && participant.identity === (this.room && this.room.localParticipant && this.room.localParticipant.identity)) {
-          const userName = participant.identity || '我';
-          this.localCameraTrack = null;
-          this.updateLocalVideoUI(userName);
-        }
-      });
-
-      this.room.on(RoomEvent.ParticipantConnected, (participant) => {
-        console.log('✅ 参与者加入:', participant.identity);
-        this.updateRemoteParticipantsCount();
-      });
-
-      this.room.on(RoomEvent.ParticipantDisconnected, (participant) => {
-        console.log('❌ 参与者离开:', participant.identity);
-        const items = document.querySelectorAll(`.gallery-item[data-participant-id="${participant.identity}"], .video-item[data-participant-id="${participant.identity}"]`);
-        items.forEach(item => item.remove());
-        this.galleryParticipantsCount = document.querySelectorAll('.gallery-item').length;
-        this.updateRemoteParticipantsCount();
-      });
-
-      this.room.on(RoomEvent.Disconnected, () => {
-        console.log('👋 房间已断开');
-        document.getElementById('videoContainer').innerHTML = '';
-        self.roomName = '未连接';
-        if (self.floatingCameraContainer) {
-          self.floatingCameraContainer.remove();
-          self.floatingCameraContainer = null;
-        }
-        self.remoteParticipantsCount = 0;
-      });
-    },
-
-    createRemotePlaceholder(participantIdentity, trackSid) {
-      if (document.querySelector(`.video-placeholder[data-participant-id="${participantIdentity}"]`)) return;
-
-      const container = document.getElementById('videoContainer');
-      if (!container) return;
-
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'video-item placeholder';
-      itemDiv.setAttribute('data-participant-id', participantIdentity);
-      itemDiv.setAttribute('data-track-sid', trackSid + '-placeholder');
-
-      const img = document.createElement('img');
-      img.src = this.cameraOffImage;
-      img.alt = '摄像头已关闭';
-      img.style.maxWidth = '60%';
-      img.style.maxHeight = '60%';
-      img.style.objectFit = 'contain';
-      itemDiv.appendChild(img);
-
-      if (this.screenShareActive) {
-        const galleryScroll = document.querySelector('#galleryContainer .gallery-scroll');
-        if (galleryScroll) {
-          const galleryItem = document.createElement('div');
-          galleryItem.className = 'gallery-item placeholder';
-          galleryItem.setAttribute('data-participant-id', participantIdentity);
-
-          const img2 = document.createElement('img');
-          img2.src = this.cameraOffImage;
-          img2.alt = '摄像头已关闭';
-          img2.style.maxWidth = '60%';
-          img2.style.maxHeight = '60%';
-          img2.style.objectFit = 'contain';
-          galleryItem.appendChild(img2);
-
-          galleryScroll.appendChild(galleryItem);
-          this.galleryParticipantsCount++;
-          return;
-        }
-      }
-
-      container.appendChild(itemDiv);
-    },
-
-    updateRemoteParticipantsCount() {
-      if (!this.room) return;
-      const participants = Array.from(this.room.participants.values());
-      const remoteParticipants = participants.filter(p => p.identity !== this.room.localParticipant.identity);
-      this.remoteParticipantsCount = remoteParticipants.length;
-    },
-
-    createLocalPlaceholder(userName) {
-      const container = document.getElementById('videoContainer');
-      if (!container) return;
-      if (document.querySelector('.video-item[data-is-local="true"]')) return;
-
-      const itemDiv = document.createElement('div');
-      itemDiv.className = 'video-item placeholder';
-      itemDiv.setAttribute('data-is-local', 'true');
-
-      const img = document.createElement('img');
-      img.src = this.cameraOffImage;
-      img.alt = '摄像头已关闭';
-      img.style.maxWidth = '80%';
-      img.style.maxHeight = '80%';
-      img.style.objectFit = 'contain';
-      itemDiv.appendChild(img);
-
-      container.appendChild(itemDiv);
-      console.log('✅ 已创建本地占位符（仅图片）');
     },
 
     disconnectRoom() {
-      if (this.localCameraTrack) this.localCameraTrack = null;
-      if (this.localMicrophoneTrack) this.localMicrophoneTrack = null;
       if (this.screenShareActive) this.stopScreenShare();
-      if (this.floatingCameraContainer) {
-        this.floatingCameraContainer.remove();
-        this.floatingCameraContainer = null;
-      }
       if (this.room) {
         this.room.disconnect();
         this.room = null;
-        console.log('房间已断开连接');
       }
-    }
-  }
+      // 清空参与者
+      Object.keys(this.participants).forEach(key => {
+        this.$delete(this.participants, key);
+      });
+      this.activeScreenShare = false;
+    },
+
+    // ==================== 浮动窗口拖拽/缩放 ====================
+    startDrag(e) {
+      if (!this.$refs.floatingCamera) return;
+      this.isDragging = true;
+      const rect = this.$refs.floatingCamera.getBoundingClientRect();
+      this.dragStartX = e.clientX;
+      this.dragStartY = e.clientY;
+      this.dragStartLeft = rect.left;
+      this.dragStartTop = rect.top;
+      document.addEventListener('mousemove', this.onDrag);
+      document.addEventListener('mouseup', this.stopDrag);
+    },
+    onDrag(e) {
+      if (!this.isDragging || !this.$refs.floatingCamera) return;
+      const dx = e.clientX - this.dragStartX;
+      const dy = e.clientY - this.dragStartY;
+      let left = this.dragStartLeft + dx;
+      let top = this.dragStartTop + dy;
+      left = Math.max(0, Math.min(window.innerWidth - this.$refs.floatingCamera.offsetWidth, left));
+      top = Math.max(0, Math.min(window.innerHeight - this.$refs.floatingCamera.offsetHeight, top));
+      this.$refs.floatingCamera.style.left = left + 'px';
+      this.$refs.floatingCamera.style.top = top + 'px';
+      this.$refs.floatingCamera.style.right = 'auto';
+      this.$refs.floatingCamera.style.bottom = 'auto';
+    },
+    stopDrag() {
+      this.isDragging = false;
+      document.removeEventListener('mousemove', this.onDrag);
+      document.removeEventListener('mouseup', this.stopDrag);
+    },
+    startResize(e) {
+      e.stopPropagation();
+      if (!this.$refs.floatingCamera) return;
+      this.isResizing = true;
+      this.resizeStartX = e.clientX;
+      this.resizeStartY = e.clientY;
+      this.resizeStartWidth = this.$refs.floatingCamera.offsetWidth;
+      this.resizeStartHeight = this.$refs.floatingCamera.offsetHeight;
+      document.addEventListener('mousemove', this.onResize);
+      document.addEventListener('mouseup', this.stopResize);
+    },
+    onResize(e) {
+      if (!this.isResizing || !this.$refs.floatingCamera) return;
+      const dx = e.clientX - this.resizeStartX;
+      const dy = e.clientY - this.resizeStartY;
+      let w = this.resizeStartWidth + dx;
+      let h = this.resizeStartHeight + dy;
+      w = Math.max(200, Math.min(400, w));
+      h = Math.max(150, Math.min(300, h));
+      this.$refs.floatingCamera.style.width = w + 'px';
+      this.$refs.floatingCamera.style.height = h + 'px';
+    },
+    stopResize() {
+      this.isResizing = false;
+      document.removeEventListener('mousemove', this.onResize);
+      document.removeEventListener('mouseup', this.stopResize);
+    },
+  },
 };
 </script>
 
 <style scoped>
+* {
+  box-sizing: border-box;
+}
+
 .video-meeting-container {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: #f5f5f5;
-  overflow-y: auto;
-  padding-bottom: 80px;
+  background: #1a1a2e;
+  overflow: hidden;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-.video-header {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-  color: white;
-  padding: 20px 15px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
-}
-
-.video-header h2 {
-  font-size: 18px;
-  margin: 0;
-  text-align: center;
-  font-weight: bold;
-}
-
-.video-header span {
-  color: #fff;
-  font-weight: bold;
-}
-
-.video-container.grid-mode {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-  gap: 12px;
-  padding: 12px;
-  width: 100%;
-  position: relative;
-}
-
-.video-container.single-mode {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: calc(100vh - 140px);
-  padding: 15px;
-}
-
-.video-container.single-mode .video-item {
-  width: 100%;
-  max-width: 900px;
-  aspect-ratio: 16/9;
-  max-height: calc(100vh - 180px);
-  border-radius: 16px;
-  margin: 0;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+/* 腾讯会议风格布局 */
+.meeting-main {
   display: flex;
   flex-direction: column;
+  height: 100%;
+  background: #1e1f2c;
 }
 
-.video-container.single-mode .video-item video {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  border-radius: 16px;
-  background: #000;
+/* 顶部栏 */
+.meeting-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 24px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  z-index: 100;
 }
-
-.video-container.single-mode .video-item .placeholder {
-  width: 100%;
-  height: 100%;
+.room-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.room-name {
+  font-size: 18px;
+  font-weight: 500;
+  color: #fff;
+}
+.member-count {
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.2);
+  padding: 4px 10px;
+  border-radius: 20px;
+}
+.header-actions {
+  display: flex;
+  gap: 12px;
+}
+.icon-btn {
+  background: rgba(255, 255, 255, 0.1);
+  border: none;
+  border-radius: 50%;
+  width: 36px;
+  height: 36px;
   display: flex;
   align-items: center;
   justify-content: center;
-  border-radius: 16px;
-  background-color: #2d2d2d;
+  cursor: pointer;
+  color: #fff;
+  transition: background 0.2s;
+}
+.icon-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
 }
 
-.video-container.single-mode .video-item .placeholder img {
-  max-width: 60%;
-  max-height: 60%;
-  object-fit: contain;
-}
-
-.video-container.single-mode .video-item p {
-  background: rgba(0, 0, 0, 0.7);
-  font-size: 16px;
-  padding: 12px;
-  font-weight: 500;
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  border-radius: 0 0 16px 16px;
-}
-
-.video-container.fullscreen-mode {
+/* 视频区域 */
+.video-area {
+  flex: 1;
   position: relative;
-  width: 100%;
-  height: calc(100vh - 140px);
-  background: #000;
   overflow: hidden;
+  padding: 16px;
 }
-
-.video-item {
-  background: #fff;
+.screen-share-view {
+  width: 100%;
+  height: 100%;
+  background: #000;
   border-radius: 12px;
   overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
   position: relative;
-  min-height: 200px;
-  display: flex;
-  flex-direction: column;
-  aspect-ratio: 16/9;
 }
-
-.video-item video {
+.screen-share-content {
   width: 100%;
   height: 100%;
-  display: block;
-  background: #1e1e1e;
-  object-fit: cover;
+  position: relative;
+}
+.screen-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  background: #000;
+}
+.screen-share-label {
+  position: absolute;
+  bottom: 16px;
+  left: 16px;
+  background: rgba(0, 0, 0, 0.6);
+  color: #fff;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  backdrop-filter: blur(4px);
 }
 
-.video-item p {
-  margin: 0;
-  padding: 8px 12px;
-  font-size: 14px;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.7);
-  color: #fff;
+/* 视频网格 */
+.video-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  width: 100%;
+  height: 100%;
+  overflow-y: auto;
+  padding: 4px;
+}
+.video-grid.single-mode {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.video-grid.single-mode .video-card {
+  max-width: 800px;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+.video-card {
+  background: #2d2d3a;
+  border-radius: 12px;
+  overflow: hidden;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+}
+.video-wrapper {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+.participant-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #1e1e2a;
+}
+.avatar-placeholder {
   position: absolute;
-  bottom: 0;
+  top: 0;
   left: 0;
-  right: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.avatar-icon {
+  width: 60px;
+  height: 60px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28px;
+  font-weight: 500;
+  color: #fff;
+}
+.avatar-icon-small {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 500;
+  color: #fff;
+}
+.participant-name {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 4px 10px;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #fff;
+  backdrop-filter: blur(4px);
+  z-index: 2;
+}
+.audio-mute-badge {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff4d4f;
   z-index: 2;
 }
 
-.video-item.placeholder {
+/* 底部工具栏 */
+.control-bar {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  padding: 20px 24px;
+  background: rgba(0, 0, 0, 0.6);
+  backdrop-filter: blur(10px);
+  z-index: 100;
+}
+.control-btn {
   display: flex;
   align-items: center;
-  justify-content: center;
-  background-color: #2d2d2d;
-  width: 100%;
-  height: 100%;
-}
-
-.video-item.placeholder img {
-  display: block;
-  max-width: 60%;
-  max-height: 60%;
-  object-fit: contain;
-}
-
-.gallery-container {
-  position: fixed;
-  bottom: 80px;
-  left: 0;
-  right: 0;
-  background: rgba(0, 0, 0, 0.8);
-  backdrop-filter: blur(10px);
-  padding: 10px;
-  z-index: 100;
-  border-top: 1px solid rgba(255, 255, 255, 0.2);
-}
-
-.gallery-title {
-  color: white;
-  font-size: 12px;
-  padding: 4px 8px;
-  margin-bottom: 8px;
-}
-
-.gallery-scroll {
-  display: flex;
-  overflow-x: auto;
-  gap: 10px;
-  padding: 8px;
-  scrollbar-width: thin;
-}
-
-.gallery-scroll::-webkit-scrollbar {
-  height: 4px;
-}
-
-.gallery-scroll::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 2px;
-}
-
-.gallery-scroll::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.3);
-  border-radius: 2px;
-}
-
-.gallery-item {
-  flex-shrink: 0;
-  width: 140px;
-  background: #1e1e1e;
-  border-radius: 8px;
-  overflow: hidden;
-  position: relative;
-  cursor: pointer;
-  transition: transform 0.2s;
-  display: flex;
-  flex-direction: column;
-}
-
-.gallery-item:hover {
-  transform: scale(1.05);
-}
-
-.gallery-item video,
-.gallery-item img {
-  width: 100%;
-  height: 100px;
-  object-fit: cover;
-  background: #000;
-}
-
-.gallery-item p {
-  margin: 0;
-  padding: 4px 8px;
-  font-size: 11px;
-  text-align: center;
-  background: rgba(0, 0, 0, 0.6);
-  color: white;
-  position: static;
-}
-
-.video-controls {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  display: flex;
   gap: 8px;
-  background: rgba(0, 0, 0, 0.6);
-  backdrop-filter: blur(10px);
-  padding: 8px 15px;
-  border-radius: 50px;
-  z-index: 200;
-  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-  flex-wrap: wrap;
-  justify-content: center;
-  max-width: 95%;
-}
-
-.video-controls button {
-  background: #fff;
+  background: rgba(255, 255, 255, 0.1);
   border: none;
   border-radius: 40px;
-  padding: 6px 12px;
-  font-size: 12px;
+  padding: 10px 20px;
+  font-size: 14px;
   font-weight: 500;
+  color: #fff;
   cursor: pointer;
   transition: all 0.2s;
+}
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  transform: scale(1.02);
+}
+.control-btn.active {
+  background: #3b82f6;
+  color: #fff;
+}
+.leave-btn {
+  background: #ef4444;
+}
+.leave-btn:hover {
+  background: #dc2626;
+}
+
+/* 画廊容器（共享模式下） */
+.gallery-dock {
+  position: fixed;
+  bottom: 90px;
+  right: 16px;
+  width: 280px;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  padding: 8px;
+  z-index: 200;
+}
+.gallery-scroll {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 300px;
+  overflow-y: auto;
+}
+.gallery-item {
   display: flex;
   align-items: center;
-  gap: 5px;
-  color: #333;
-  white-space: nowrap;
+  gap: 8px;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.gallery-item:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.gallery-video {
+  width: 48px;
+  height: 36px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #2d2d3a;
+}
+.gallery-name {
+  font-size: 12px;
+  color: #fff;
+  flex: 1;
 }
 
-.video-controls button.active {
-  background: #3f83f8;
-  color: white;
+/* 浮动摄像头窗口 */
+.floating-camera {
+  position: fixed;
+  bottom: 100px;
+  right: 20px;
+  width: 240px;
+  height: 180px;
+  background: #1e1f2c;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  z-index: 300;
+  cursor: default;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+.floating-header {
+  background: rgba(0, 0, 0, 0.7);
+  padding: 6px 12px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #fff;
+  font-size: 12px;
+  cursor: move;
+}
+.float-cam-btn {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 14px;
+}
+.floating-content {
+  height: calc(100% - 32px);
+  position: relative;
+  background: #2d2d3a;
+}
+.floating-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.floating-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.floating-resize {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nw-resize;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: 4px 0 0 0;
 }
 
-.video-controls button:active {
-  transform: scale(0.95);
-}
-
-.video-controls .view-btn {
-  background: #3f83f8;
-  color: white;
-}
-
-.video-controls .member-btn {
-  background: #3f83f8;
-  color: white;
-}
-
-.video-controls .invite-btn {
-  background: #3f83f8;
-  color: white;
-}
-
-.video-controls .leave-btn {
-  background: #3f83f8;
-  color: white;
-}
-
+/* 钉钉提示层 */
 .dingtalk-overlay {
   position: fixed;
   top: 0;
   left: 0;
   width: 100%;
   height: 100%;
-  background: rgba(0, 0, 0, 0.8);
+  background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
   justify-content: center;
   z-index: 1000;
 }
-
 .dingtalk-card {
-  background: white;
-  border-radius: 16px;
-  width: 85%;
-  max-width: 320px;
-  padding: 24px 20px;
+  background: #fff;
+  border-radius: 24px;
+  width: 90%;
+  max-width: 340px;
+  padding: 28px 24px;
   text-align: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
-
 .dingtalk-icon {
   font-size: 48px;
   margin-bottom: 16px;
 }
-
 .dingtalk-card h3 {
   font-size: 20px;
-  margin: 0 0 12px 0;
-  color: #333;
+  margin: 0 0 12px;
 }
-
 .dingtalk-card p {
   font-size: 14px;
   color: #666;
   margin: 8px 0;
-  line-height: 1.5;
 }
-
 .open-browser-btn, .copy-link-btn {
   width: 100%;
   padding: 12px;
   border: none;
-  border-radius: 8px;
+  border-radius: 12px;
   font-size: 16px;
   font-weight: 500;
-  cursor: pointer;
   margin-top: 12px;
+  cursor: pointer;
 }
-
 .open-browser-btn {
-  background: #667eea;
-  color: white;
+  background: #3b82f6;
+  color: #fff;
 }
-
 .copy-link-btn {
   background: #f0f0f0;
   color: #333;
-  border: 1px solid #ddd;
 }
 
-.floating-camera {
-  border-radius: 12px;
-  overflow: hidden;
-  transition: box-shadow 0.2s;
-}
-
-.floating-camera:hover {
-  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.4);
-}
-
-.floating-drag-handle {
-  cursor: move;
-}
-
-.floating-resize-handle {
-  cursor: nw-resize;
-}
-
-.floating-content {
-  overflow: hidden;
-  background: #1e1e1e;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  height: 100%;
-  width: 100%;
-}
-
-.floating-content video {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.floating-content img {
-  max-width: 90%;
-  max-height: 90%;
-  object-fit: contain;
-}
-
+/* 响应式 */
 @media (max-width: 768px) {
-  .video-container.grid-mode {
+  .video-grid {
     grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 12px;
+  }
+  .control-btn span {
+    display: none;
+  }
+  .control-btn {
     padding: 10px;
   }
-
-  .video-container.single-mode {
-    height: calc(100vh - 120px);
-    padding: 10px;
+  .gallery-dock {
+    width: 240px;
+    bottom: 80px;
+    right: 8px;
   }
-
-  .video-container.single-mode .video-item {
-    max-width: 100%;
-    max-height: calc(100vh - 160px);
-  }
-
-  .video-controls button {
-    padding: 5px 10px;
-    font-size: 11px;
-  }
-
-  .video-controls {
-    gap: 6px;
-    padding: 6px 12px;
-    bottom: 15px;
-  }
-
-  .gallery-item {
-    width: 120px;
-  }
-
-  .gallery-item video,
-  .gallery-item img {
-    height: 85px;
-  }
-
   .floating-camera {
-    width: 180px !important;
-    height: 135px !important;
-  }
-}
-
-@media (max-width: 480px) {
-  .video-header h2 {
-    font-size: 16px;
-  }
-
-  .video-container.grid-mode {
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .video-item {
-    min-height: 180px;
-  }
-
-  .video-controls {
-    gap: 4px;
-    padding: 5px 10px;
-    bottom: 10px;
-    max-width: 98%;
-  }
-
-  .video-controls button {
-    padding: 4px 8px;
-    font-size: 10px;
-    gap: 4px;
-  }
-
-  .gallery-item {
-    width: 100px;
-  }
-
-  .gallery-item video,
-  .gallery-item img {
-    height: 70px;
-  }
-
-  .gallery-item p {
-    font-size: 10px;
-    padding: 3px 6px;
-  }
-
-  .floating-camera {
-    width: 160px !important;
-    height: 120px !important;
-  }
-}
-
-@media (max-height: 500px) and (orientation: landscape) {
-  .video-container.grid-mode {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    padding: 8px;
-  }
-
-  .video-item {
-    min-height: 150px;
-  }
-
-  .video-controls {
-    bottom: 10px;
-  }
-
-  .gallery-container {
-    bottom: 60px;
-  }
-
-  .video-container.single-mode {
-    height: calc(100vh - 100px);
-  }
-
-  .video-container.single-mode .video-item {
-    max-height: calc(100vh - 130px);
+    width: 180px;
+    height: 135px;
+    bottom: 80px;
+    right: 8px;
   }
 }
 </style>
