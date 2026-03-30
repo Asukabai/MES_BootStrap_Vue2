@@ -19,14 +19,14 @@ module.exports = {
         // target:'http://192.168.67.62:35001/',
         changeOrigin:true, // 在本地会创建一个虚拟服务端，然后发送请求的数据，并同时接收请求的数据，这样服务端和服务端进行数据的交互就不会有跨域问题
         pathRewrite:{  // 路径重写，
-          '^/': ''  // 替换target中的请求地址，也就是说以后你在请求http://api.douban.com/v2/XXXXX这个地址的时候直接写成/api即可。
+          '^/': ''  // 替换 target 中的请求地址，也就是说以后你在请求 http://api.douban.com/v2/XXXXX这个地址的时候直接写成/api即可。
         },
         logLevel: 'debug'  // 添加调试日志
         // pathRewrite: {
         //   '^/ding/pack': '' // 请求路径中去掉 '/ss-proxy'
         // }
       },
-      // // 添加SS监控平台代理
+      // // 添加 SS 监控平台代理
       // '/api/ssmonitor': {
       //   target: 'https://www.sensor-smart.com',
       //   changeOrigin: true,
@@ -35,7 +35,7 @@ module.exports = {
       //   },
       //   logLevel: 'debug'
       // },
-      // // 添加3D仿真平台代理
+      // // 添加 3D 仿真平台代理
       // '/api/ss3dsimulation': {
       //   target: 'https://www.sensor-smart.com',
       //   changeOrigin: true,
@@ -47,8 +47,8 @@ module.exports = {
     },
     // Various Dev Server settings
     // host: 'localhost', // can be overwritten by process.env.HOST
-    host: '127.0.0.1', // can be overwritten by process.env.HOST    host: '192.168.65.76', // can be overwritten by process.env.HOST
-    port: 8888,
+    host: '192.168.67.54', // can be overwritten by process.env.HOST    host: '192.168.65.76', // can be overwritten by process.env.HOST
+    port: 35001,
     autoOpenBrowser: true,
     errorOverlay: true,
     notifyOnErrors: true,
