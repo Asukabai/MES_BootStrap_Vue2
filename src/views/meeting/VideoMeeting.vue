@@ -410,6 +410,11 @@ export default {
         this.cameraEnabled = true;
         this.microphoneEnabled = true;
         console.log('摄像头和麦克风已启用');
+
+        // 如果当前已经在共享屏幕模式，需要将本地摄像头绑定到浮动窗口
+        if (this.screenShareActive) {
+          this.$nextTick(() => this.bindLocalCameraToFloating());
+        }
       } catch (error) {
         console.warn('媒体初始化失败:', error);
         this.$toast.fail('无法访问摄像头/麦克风：' + (error.message || '请检查权限设置'));
@@ -595,6 +600,10 @@ export default {
           this.localCameraTrack = null;
           this.updateParticipantVideo(this.localParticipantId, false, null);
         }
+        // 如果当前在共享屏幕模式，将摄像头画面绑定/清空到浮动窗口
+        if (this.screenShareActive) {
+          this.$nextTick(() => this.bindLocalCameraToFloating());
+        }
       } catch (err) {
         this.$toast.fail('切换摄像头失败');
       }
@@ -640,6 +649,9 @@ export default {
           if (screenVideo) screenVideo.srcObject = stream;
         });
 
+        // 共享屏幕启动后，将本地摄像头绑定到浮动窗口
+        this.$nextTick(() => this.bindLocalCameraToFloating());
+
         this.$toast.success('屏幕共享已开始');
       } catch (error) {
         console.error('屏幕共享失败:', error);
@@ -662,6 +674,36 @@ export default {
         this.activeScreenShare = false;
       }
       this.$toast.success('屏幕共享已停止');
+    },
+
+    /**
+     * 将本地摄像头轨道绑定到浮动窗口视频元素（仅在共享屏幕模式下生效）
+     * 如果摄像头未启用或没有轨道，则清空浮动窗口的视频源，让占位符显示
+     */
+    bindLocalCameraToFloating() {
+      // 仅在共享屏幕模式下且浮动窗口元素存在时执行
+      if (!this.screenShareActive) return;
+      const floatingVideoEl = this.$refs.floatingVideo;
+      if (!floatingVideoEl) return;
+
+      if (this.cameraEnabled && this.localCameraTrack) {
+        // 避免重复绑定相同的流
+        const currentStream = floatingVideoEl.srcObject;
+        const trackStream = this.localCameraTrack.mediaStream;
+        if (currentStream !== trackStream) {
+          // 先清空，再附加，确保画面更新
+          if (currentStream) {
+            floatingVideoEl.srcObject = null;
+          }
+          this.localCameraTrack.attach(floatingVideoEl);
+          console.log('本地摄像头已绑定到浮动窗口');
+        }
+      } else {
+        // 摄像头未开启或没有轨道，清空视频元素
+        if (floatingVideoEl.srcObject) {
+          floatingVideoEl.srcObject = null;
+        }
+      }
     },
 
     switchToParticipant(item) {
