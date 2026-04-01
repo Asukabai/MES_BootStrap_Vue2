@@ -1,4 +1,5 @@
 <template>
+  <!-- 模板部分与之前完全相同，此处省略重复内容（保持原样） -->
   <div class="video-meeting-container" :class="{ 'screen-sharing-mode': screenShareActive }">
     <!-- 钉钉环境提示层 -->
     <div v-if="isInDingTalk" class="dingtalk-overlay">
@@ -11,7 +12,6 @@
         <button @click="copyLinkAndExit" class="copy-link-btn">复制链接并退出</button>
       </div>
     </div>
-
     <!-- 正常视频会议界面 -->
     <div v-else class="meeting-main">
       <!-- 顶部标题栏 -->
@@ -34,10 +34,8 @@
           </button>
         </div>
       </div>
-
       <!-- 主视频区域 -->
       <div class="video-area" ref="videoArea">
-        <!-- 共享屏幕视图 -->
         <div v-if="activeScreenShare" class="screen-share-view">
           <div class="screen-share-content">
             <video ref="screenShareVideo" autoplay playsinline class="screen-video"></video>
@@ -45,7 +43,6 @@
           </div>
         </div>
 
-        <!-- 视频网格视图 -->
         <div v-else :class="['video-grid', { 'single-mode': videoItems.length === 1 }]">
           <div
             v-for="item in videoItems"
@@ -63,10 +60,10 @@
                 class="participant-video"
               ></video>
               <div v-if="!item.hasVideo" class="avatar-placeholder">
-                <div class="avatar-icon">{{ item.name.charAt(0).toUpperCase() }}</div>
+                <div class="avatar-icon">{{ getDisplayName(item).charAt(0).toUpperCase() }}</div>
               </div>
               <div class="participant-name">
-                {{ item.name }}{{ item.isLocal ? ' (我)' : '' }}
+                {{ getDisplayName(item) }}{{ item.isLocal ? ' (我)' : '' }}
               </div>
               <div v-if="!item.hasAudio" class="audio-mute-badge">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
@@ -109,7 +106,7 @@
         </button>
       </div>
 
-      <!-- 画廊容器（共享屏幕模式下的小窗列表） -->
+      <!-- 画廊容器 -->
       <div v-if="screenShareActive && galleryItems.length" class="gallery-dock">
         <div class="gallery-scroll">
           <div
@@ -119,12 +116,12 @@
             @click="switchToParticipant(item)"
           >
             <video :ref="(el) => setGalleryVideoRef(item.id, el)" autoplay playsinline class="gallery-video"></video>
-            <div class="gallery-name">{{ item.name }}</div>
+            <div class="gallery-name">{{ getDisplayNameById(item.id) }}</div>
           </div>
         </div>
       </div>
 
-      <!-- 本地摄像头浮窗（共享模式下） -->
+      <!-- 本地摄像头浮窗 -->
       <div v-if="screenShareActive && localVideoItem" class="floating-camera" ref="floatingCamera">
         <div class="floating-header" @mousedown="startDrag">
           <span>我的视频</span>
@@ -135,7 +132,7 @@
         <div class="floating-content">
           <video ref="floatingVideo" autoplay playsinline muted class="floating-video"></video>
           <div v-if="!cameraEnabled" class="floating-placeholder">
-            <div class="avatar-icon-small">{{ localParticipantName.charAt(0).toUpperCase() }}</div>
+            <div class="avatar-icon-small">{{ getDisplayNameById(localParticipantId).charAt(0).toUpperCase() }}</div>
           </div>
         </div>
         <div class="floating-resize" @mousedown="startResize"></div>
@@ -146,35 +143,27 @@
 
 <script>
 import { Room, RoomEvent, Track, VideoPresets, LocalVideoTrack, createLocalTracks } from 'livekit-client';
-
+import SensorRequest from '../../utils/SensorRequest.js';
+import { key_DingTokenJWT } from '../../utils/Dingding.js';
 export default {
   name: 'VideoMeeting',
   data() {
     return {
-      // 连接相关
       meetingUrl: '',
       roomName: '未连接',
       room: null,
       wsUrl: 'wss://api-v2.sensor-smart.cn:29028',
-
-      // 媒体状态
       cameraEnabled: true,
       microphoneEnabled: true,
       screenShareActive: false,
       screenShareTrack: null,
       screenStream: null,
       localCameraTrack: null,
-      activeScreenShare: false, // 是否有屏幕共享（本地或远程）
+      activeScreenShare: false,
       remoteScreenTrack: null,
-
-      // 参与者管理（改为普通对象，确保响应式）
-      participants: {}, // key: participantId, value: { id, name, isLocal, hasVideo, hasAudio, videoTrack, audioTrack, screenTrack }
+      participants: {},
       localParticipantId: null,
-
-      // 钉钉环境
       isInDingTalk: false,
-
-      // 浮动窗口拖拽/缩放
       isDragging: false,
       isResizing: false,
       dragStartX: 0,
@@ -185,27 +174,25 @@ export default {
       resizeStartY: 0,
       resizeStartWidth: 0,
       resizeStartHeight: 0,
-
-      // 视频元素映射
       videoRefs: new Map(),
       galleryVideoRefs: new Map(),
-
-      // 当前视图模式
       currentViewMode: 'grid',
+      // ✅ 新增：参会者姓名映射表（前端内存管理）
+      participantNames: new Map(),
+      // ✅ 新增：正在请求姓名的缓存，避免重复请求
+      fetchingNames: new Set(),
+      requireLogin: false, // ✅ 新增：是否需要登录验证
     };
   },
   computed: {
-    // 所有视频项（非共享模式下显示）
     videoItems() {
       const items = [];
       for (const [id, p] of Object.entries(this.participants)) {
-        // 共享模式下，只有远程屏幕共享者不在网格中显示
-        if (this.screenShareActive && this.activeScreenShare === id) {
-          continue;
-        }
+        if (this.screenShareActive && this.activeScreenShare === id) continue;
         items.push({
           id,
           name: p.name,
+          displayName: p.displayName,
           isLocal: p.isLocal,
           hasVideo: p.hasVideo,
           hasAudio: p.hasAudio,
@@ -213,36 +200,21 @@ export default {
       }
       return items;
     },
-
-    // 画廊模式下的参与者（共享模式下除共享者外的其他人）
     galleryItems() {
       if (!this.screenShareActive) return [];
       const items = [];
       for (const [id, p] of Object.entries(this.participants)) {
         if (!p.isLocal && id !== this.activeScreenShare) {
-          items.push({ id, name: p.name });
+          items.push({ id, name: p.name, displayName: p.displayName });
         }
       }
       return items;
     },
-
-    // 本地参与者信息
     localVideoItem() {
       if (!this.localParticipantId) return null;
       const p = this.participants[this.localParticipantId];
-      if (!p) return null;
-      return {
-        id: p.id,
-        name: p.name,
-        hasVideo: p.hasVideo,
-      };
+      return p ? { id: p.id, name: p.name, displayName: p.displayName, hasVideo: p.hasVideo } : null;
     },
-
-    localParticipantName() {
-      const p = this.participants[this.localParticipantId];
-      return p ? p.name : '我';
-    },
-
     totalParticipants() {
       return Object.keys(this.participants).length;
     },
@@ -254,25 +226,171 @@ export default {
   },
   mounted() {
     this.checkDingTalkEnvironment();
+    // ✅ 检查是否在钉钉内，如果不在且没有 token，需要登录验证
+    if (!this.isInDingTalk) {
+      // ✅ 优先从 URL 参数获取 token
+      const urlToken = this.$route.query.token;
+      console.log('[VideoMeeting] 检测到浏览器环境，尝试从 URL 获取 token： '+ urlToken);
+      const userToken = urlToken || localStorage.getItem(key_DingTokenJWT);
+      if (!userToken) {
+        console.log('[VideoMeeting] 检测到浏览器环境且无 token，跳转到登录页');
+        this.requireLogin = true;
+        const department = this.$route.params.department;
+        // 跳转到登录验证页面，并带上会议参数
+        this.$router.replace({
+          path: `/${department}/phone-login`,
+          query: {
+            meetingUrl: this.$route.query.meetingUrl,
+            meetingName: this.$route.query.meetingName,
+            token: urlToken // ✅ 传递 URL 中的 token
+          }
+        });
+        return;
+      }
+      // ✅ 如果使用的是 URL 中的 token，保存到 localStorage
+      if (urlToken && !localStorage.getItem(key_DingTokenJWT)) {
+        localStorage.setItem(key_DingTokenJWT, urlToken);
+        console.log('[VideoMeeting] 已保存 URL token 到 localStorage');
+      }
+    }
     if (this.isInDingTalk) return;
-
     if (this.meetingUrl) {
       this.parseAndJoinRoom();
     } else {
       this.$toast.fail('缺少会议链接参数');
       setTimeout(() => this.leaveRoom(), 1500);
     }
-
-    // 调试：检查视频 refs
-    setTimeout(() => {
-      console.log('视频元素 refs:', this.videoRefs);
-    }, 3000);
   },
   beforeDestroy() {
     this.disconnectRoom();
     document.title = '工作助手';
   },
   methods: {
+    // ==================== 辅助显示名称 ====================
+    getDisplayName(item) {
+      // ✅ 优先从映射表获取姓名
+      const mappedName = this.participantNames.get(item.id);
+      if (mappedName) return mappedName;
+
+      if (item.displayName) return item.displayName;
+      if (item.name && item.name !== item.id) return item.name;
+      return item.id;
+    },
+
+    getDisplayNameById(participantId) {
+      // ✅ 优先从映射表获取姓名
+      const mappedName = this.participantNames.get(participantId);
+      if (mappedName) return mappedName;
+
+      const p = this.participants[participantId];
+      if (!p) return participantId;
+      if (p.displayName) return p.displayName;
+      if (p.name && p.name !== participantId) return p.name;
+      return participantId;
+    },
+
+    // ==================== 注册/注销参会者姓名 ====================
+    registerParticipantName(participantId, name) {
+      if (participantId && name) {
+        this.participantNames.set(participantId, name);
+        console.log(`✅ 注册参会者：${participantId} -> ${name}`);
+
+        // ✅ 同步更新 participants 中的 displayName
+        const p = this.participants[participantId];
+        if (p && p.displayName !== name) {
+          p.displayName = name;
+          this.$set(this.participants, participantId, p);
+        }
+      }
+    },
+
+    unregisterParticipantName(participantId) {
+      if (participantId) {
+        const deleted = this.participantNames.delete(participantId);
+        if (deleted) {
+          console.log(`❌ 注销参会者：${participantId}`);
+        }
+      }
+    },
+
+    // ✅ 新增：从后端获取人员姓名
+    async fetchPersonName(personDingID) {
+      // 如果已经在请求中，直接返回
+      if (this.fetchingNames.has(personDingID)) {
+        return null;
+      }
+
+      // 检查是否已经缓存过
+      const cachedName = this.participantNames.get(personDingID);
+      if (cachedName && cachedName !== personDingID) {
+        return cachedName;
+      }
+
+      try {
+        this.fetchingNames.add(personDingID);
+
+        // 构造请求参数
+        const param = {
+          Person_DingID: personDingID
+        };
+        // 调用后端接口获取人员信息
+        return await new Promise((resolve, reject) => {
+          SensorRequest.PersonGetFun(JSON.stringify(param),
+            (respData) => {
+              console.log(`📋 获取到人员信息：${personDingID}`, respData);
+              let personName = personDingID; // 默认返回 DingID
+              // ✅ 修改：根据后端返回的数组格式解析姓名
+              if (respData) {
+                try {
+                  // 如果 respData 是字符串，尝试解析为 JSON
+                  const data = typeof respData === 'string' ? JSON.parse(respData) : respData;
+                  // 如果是数组，取第一个元素
+                  if (Array.isArray(data) && data.length > 0) {
+                    const personInfo = data[0];
+                    // 优先使用 Person_Name 字段
+                    if (personInfo.Person_Name) {
+                      personName = personInfo.Person_Name;
+                    } else if (personInfo.name) {
+                      personName = personInfo.name;
+                    }
+                    console.log(`✅ 成功获取姓名：${personInfo.Person_DingID} -> ${personName}`);
+                  } else if (data && data.Person_Name) {
+                    // 如果不是数组而是单个对象
+                    personName = data.Person_Name;
+                  }
+                } catch (error) {
+                  console.warn('解析人员信息失败:', error);
+                }
+              }
+              resolve(personName);
+            },
+            (error) => {
+              console.warn(`❌ 获取人员信息失败：${personDingID}`, error);
+              resolve(personDingID); // 失败时返回 DingID
+            }
+          );
+        });
+      } catch (error) {
+        console.error('获取人员信息异常:', error);
+        return personDingID;
+      } finally {
+        this.fetchingNames.delete(personDingID);
+      }
+    },
+
+    // ✅ 修改：异步获取并注册姓名
+    async fetchAndRegisterName(participantId, currentName) {
+      // 如果当前 name 不为空且不等于 identity，直接使用
+      if (currentName && currentName.trim() !== '' && currentName !== participantId) {
+        this.registerParticipantName(participantId, currentName);
+        return;
+      }
+
+      // 否则调用后端接口获取真实姓名
+      const realName = await this.fetchPersonName(participantId);
+      this.registerParticipantName(participantId, realName);
+    },
+
     // ==================== 钉钉环境 ====================
     checkDingTalkEnvironment() {
       const ua = navigator.userAgent.toLowerCase();
@@ -327,6 +445,7 @@ export default {
       }
     },
     async joinRoom(roomName, userName, token) {
+      console.log('加入会议室:', roomName, userName);
       const loadingToast = this.$toast.loading({ message: '正在加入会议室...', forbidClick: true, duration: 0 });
       try {
         this.room = new Room({
@@ -336,14 +455,18 @@ export default {
           audioCaptureDefaults: { echoCancellation: true, noiseCancellation: true, autoGainControl: true }
         });
         this.setupRoomEvents();
-        await this.room.connect(this.wsUrl, token);
+        await this.room.connect(this.wsUrl, token, { name: userName });
         this.roomName = this.room.name;
 
-        // 添加本地参与者（使用 $set 确保响应式）
         this.localParticipantId = this.room.localParticipant.identity;
+
+        // ✅ 关键：注册自己的姓名到映射表
+        this.registerParticipantName(this.localParticipantId, userName);
+
         this.$set(this.participants, this.localParticipantId, {
           id: this.localParticipantId,
           name: userName,
+          displayName: userName,
           isLocal: true,
           hasVideo: false,
           hasAudio: false,
@@ -352,69 +475,35 @@ export default {
         });
 
         await this.enableMedia();
+
         loadingToast.close();
-        this.$toast.success('已进入会议室');
+        this.$toast.success(userName + '已进入会议室');
       } catch (error) {
         console.error('连接失败:', error);
         loadingToast.close();
-        this.$toast.fail('连接失败：' + error.message);
+        this.$toast.fail('连接失败：' + (error.message || '未知错误'));
       }
     },
 
     async enableMedia() {
       try {
-        // 使用 livekit 的 createLocalTracks 创建本地轨道
         const tracks = await createLocalTracks({
-          video: {
-            resolution: VideoPresets.h540,
-            facingMode: 'user'
-          },
-          audio: {
-            echoCancellation: true,
-            noiseCancellation: true,
-            autoGainControl: true
-          }
+          video: { resolution: VideoPresets.h540, facingMode: 'user' },
+          audio: { echoCancellation: true, noiseCancellation: true, autoGainControl: true }
         });
-
-        console.log('获取到的轨道:', tracks);
-
-        // 逐个发布轨道到房间
-        const publishPromises = [];
-        for (const track of tracks) {
-          const pubPromise = this.room.localParticipant.publishTrack(track).then((publication) => {
-            console.log('轨道发布成功:', publication.trackSid, publication.track ? publication.track.kind : null);
-            return publication;
-          });
-          publishPromises.push(pubPromise);
-        }
-
-        // 等待所有轨道发布完成
-        const publications = await Promise.all(publishPromises);
-        console.log('所有轨道发布完成:', publications);
-
-        // 更新本地参与者状态
+        const publications = await Promise.all(
+          tracks.map(track => this.room.localParticipant.publishTrack(track))
+        );
         const cameraPub = publications.find(pub => pub.track && pub.track.kind === Track.Kind.Video);
         const micPub = publications.find(pub => pub.track && pub.track.kind === Track.Kind.Audio);
-
         if (cameraPub && cameraPub.track) {
           this.localCameraTrack = cameraPub.track;
           this.updateParticipantVideo(this.localParticipantId, true, this.localCameraTrack);
-          console.log('摄像头轨道已设置:', cameraPub.trackSid);
         }
-
-        if (micPub && micPub.track) {
-          this.updateParticipantAudio(this.localParticipantId, true);
-          console.log('麦克风轨道已设置:', micPub.trackSid);
-        }
-
+        if (micPub && micPub.track) this.updateParticipantAudio(this.localParticipantId, true);
         this.cameraEnabled = true;
         this.microphoneEnabled = true;
-        console.log('摄像头和麦克风已启用');
-
-        // 如果当前已经在共享屏幕模式，需要将本地摄像头绑定到浮动窗口
-        if (this.screenShareActive) {
-          this.$nextTick(() => this.bindLocalCameraToFloating());
-        }
+        if (this.screenShareActive) this.$nextTick(() => this.bindLocalCameraToFloating());
       } catch (error) {
         console.warn('媒体初始化失败:', error);
         this.$toast.fail('无法访问摄像头/麦克风：' + (error.message || '请检查权限设置'));
@@ -439,34 +528,25 @@ export default {
     updateParticipantVideo(participantId, hasVideo, track) {
       const p = this.participants[participantId];
       if (!p) return;
-      // 直接修改对象属性，Vue 能检测到（对象本身是响应式的）
       p.hasVideo = hasVideo;
       p.videoTrack = track;
-      // 触发视图更新（可选，因为对象属性变化 Vue 会自动检测）
-      // 但为了保险，可以手动 $set，不过直接赋值通常足够
       this.$set(this.participants, participantId, p);
 
-      // 尝试通过 videoRefs 获取元素并绑定/清理
       const videoEl = this.videoRefs.get(participantId);
       if (videoEl) {
         if (hasVideo && track) {
-          // 有视频轨道且元素存在，先清理旧流（避免残留）
           if (videoEl.srcObject) videoEl.srcObject = null;
           track.attach(videoEl);
-          console.log(`视频轨道已绑定到元素 (通过 videoRefs): ${participantId}`);
-        } else if (!hasVideo) {
-          // 无视频时清空元素内容
-          if (videoEl.srcObject) videoEl.srcObject = null;
+        } else if (!hasVideo && videoEl.srcObject) {
+          videoEl.srcObject = null;
         }
       } else {
-        // 降级：通过 data 属性查找（可能元素尚未被 ref 回调收集，但这种情况较少）
         this.$nextTick(() => {
           const fallbackEl = document.querySelector(`video[data-participant-id="${participantId}"]`);
           if (fallbackEl) {
             if (hasVideo && track) {
               if (fallbackEl.srcObject) fallbackEl.srcObject = null;
               track.attach(fallbackEl);
-              console.log(`视频轨道已绑定到元素 (通过降级查询): ${participantId}`);
             } else if (!hasVideo && fallbackEl.srcObject) {
               fallbackEl.srcObject = null;
             }
@@ -484,22 +564,11 @@ export default {
     },
 
     setVideoRef(id, el) {
-      console.log('setVideoRef 被调用:', id, el);
       if (el) {
         this.videoRefs.set(id, el);
-        console.log('设置视频 ref:', id, '元素:', el);
-        // 如果已经有轨道，立即绑定
         const p = this.participants[id];
-        if (p && p.videoTrack && el) {
-          try {
-            // 避免重复绑定：如果元素已经附加了相同的轨道，无需重复
-            if (el.srcObject !== p.videoTrack.mediaStream) {
-              p.videoTrack.attach(el);
-              console.log('视频轨道在 ref 设定时已绑定:', id);
-            }
-          } catch (err) {
-            console.error('视频轨道绑定失败:', err);
-          }
+        if (p && p.videoTrack && el && el.srcObject !== p.videoTrack.mediaStream) {
+          p.videoTrack.attach(el);
         }
       } else {
         this.videoRefs.delete(id);
@@ -510,78 +579,145 @@ export default {
       if (el) this.galleryVideoRefs.set(id, el);
       else this.galleryVideoRefs.delete(id);
       const p = this.participants[id];
-      if (p && p.videoTrack && el) {
-        p.videoTrack.attach(el);
-      }
+      if (p && p.videoTrack && el) p.videoTrack.attach(el);
     },
 
-    // ==================== 房间事件 ====================
+    // ==================== 房间事件（带后端接口调用） ====================
     setupRoomEvents() {
-      this.room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+      const room = this.room;
+      if (!room) {
+        console.warn('setupRoomEvents: room is null');
+        return;
+      }
+      // 连接成功
+      room.on(RoomEvent.Connected, () => {
+        console.log('✅ 房间连接成功');
+        // ✅ 遍历已连接的参与者，直接使用他们的 name 属性
+        if (room.participants && typeof room.participants.values === 'function') {
+          for (const participant of room.participants.values()) {
+            if (!this.participants[participant.identity]) {
+              // ✅ 先使用现有的 name，后续可能会通过后端接口更新
+              let displayName = participant.identity;
+
+              if (participant.name && participant.name.trim() !== '' && participant.name !== participant.identity) {
+                displayName = participant.name;
+              }
+              // ✅ 注册到映射表
+              this.registerParticipantName(participant.identity, displayName);
+              this.$set(this.participants, participant.identity, {
+                id: participant.identity,
+                name: displayName,
+                displayName: displayName,
+                isLocal: false,
+                hasVideo: false,
+                hasAudio: false,
+                videoTrack: null,
+                audioTrack: null,
+              });
+              console.log(`👤 发现参与者：${participant.identity}, name: ${displayName}`);
+              // ✅ 如果 name 为空或等于 identity，异步获取真实姓名
+              if (!participant.name || participant.name.trim() === '' || participant.name === participant.identity) {
+                this.fetchAndRegisterName(participant.identity, participant.name);
+              }
+            }
+          }
+        }
+      });
+
+      // 新参与者加入
+      room.on(RoomEvent.ParticipantConnected, (participant) => {
+        console.log('👤 新参与者加入:', participant.identity, ', name:', participant.name);
+
+        // ✅ 先使用现有的 name，后续可能会通过后端接口更新
+        let displayName = participant.identity;
+
+        if (participant.name && participant.name.trim() !== '' && participant.name !== participant.identity) {
+          displayName = participant.name;
+        }
+
+        // ✅ 注册到映射表
+        this.registerParticipantName(participant.identity, displayName);
+
+        this.$set(this.participants, participant.identity, {
+          id: participant.identity,
+          name: displayName,
+          displayName: displayName,
+          isLocal: false,
+          hasVideo: false,
+          hasAudio: false,
+          videoTrack: null,
+          audioTrack: null,
+        });
+
+        // ✅ 如果 name 为空或等于 identity，异步获取真实姓名
+        if (!participant.name || participant.name.trim() === '' || participant.name === participant.identity) {
+          this.fetchAndRegisterName(participant.identity, participant.name);
+        }
+      });
+
+      // 参与者断开 - 清除姓名映射
+      room.on(RoomEvent.ParticipantDisconnected, (participant) => {
+        console.log('👋 参与者离开:', participant.identity);
+        // ✅ 从内存中清除该参会者的姓名信息
+        this.unregisterParticipantName(participant.identity);
+        this.$delete(this.participants, participant.identity);
+        if (this.activeScreenShare === participant.identity) this.activeScreenShare = false;
+      });
+
+      // 房间断开 - 清除所有姓名映射
+      room.on(RoomEvent.Disconnected, () => {
+        console.log('🔌 房间已断开');
+        Object.keys(this.participants).forEach(key => {
+          this.unregisterParticipantName(key);
+          this.$delete(this.participants, key);
+        });
+        this.activeScreenShare = false;
+        this.roomName = '未连接';
+      });
+
+      // 轨道订阅
+      room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
         const participantId = participant.identity;
-        let p = this.participants[participantId];
-        if (!p) {
-          // 新参与者，使用 $set 添加
+        if (!this.participants[participantId]) {
+          let displayName = participantId;
+
+          if (participant.name && participant.name.trim() !== '' && participant.name !== participantId) {
+            displayName = participant.name;
+          }
+
+          // ✅ 注册到映射表
+          this.registerParticipantName(participantId, displayName);
+
           this.$set(this.participants, participantId, {
             id: participantId,
-            name: participant.identity,
+            name: displayName,
+            displayName: displayName,
             isLocal: false,
             hasVideo: false,
             hasAudio: false,
             videoTrack: null,
             audioTrack: null,
           });
-          p = this.participants[participantId];
-        }
 
-        if (track.kind === Track.Kind.Video) {
-          const isScreenShare = publication.source === Track.Source.ScreenShare;
-          if (isScreenShare) {
-            this.activeScreenShare = participantId;
-            this.remoteScreenTrack = track;
-            // 显示共享屏幕
-            this.$nextTick(() => {
-              const screenVideo = this.$refs.screenShareVideo;
-              if (screenVideo) track.attach(screenVideo);
-            });
-          } else {
-            this.updateParticipantVideo(participantId, true, track);
+          // ✅ 如果 name 为空或等于 identity，异步获取真实姓名
+          if (!participant.name || participant.name.trim() === '' || participant.name === participantId) {
+            this.fetchAndRegisterName(participantId, participant.name);
           }
+        }
+        if (track.kind === Track.Kind.Video) {
+          this.updateParticipantVideo(participantId, true, track);
         } else if (track.kind === Track.Kind.Audio) {
           this.updateParticipantAudio(participantId, true);
-          track.attach(); // 播放音频
         }
       });
 
-      this.room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+      room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
         const participantId = participant.identity;
         if (track.kind === Track.Kind.Video) {
-          const isScreenShare = publication.source === Track.Source.ScreenShare;
-          if (isScreenShare) {
-            this.activeScreenShare = false;
-            this.remoteScreenTrack = null;
-          } else {
-            this.updateParticipantVideo(participantId, false, null);
-          }
+          this.updateParticipantVideo(participantId, false, null);
         } else if (track.kind === Track.Kind.Audio) {
           this.updateParticipantAudio(participantId, false);
         }
-      });
-
-      this.room.on(RoomEvent.ParticipantDisconnected, (participant) => {
-        this.$delete(this.participants, participant.identity);
-        if (this.activeScreenShare === participant.identity) {
-          this.activeScreenShare = false;
-        }
-      });
-
-      this.room.on(RoomEvent.Disconnected, () => {
-        // 清空参与者对象
-        Object.keys(this.participants).forEach(key => {
-          this.$delete(this.participants, key);
-        });
-        this.activeScreenShare = false;
-        this.roomName = '未连接';
       });
     },
 
@@ -600,10 +736,7 @@ export default {
           this.localCameraTrack = null;
           this.updateParticipantVideo(this.localParticipantId, false, null);
         }
-        // 如果当前在共享屏幕模式，将摄像头画面绑定/清空到浮动窗口
-        if (this.screenShareActive) {
-          this.$nextTick(() => this.bindLocalCameraToFloating());
-        }
+        if (this.screenShareActive) this.$nextTick(() => this.bindLocalCameraToFloating());
       } catch (err) {
         this.$toast.fail('切换摄像头失败');
       }
@@ -643,15 +776,11 @@ export default {
         this.screenShareActive = true;
         this.activeScreenShare = this.localParticipantId;
 
-        // 创建本地共享视频显示
         this.$nextTick(() => {
           const screenVideo = this.$refs.screenShareVideo;
           if (screenVideo) screenVideo.srcObject = stream;
         });
-
-        // 共享屏幕启动后，将本地摄像头绑定到浮动窗口
         this.$nextTick(() => this.bindLocalCameraToFloating());
-
         this.$toast.success('屏幕共享已开始');
       } catch (error) {
         console.error('屏幕共享失败:', error);
@@ -670,53 +799,33 @@ export default {
         this.screenStream = null;
       }
       this.screenShareActive = false;
-      if (this.activeScreenShare === this.localParticipantId) {
-        this.activeScreenShare = false;
-      }
+      if (this.activeScreenShare === this.localParticipantId) this.activeScreenShare = false;
       this.$toast.success('屏幕共享已停止');
     },
 
-    /**
-     * 将本地摄像头轨道绑定到浮动窗口视频元素（仅在共享屏幕模式下生效）
-     * 如果摄像头未启用或没有轨道，则清空浮动窗口的视频源，让占位符显示
-     */
     bindLocalCameraToFloating() {
-      // 仅在共享屏幕模式下且浮动窗口元素存在时执行
       if (!this.screenShareActive) return;
       const floatingVideoEl = this.$refs.floatingVideo;
       if (!floatingVideoEl) return;
-
       if (this.cameraEnabled && this.localCameraTrack) {
-        // 避免重复绑定相同的流
         const currentStream = floatingVideoEl.srcObject;
         const trackStream = this.localCameraTrack.mediaStream;
         if (currentStream !== trackStream) {
-          // 先清空，再附加，确保画面更新
-          if (currentStream) {
-            floatingVideoEl.srcObject = null;
-          }
+          if (currentStream) floatingVideoEl.srcObject = null;
           this.localCameraTrack.attach(floatingVideoEl);
-          console.log('本地摄像头已绑定到浮动窗口');
         }
-      } else {
-        // 摄像头未开启或没有轨道，清空视频元素
-        if (floatingVideoEl.srcObject) {
-          floatingVideoEl.srcObject = null;
-        }
+      } else if (floatingVideoEl.srcObject) {
+        floatingVideoEl.srcObject = null;
       }
     },
 
     switchToParticipant(item) {
-      // 切换到指定参与者的视频（简化版，聚焦该参与者）
-      const p = this.participants[item.id];
-      if (p && p.videoTrack) {
-        // 可扩展：切换主视图
-      }
+      // 可扩展
     },
 
     showMemberList() {
       const members = Object.values(this.participants).map(p => ({
-        name: p.name,
+        name: this.getDisplayNameById(p.id),
         isLocal: p.isLocal,
       }));
       let html = '<div style="padding: 12px;"><div style="max-height: 400px; overflow-y: auto;">';
@@ -759,8 +868,9 @@ export default {
         this.room.disconnect();
         this.room = null;
       }
-      // 清空参与者
+      // ✅ 清除所有参会者姓名映射
       Object.keys(this.participants).forEach(key => {
+        this.unregisterParticipantName(key);
         this.$delete(this.participants, key);
       });
       this.activeScreenShare = false;
@@ -826,6 +936,7 @@ export default {
   },
 };
 </script>
+
 
 <style scoped>
 * {
