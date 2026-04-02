@@ -1,6 +1,5 @@
 <template>
-  <!-- 模板部分与之前完全相同，此处省略重复内容（保持原样） -->
-  <div class="video-meeting-container" :class="{ 'screen-sharing-mode': screenShareActive }">
+  <div class="video-meeting-container" :class="{ 'screen-sharing-mode': viewMode === 'screen-share' }">
     <!-- 钉钉环境提示层 -->
     <div v-if="isInDingTalk" class="dingtalk-overlay">
       <div class="dingtalk-card">
@@ -34,15 +33,56 @@
           </button>
         </div>
       </div>
+
       <!-- 主视频区域 -->
       <div class="video-area" ref="videoArea">
-        <div v-if="activeScreenShare" class="screen-share-view">
-          <div class="screen-share-content">
-            <video ref="screenShareVideo" autoplay playsinline class="screen-video"></video>
-            <div class="screen-share-label">正在共享屏幕</div>
+        <!-- 屏幕共享模式 -->
+        <div v-if="viewMode === 'screen-share'" class="screen-share-layout">
+          <div class="main-screen">
+            <!-- 本地共享的屏幕视频 -->
+            <video
+              v-if="activeScreenShareId === localParticipantId"
+              ref="screenShareVideo"
+              autoplay
+              playsinline
+              class="screen-video"
+            ></video>
+            <!-- 远程共享的屏幕视频 -->
+            <video
+              v-else
+              ref="remoteScreenVideo"
+              autoplay
+              playsinline
+              class="screen-video"
+            ></video>
+            <div class="screen-share-label">
+              正在共享屏幕：{{ getDisplayNameById(activeScreenShareId) }}
+            </div>
+          </div>
+          <div class="participants-sidebar">
+            <div class="sidebar-title">参会者 ({{ totalParticipants }})</div>
+            <div class="sidebar-videos">
+              <div
+                v-for="item in sidebarParticipants"
+                :key="item.id"
+                class="sidebar-item"
+                @click="switchToParticipant(item.id)"
+              >
+                <div class="sidebar-video-wrapper">
+                  <video
+                    :ref="(el) => setSidebarVideoRef(item.id, el)"
+                    autoplay
+                    playsinline
+                    class="sidebar-video"
+                  ></video>
+                  <div class="sidebar-name">{{ getDisplayNameById(item.id) }}</div>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
+        <!-- 网格模式（原有布局） -->
         <div v-else :class="['video-grid', { 'single-mode': videoItems.length === 1 }]">
           <div
             v-for="item in videoItems"
@@ -58,6 +98,7 @@
                 playsinline
                 :muted="item.isLocal"
                 class="participant-video"
+                :style="{ display: item.hasVideo ? 'block' : 'none' }"
               ></video>
               <div v-if="!item.hasVideo" class="avatar-placeholder">
                 <div class="avatar-icon">{{ getDisplayName(item).charAt(0).toUpperCase() }}</div>
@@ -91,11 +132,11 @@
           <span>{{ cameraEnabled ? '关闭视频' : '开启视频' }}</span>
         </button>
 
-        <button @click="shareScreen" :class="['control-btn', { active: screenShareActive }]">
+        <button @click="shareScreen" :class="['control-btn', { active: viewMode === 'screen-share' && activeScreenShareId === localParticipantId }]">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z" fill="currentColor"/>
           </svg>
-          <span>{{ screenShareActive ? '停止共享' : '共享屏幕' }}</span>
+          <span>{{ viewMode === 'screen-share' && activeScreenShareId === localParticipantId ? '停止共享' : '共享屏幕' }}</span>
         </button>
 
         <button @click="leaveRoom" class="control-btn leave-btn">
@@ -106,23 +147,8 @@
         </button>
       </div>
 
-      <!-- 画廊容器 -->
-      <div v-if="screenShareActive && galleryItems.length" class="gallery-dock">
-        <div class="gallery-scroll">
-          <div
-            v-for="item in galleryItems"
-            :key="item.id"
-            class="gallery-item"
-            @click="switchToParticipant(item)"
-          >
-            <video :ref="(el) => setGalleryVideoRef(item.id, el)" autoplay playsinline class="gallery-video"></video>
-            <div class="gallery-name">{{ getDisplayNameById(item.id) }}</div>
-          </div>
-        </div>
-      </div>
-
-      <!-- 本地摄像头浮窗 -->
-      <div v-if="screenShareActive && localVideoItem" class="floating-camera" ref="floatingCamera">
+      <!-- 本地摄像头浮窗（仅在屏幕共享模式下显示） -->
+      <div v-if="viewMode === 'screen-share' && localVideoItem" class="floating-camera" ref="floatingCamera">
         <div class="floating-header" @mousedown="startDrag">
           <span>我的视频</span>
           <button @click="toggleCamera" class="float-cam-btn">
@@ -145,6 +171,7 @@
 import { Room, RoomEvent, Track, VideoPresets, LocalVideoTrack, createLocalTracks } from 'livekit-client';
 import SensorRequest from '../../utils/SensorRequest.js';
 import { key_DingTokenJWT } from '../../utils/Dingding.js';
+
 export default {
   name: 'VideoMeeting',
   data() {
@@ -155,15 +182,17 @@ export default {
       wsUrl: 'wss://api-v2.sensor-smart.cn:29028',
       cameraEnabled: true,
       microphoneEnabled: true,
-      screenShareActive: false,
-      screenShareTrack: null,
+      // 屏幕共享相关
+      localScreenTrack: null,
       screenStream: null,
       localCameraTrack: null,
-      activeScreenShare: false,
-      remoteScreenTrack: null,
+      activeScreenShareId: null,   // 当前正在共享屏幕的参与者ID（null表示无共享）
+      viewMode: 'grid',            // 'grid' 或 'screen-share'
+      // 参与者数据
       participants: {},
       localParticipantId: null,
       isInDingTalk: false,
+      // 拖拽缩放
       isDragging: false,
       isResizing: false,
       dragStartX: 0,
@@ -174,21 +203,20 @@ export default {
       resizeStartY: 0,
       resizeStartWidth: 0,
       resizeStartHeight: 0,
+      // 视频元素引用
       videoRefs: new Map(),
-      galleryVideoRefs: new Map(),
-      currentViewMode: 'grid',
-      // ✅ 新增：参会者姓名映射表（前端内存管理）
+      sidebarVideoRefs: new Map(),
       participantNames: new Map(),
-      // ✅ 新增：正在请求姓名的缓存，避免重复请求
       fetchingNames: new Set(),
-      requireLogin: false, // ✅ 新增：是否需要登录验证
+      requireLogin: false,
     };
   },
   computed: {
+    // 网格模式下显示的参与者（排除屏幕共享者）
     videoItems() {
       const items = [];
       for (const [id, p] of Object.entries(this.participants)) {
-        if (this.screenShareActive && this.activeScreenShare === id) continue;
+        if (this.viewMode === 'screen-share' && this.activeScreenShareId === id) continue;
         items.push({
           id,
           name: p.name,
@@ -200,11 +228,12 @@ export default {
       }
       return items;
     },
-    galleryItems() {
-      if (!this.screenShareActive) return [];
+    // 屏幕共享模式下侧边栏显示的参与者（排除屏幕共享者）
+    sidebarParticipants() {
+      if (this.viewMode !== 'screen-share') return [];
       const items = [];
       for (const [id, p] of Object.entries(this.participants)) {
-        if (!p.isLocal && id !== this.activeScreenShare) {
+        if (id !== this.activeScreenShareId) {
           items.push({ id, name: p.name, displayName: p.displayName });
         }
       }
@@ -226,28 +255,25 @@ export default {
   },
   mounted() {
     this.checkDingTalkEnvironment();
-    // ✅ 检查是否在钉钉内，如果不在且没有 token，需要登录验证
     if (!this.isInDingTalk) {
-      // ✅ 优先从 URL 参数获取 token
       const urlToken = this.$route.query.token;
-      console.log('[VideoMeeting] 检测到浏览器环境，尝试从 URL 获取 token： '+ urlToken);
+      localStorage.setItem(key_DingTokenJWT, urlToken);
+      console.log('[VideoMeeting] 检测到浏览器环境，尝试从 URL 获取 token：', urlToken);
       const userToken = urlToken || localStorage.getItem(key_DingTokenJWT);
       if (!userToken) {
         console.log('[VideoMeeting] 检测到浏览器环境且无 token，跳转到登录页');
         this.requireLogin = true;
         const department = this.$route.params.department;
-        // 跳转到登录验证页面，并带上会议参数
         this.$router.replace({
           path: `/${department}/phone-login`,
           query: {
             meetingUrl: this.$route.query.meetingUrl,
             meetingName: this.$route.query.meetingName,
-            token: urlToken // ✅ 传递 URL 中的 token
-          }
+            token: urlToken,
+          },
         });
         return;
       }
-      // ✅ 如果使用的是 URL 中的 token，保存到 localStorage
       if (urlToken && !localStorage.getItem(key_DingTokenJWT)) {
         localStorage.setItem(key_DingTokenJWT, urlToken);
         console.log('[VideoMeeting] 已保存 URL token 到 localStorage');
@@ -268,20 +294,15 @@ export default {
   methods: {
     // ==================== 辅助显示名称 ====================
     getDisplayName(item) {
-      // ✅ 优先从映射表获取姓名
       const mappedName = this.participantNames.get(item.id);
       if (mappedName) return mappedName;
-
       if (item.displayName) return item.displayName;
       if (item.name && item.name !== item.id) return item.name;
       return item.id;
     },
-
     getDisplayNameById(participantId) {
-      // ✅ 优先从映射表获取姓名
       const mappedName = this.participantNames.get(participantId);
       if (mappedName) return mappedName;
-
       const p = this.participants[participantId];
       if (!p) return participantId;
       if (p.displayName) return p.displayName;
@@ -294,8 +315,6 @@ export default {
       if (participantId && name) {
         this.participantNames.set(participantId, name);
         console.log(`✅ 注册参会者：${participantId} -> ${name}`);
-
-        // ✅ 同步更新 participants 中的 displayName
         const p = this.participants[participantId];
         if (p && p.displayName !== name) {
           p.displayName = name;
@@ -303,7 +322,6 @@ export default {
         }
       }
     },
-
     unregisterParticipantName(participantId) {
       if (participantId) {
         const deleted = this.participantNames.delete(participantId);
@@ -313,41 +331,24 @@ export default {
       }
     },
 
-    // ✅ 新增：从后端获取人员姓名
     async fetchPersonName(personDingID) {
-      // 如果已经在请求中，直接返回
-      if (this.fetchingNames.has(personDingID)) {
-        return null;
-      }
-
-      // 检查是否已经缓存过
+      if (this.fetchingNames.has(personDingID)) return null;
       const cachedName = this.participantNames.get(personDingID);
-      if (cachedName && cachedName !== personDingID) {
-        return cachedName;
-      }
-
+      if (cachedName && cachedName !== personDingID) return cachedName;
       try {
         this.fetchingNames.add(personDingID);
-
-        // 构造请求参数
-        const param = {
-          Person_DingID: personDingID
-        };
-        // 调用后端接口获取人员信息
+        const param = { Person_DingID: personDingID };
         return await new Promise((resolve, reject) => {
-          SensorRequest.PersonGetFun(JSON.stringify(param),
+          SensorRequest.PersonGetFun(
+            JSON.stringify(param),
             (respData) => {
               console.log(`📋 获取到人员信息：${personDingID}`, respData);
-              let personName = personDingID; // 默认返回 DingID
-              // ✅ 修改：根据后端返回的数组格式解析姓名
+              let personName = personDingID;
               if (respData) {
                 try {
-                  // 如果 respData 是字符串，尝试解析为 JSON
                   const data = typeof respData === 'string' ? JSON.parse(respData) : respData;
-                  // 如果是数组，取第一个元素
                   if (Array.isArray(data) && data.length > 0) {
                     const personInfo = data[0];
-                    // 优先使用 Person_Name 字段
                     if (personInfo.Person_Name) {
                       personName = personInfo.Person_Name;
                     } else if (personInfo.name) {
@@ -355,7 +356,6 @@ export default {
                     }
                     console.log(`✅ 成功获取姓名：${personInfo.Person_DingID} -> ${personName}`);
                   } else if (data && data.Person_Name) {
-                    // 如果不是数组而是单个对象
                     personName = data.Person_Name;
                   }
                 } catch (error) {
@@ -366,7 +366,7 @@ export default {
             },
             (error) => {
               console.warn(`❌ 获取人员信息失败：${personDingID}`, error);
-              resolve(personDingID); // 失败时返回 DingID
+              resolve(personDingID);
             }
           );
         });
@@ -378,15 +378,11 @@ export default {
       }
     },
 
-    // ✅ 修改：异步获取并注册姓名
     async fetchAndRegisterName(participantId, currentName) {
-      // 如果当前 name 不为空且不等于 identity，直接使用
       if (currentName && currentName.trim() !== '' && currentName !== participantId) {
         this.registerParticipantName(participantId, currentName);
         return;
       }
-
-      // 否则调用后端接口获取真实姓名
       const realName = await this.fetchPersonName(participantId);
       this.registerParticipantName(participantId, realName);
     },
@@ -452,15 +448,13 @@ export default {
           adaptiveStream: true,
           dynacast: true,
           videoCaptureDefaults: { resolution: VideoPresets.h540 },
-          audioCaptureDefaults: { echoCancellation: true, noiseCancellation: true, autoGainControl: true }
+          audioCaptureDefaults: { echoCancellation: true, noiseCancellation: true, autoGainControl: true },
         });
         this.setupRoomEvents();
         await this.room.connect(this.wsUrl, token, { name: userName });
         this.roomName = this.room.name;
 
         this.localParticipantId = this.room.localParticipant.identity;
-
-        // ✅ 关键：注册自己的姓名到映射表
         this.registerParticipantName(this.localParticipantId, userName);
 
         this.$set(this.participants, this.localParticipantId, {
@@ -489,13 +483,11 @@ export default {
       try {
         const tracks = await createLocalTracks({
           video: { resolution: VideoPresets.h540, facingMode: 'user' },
-          audio: { echoCancellation: true, noiseCancellation: true, autoGainControl: true }
+          audio: { echoCancellation: true, noiseCancellation: true, autoGainControl: true },
         });
-        const publications = await Promise.all(
-          tracks.map(track => this.room.localParticipant.publishTrack(track))
-        );
-        const cameraPub = publications.find(pub => pub.track && pub.track.kind === Track.Kind.Video);
-        const micPub = publications.find(pub => pub.track && pub.track.kind === Track.Kind.Audio);
+        const publications = await Promise.all(tracks.map((track) => this.room.localParticipant.publishTrack(track)));
+        const cameraPub = publications.find((pub) => pub.track && pub.track.kind === Track.Kind.Video);
+        const micPub = publications.find((pub) => pub.track && pub.track.kind === Track.Kind.Audio);
         if (cameraPub && cameraPub.track) {
           this.localCameraTrack = cameraPub.track;
           this.updateParticipantVideo(this.localParticipantId, true, this.localCameraTrack);
@@ -503,7 +495,7 @@ export default {
         if (micPub && micPub.track) this.updateParticipantAudio(this.localParticipantId, true);
         this.cameraEnabled = true;
         this.microphoneEnabled = true;
-        if (this.screenShareActive) this.$nextTick(() => this.bindLocalCameraToFloating());
+        if (this.viewMode === 'screen-share') this.$nextTick(() => this.bindLocalCameraToFloating());
       } catch (error) {
         console.warn('媒体初始化失败:', error);
         this.$toast.fail('无法访问摄像头/麦克风：' + (error.message || '请检查权限设置'));
@@ -527,31 +519,54 @@ export default {
     // ==================== 参与者管理 ====================
     updateParticipantVideo(participantId, hasVideo, track) {
       const p = this.participants[participantId];
-      if (!p) return;
-      p.hasVideo = hasVideo;
-      p.videoTrack = track;
-      this.$set(this.participants, participantId, p);
+      if (!p) {
+        console.warn(`updateParticipantVideo: 参与者 ${participantId} 不存在`);
+        return;
+      }
+      console.log(`📹 更新视频状态: ${participantId}, hasVideo=${hasVideo}, track=${track ? '有轨道' : '无轨道'}`);
+      const newParticipant = {
+        ...p,
+        hasVideo,
+        videoTrack: track,
+      };
+      this.$set(this.participants, participantId, newParticipant);
 
-      const videoEl = this.videoRefs.get(participantId);
-      if (videoEl) {
-        if (hasVideo && track) {
+      this.$nextTick(() => {
+        this.$forceUpdate();
+        console.log(`🔄 强制刷新视图，参与者 ${participantId} hasVideo=${hasVideo}`);
+      });
+
+      if (hasVideo && track) {
+        const videoEl = this.videoRefs.get(participantId);
+        if (videoEl) {
           if (videoEl.srcObject) videoEl.srcObject = null;
           track.attach(videoEl);
-        } else if (!hasVideo && videoEl.srcObject) {
-          videoEl.srcObject = null;
-        }
-      } else {
-        this.$nextTick(() => {
-          const fallbackEl = document.querySelector(`video[data-participant-id="${participantId}"]`);
-          if (fallbackEl) {
-            if (hasVideo && track) {
-              if (fallbackEl.srcObject) fallbackEl.srcObject = null;
+          console.log(`✅ 已将视频轨道附加到 ${participantId}`);
+        } else {
+          this.$nextTick(() => {
+            const fallbackEl = document.querySelector(`video[data-participant-id="${participantId}"]`);
+            if (fallbackEl && track) {
               track.attach(fallbackEl);
-            } else if (!hasVideo && fallbackEl.srcObject) {
-              fallbackEl.srcObject = null;
+              console.log(`✅ (fallback) 已将视频轨道附加到 ${participantId}`);
             }
-          }
-        });
+          });
+        }
+        // 同时更新侧边栏的视频
+        const sidebarEl = this.sidebarVideoRefs.get(participantId);
+        if (sidebarEl && sidebarEl.srcObject !== track.mediaStream) {
+          if (sidebarEl.srcObject) sidebarEl.srcObject = null;
+          track.attach(sidebarEl);
+        }
+      } else if (!hasVideo) {
+        const videoEl = this.videoRefs.get(participantId);
+        if (videoEl && videoEl.srcObject) {
+          videoEl.srcObject = null;
+          console.log(`🖥️ 已清空 ${participantId} 的视频元素 srcObject`);
+        }
+        const sidebarEl = this.sidebarVideoRefs.get(participantId);
+        if (sidebarEl && sidebarEl.srcObject) {
+          sidebarEl.srcObject = null;
+        }
       }
     },
 
@@ -560,6 +575,7 @@ export default {
       if (p) {
         p.hasAudio = hasAudio;
         this.$set(this.participants, participantId, p);
+        console.log(`🎤 更新音频状态: ${participantId}, hasAudio=${hasAudio}`);
       }
     },
 
@@ -567,42 +583,44 @@ export default {
       if (el) {
         this.videoRefs.set(id, el);
         const p = this.participants[id];
-        if (p && p.videoTrack && el && el.srcObject !== p.videoTrack.mediaStream) {
+        if (p && p.hasVideo && p.videoTrack && el.srcObject !== p.videoTrack.mediaStream) {
           p.videoTrack.attach(el);
+          console.log(`🔗 setVideoRef: 为 ${id} 附加轨道`);
         }
       } else {
         this.videoRefs.delete(id);
       }
     },
 
-    setGalleryVideoRef(id, el) {
-      if (el) this.galleryVideoRefs.set(id, el);
-      else this.galleryVideoRefs.delete(id);
-      const p = this.participants[id];
-      if (p && p.videoTrack && el) p.videoTrack.attach(el);
+    setSidebarVideoRef(id, el) {
+      if (el) {
+        this.sidebarVideoRefs.set(id, el);
+        const p = this.participants[id];
+        if (p && p.hasVideo && p.videoTrack && el.srcObject !== p.videoTrack.mediaStream) {
+          p.videoTrack.attach(el);
+        }
+      } else {
+        this.sidebarVideoRefs.delete(id);
+      }
     },
 
-    // ==================== 房间事件（带后端接口调用） ====================
+    // ==================== 房间事件 ====================
     setupRoomEvents() {
       const room = this.room;
       if (!room) {
         console.warn('setupRoomEvents: room is null');
         return;
       }
-      // 连接成功
+
       room.on(RoomEvent.Connected, () => {
         console.log('✅ 房间连接成功');
-        // ✅ 遍历已连接的参与者，直接使用他们的 name 属性
         if (room.participants && typeof room.participants.values === 'function') {
           for (const participant of room.participants.values()) {
             if (!this.participants[participant.identity]) {
-              // ✅ 先使用现有的 name，后续可能会通过后端接口更新
               let displayName = participant.identity;
-
               if (participant.name && participant.name.trim() !== '' && participant.name !== participant.identity) {
                 displayName = participant.name;
               }
-              // ✅ 注册到映射表
               this.registerParticipantName(participant.identity, displayName);
               this.$set(this.participants, participant.identity, {
                 id: participant.identity,
@@ -615,7 +633,6 @@ export default {
                 audioTrack: null,
               });
               console.log(`👤 发现参与者：${participant.identity}, name: ${displayName}`);
-              // ✅ 如果 name 为空或等于 identity，异步获取真实姓名
               if (!participant.name || participant.name.trim() === '' || participant.name === participant.identity) {
                 this.fetchAndRegisterName(participant.identity, participant.name);
               }
@@ -624,20 +641,13 @@ export default {
         }
       });
 
-      // 新参与者加入
       room.on(RoomEvent.ParticipantConnected, (participant) => {
         console.log('👤 新参与者加入:', participant.identity, ', name:', participant.name);
-
-        // ✅ 先使用现有的 name，后续可能会通过后端接口更新
         let displayName = participant.identity;
-
         if (participant.name && participant.name.trim() !== '' && participant.name !== participant.identity) {
           displayName = participant.name;
         }
-
-        // ✅ 注册到映射表
         this.registerParticipantName(participant.identity, displayName);
-
         this.$set(this.participants, participant.identity, {
           id: participant.identity,
           name: displayName,
@@ -648,46 +658,46 @@ export default {
           videoTrack: null,
           audioTrack: null,
         });
-
-        // ✅ 如果 name 为空或等于 identity，异步获取真实姓名
         if (!participant.name || participant.name.trim() === '' || participant.name === participant.identity) {
           this.fetchAndRegisterName(participant.identity, participant.name);
         }
       });
 
-      // 参与者断开 - 清除姓名映射
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
         console.log('👋 参与者离开:', participant.identity);
-        // ✅ 从内存中清除该参会者的姓名信息
         this.unregisterParticipantName(participant.identity);
         this.$delete(this.participants, participant.identity);
-        if (this.activeScreenShare === participant.identity) this.activeScreenShare = false;
+        if (this.activeScreenShareId === participant.identity) {
+          this.activeScreenShareId = null;
+          this.viewMode = 'grid';
+        }
       });
 
-      // 房间断开 - 清除所有姓名映射
       room.on(RoomEvent.Disconnected, () => {
         console.log('🔌 房间已断开');
-        Object.keys(this.participants).forEach(key => {
+        Object.keys(this.participants).forEach((key) => {
           this.unregisterParticipantName(key);
           this.$delete(this.participants, key);
         });
-        this.activeScreenShare = false;
+        this.activeScreenShareId = null;
+        this.viewMode = 'grid';
         this.roomName = '未连接';
       });
 
-      // 轨道订阅
+      // 轨道订阅：区分屏幕共享轨道和普通轨道
       room.on(RoomEvent.TrackSubscribed, (track, publication, participant) => {
+        if (!participant) {
+          console.warn('TrackSubscribed: participant is undefined');
+          return;
+        }
         const participantId = participant.identity;
+        console.log(`📡 TrackSubscribed: ${participantId}, kind=${track.kind}, source=${track.source}`);
         if (!this.participants[participantId]) {
           let displayName = participantId;
-
           if (participant.name && participant.name.trim() !== '' && participant.name !== participantId) {
             displayName = participant.name;
           }
-
-          // ✅ 注册到映射表
           this.registerParticipantName(participantId, displayName);
-
           this.$set(this.participants, participantId, {
             id: participantId,
             name: displayName,
@@ -698,25 +708,87 @@ export default {
             videoTrack: null,
             audioTrack: null,
           });
-
-          // ✅ 如果 name 为空或等于 identity，异步获取真实姓名
           if (!participant.name || participant.name.trim() === '' || participant.name === participantId) {
             this.fetchAndRegisterName(participantId, participant.name);
           }
         }
-        if (track.kind === Track.Kind.Video) {
+
+        // 屏幕共享轨道处理
+        if (track.source === Track.Source.ScreenShare) {
+          console.log('📺 接收到屏幕共享轨道，来自:', participantId);
+          this.activeScreenShareId = participantId;
+          this.viewMode = 'screen-share';
+          // 绑定到主区域的 video 元素
+          this.$nextTick(() => {
+            let screenVideoEl = null;
+            if (participantId === this.localParticipantId) {
+              screenVideoEl = this.$refs.screenShareVideo;
+            } else {
+              screenVideoEl = this.$refs.remoteScreenVideo;
+            }
+            if (screenVideoEl) {
+              if (screenVideoEl.srcObject) screenVideoEl.srcObject = null;
+              track.attach(screenVideoEl);
+            }
+          });
+        } else if (track.kind === Track.Kind.Video) {
           this.updateParticipantVideo(participantId, true, track);
         } else if (track.kind === Track.Kind.Audio) {
           this.updateParticipantAudio(participantId, true);
         }
       });
 
+      // 轨道取消订阅
       room.on(RoomEvent.TrackUnsubscribed, (track, publication, participant) => {
+        if (!participant) {
+          console.warn('TrackUnsubscribed: participant is undefined');
+          return;
+        }
         const participantId = participant.identity;
+        console.log(`❌ TrackUnsubscribed: ${participantId}, kind=${track.kind}, source=${track.source}`);
+        if (track.source === Track.Source.ScreenShare) {
+          console.log('🛑 屏幕共享已停止，来自:', participantId);
+          if (this.activeScreenShareId === participantId) {
+            this.activeScreenShareId = null;
+            this.viewMode = 'grid';
+            // 清理视频元素
+            const screenVideoEl = this.$refs.remoteScreenVideo || this.$refs.screenShareVideo;
+            if (screenVideoEl && screenVideoEl.srcObject) {
+              screenVideoEl.srcObject = null;
+            }
+          }
+        } else if (track.kind === Track.Kind.Video) {
+          this.updateParticipantVideo(participantId, false, null);
+        } else if (track.kind === Track.Kind.Audio) {
+          this.updateParticipantAudio(participantId, false);
+        }
+      });
+
+      // 轨道静音/取消静音处理
+      room.on(RoomEvent.TrackMuted, (track, publication, participant) => {
+        if (!participant) return;
+        const participantId = participant.identity;
+        console.log(`🔇 TrackMuted: ${participantId}, kind=${track.kind}`);
         if (track.kind === Track.Kind.Video) {
           this.updateParticipantVideo(participantId, false, null);
         } else if (track.kind === Track.Kind.Audio) {
           this.updateParticipantAudio(participantId, false);
+        }
+      });
+
+      room.on(RoomEvent.TrackUnmuted, (track, publication, participant) => {
+        if (!participant) return;
+        const participantId = participant.identity;
+        console.log(`🔊 TrackUnmuted: ${participantId}, kind=${track.kind}`);
+        if (track.kind === Track.Kind.Video) {
+          const videoTrack = participant.getTrack(Track.Source.Camera);
+          if (videoTrack && videoTrack.track) {
+            this.updateParticipantVideo(participantId, true, videoTrack.track);
+          } else {
+            console.warn(`TrackUnmuted 但无法获取视频轨道: ${participantId}`);
+          }
+        } else if (track.kind === Track.Kind.Audio) {
+          this.updateParticipantAudio(participantId, true);
         }
       });
     },
@@ -725,9 +797,11 @@ export default {
     async toggleCamera() {
       if (!this.room || !this.room.localParticipant) return;
       const newEnabled = !this.cameraEnabled;
+      console.log(`🎥 切换摄像头: 当前状态=${this.cameraEnabled}, 目标状态=${newEnabled}`);
       try {
         await this.room.localParticipant.setCameraEnabled(newEnabled);
         this.cameraEnabled = newEnabled;
+
         if (newEnabled) {
           const pub = await this.waitForTrack(Track.Source.Camera, 3000);
           this.localCameraTrack = (pub && pub.track) || null;
@@ -736,8 +810,9 @@ export default {
           this.localCameraTrack = null;
           this.updateParticipantVideo(this.localParticipantId, false, null);
         }
-        if (this.screenShareActive) this.$nextTick(() => this.bindLocalCameraToFloating());
+        if (this.viewMode === 'screen-share') this.$nextTick(() => this.bindLocalCameraToFloating());
       } catch (err) {
+        console.error('切换摄像头失败:', err);
         this.$toast.fail('切换摄像头失败');
       }
     },
@@ -745,6 +820,7 @@ export default {
     async toggleMicrophone() {
       if (!this.room || !this.room.localParticipant) return;
       const newEnabled = !this.microphoneEnabled;
+      console.log(`🎤 切换麦克风: ${this.microphoneEnabled} -> ${newEnabled}`);
       try {
         await this.room.localParticipant.setMicrophoneEnabled(newEnabled);
         this.microphoneEnabled = newEnabled;
@@ -756,7 +832,8 @@ export default {
 
     async shareScreen() {
       if (!this.room || !this.room.localParticipant) return;
-      if (this.screenShareActive) {
+      // 如果已经在共享屏幕
+      if (this.activeScreenShareId === this.localParticipantId) {
         await this.stopScreenShare();
         return;
       }
@@ -772,9 +849,9 @@ export default {
           source: Track.Source.ScreenShare,
         });
         await this.room.localParticipant.publishTrack(localScreenTrack);
-        this.screenShareTrack = localScreenTrack;
-        this.screenShareActive = true;
-        this.activeScreenShare = this.localParticipantId;
+        this.localScreenTrack = localScreenTrack;
+        this.activeScreenShareId = this.localParticipantId;
+        this.viewMode = 'screen-share';
 
         this.$nextTick(() => {
           const screenVideo = this.$refs.screenShareVideo;
@@ -789,22 +866,22 @@ export default {
     },
 
     async stopScreenShare() {
-      if (this.screenShareTrack) {
-        await this.room.localParticipant.unpublishTrack(this.screenShareTrack);
-        this.screenShareTrack.stop();
-        this.screenShareTrack = null;
+      if (this.localScreenTrack) {
+        await this.room.localParticipant.unpublishTrack(this.localScreenTrack);
+        this.localScreenTrack.stop();
+        this.localScreenTrack = null;
       }
       if (this.screenStream) {
-        this.screenStream.getTracks().forEach(t => t.stop());
+        this.screenStream.getTracks().forEach((t) => t.stop());
         this.screenStream = null;
       }
-      this.screenShareActive = false;
-      if (this.activeScreenShare === this.localParticipantId) this.activeScreenShare = false;
+      this.activeScreenShareId = null;
+      this.viewMode = 'grid';
       this.$toast.success('屏幕共享已停止');
     },
 
     bindLocalCameraToFloating() {
-      if (!this.screenShareActive) return;
+      if (this.viewMode !== 'screen-share') return;
       const floatingVideoEl = this.$refs.floatingVideo;
       if (!floatingVideoEl) return;
       if (this.cameraEnabled && this.localCameraTrack) {
@@ -819,18 +896,21 @@ export default {
       }
     },
 
-    switchToParticipant(item) {
-      // 可扩展
+    switchToParticipant(participantId) {
+      // 可选：点击侧边栏切换主视图（演讲者模式），当前版本仅记录日志
+      console.log('切换到参与者:', participantId);
     },
 
     showMemberList() {
-      const members = Object.values(this.participants).map(p => ({
+      const members = Object.values(this.participants).map((p) => ({
         name: this.getDisplayNameById(p.id),
         isLocal: p.isLocal,
       }));
       let html = '<div style="padding: 12px;"><div style="max-height: 400px; overflow-y: auto;">';
-      members.forEach(m => {
-        html += `<div style="padding: 8px 0; border-bottom: 1px solid #eee;">${m.isLocal ? '👤 ' : '👥 '}${m.name}${m.isLocal ? ' (我)' : ''}</div>`;
+      members.forEach((m) => {
+        html += `<div style="padding: 8px 0; border-bottom: 1px solid #eee;">${m.isLocal ? '👤 ' : '👥 '}${m.name}${
+          m.isLocal ? ' (我)' : ''
+        }</div>`;
       });
       html += '</div></div>';
       this.$dialog.alert({ title: '成员列表', message: html, confirmButtonText: '关闭', allowHtml: true });
@@ -850,30 +930,32 @@ export default {
     },
 
     leaveRoom() {
-      this.$dialog.confirm({
-        title: '确认离开',
-        message: '确定要离开当前会议室吗？',
-        confirmButtonText: '确定',
-        cancelButtonText: '取消',
-      }).then(() => {
-        this.disconnectRoom();
-        this.$toast.success('已离开会议室');
-        setTimeout(() => this.$router.back(), 1000);
-      });
+      this.$dialog
+        .confirm({
+          title: '确认离开',
+          message: '确定要离开当前会议室吗？',
+          confirmButtonText: '确定',
+          cancelButtonText: '取消',
+        })
+        .then(() => {
+          this.disconnectRoom();
+          this.$toast.success('已离开会议室');
+          setTimeout(() => this.$router.back(), 1000);
+        });
     },
 
     disconnectRoom() {
-      if (this.screenShareActive) this.stopScreenShare();
+      if (this.activeScreenShareId === this.localParticipantId) this.stopScreenShare();
       if (this.room) {
         this.room.disconnect();
         this.room = null;
       }
-      // ✅ 清除所有参会者姓名映射
-      Object.keys(this.participants).forEach(key => {
+      Object.keys(this.participants).forEach((key) => {
         this.unregisterParticipantName(key);
         this.$delete(this.participants, key);
       });
-      this.activeScreenShare = false;
+      this.activeScreenShareId = null;
+      this.viewMode = 'grid';
     },
 
     // ==================== 浮动窗口拖拽/缩放 ====================
@@ -937,8 +1019,8 @@ export default {
 };
 </script>
 
-
 <style scoped>
+/* 原有样式保留，新增屏幕共享布局样式 */
 * {
   box-sizing: border-box;
 }
@@ -954,7 +1036,6 @@ export default {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* 腾讯会议风格布局 */
 .meeting-main {
   display: flex;
   flex-direction: column;
@@ -1017,17 +1098,19 @@ export default {
   overflow: hidden;
   padding: 16px;
 }
-.screen-share-view {
+
+/* 屏幕共享布局：主区域 + 右侧边栏 */
+.screen-share-layout {
+  display: flex;
   width: 100%;
   height: 100%;
+  gap: 16px;
+}
+.main-screen {
+  flex: 1;
   background: #000;
   border-radius: 12px;
   overflow: hidden;
-  position: relative;
-}
-.screen-share-content {
-  width: 100%;
-  height: 100%;
   position: relative;
 }
 .screen-video {
@@ -1047,8 +1130,64 @@ export default {
   font-size: 12px;
   backdrop-filter: blur(4px);
 }
+.participants-sidebar {
+  width: 260px;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(10px);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-title {
+  padding: 12px;
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+}
+.sidebar-videos {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.sidebar-item {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.sidebar-item:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+.sidebar-video-wrapper {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  background: #2d2d3a;
+  border-radius: 6px;
+  overflow: hidden;
+}
+.sidebar-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.sidebar-name {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 10px;
+  color: #fff;
+  backdrop-filter: blur(4px);
+}
 
-/* 视频网格 */
+/* 原有网格样式保持不变 */
 .video-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
@@ -1189,51 +1328,6 @@ export default {
   background: #dc2626;
 }
 
-/* 画廊容器（共享模式下） */
-.gallery-dock {
-  position: fixed;
-  bottom: 90px;
-  right: 16px;
-  width: 280px;
-  background: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(10px);
-  border-radius: 12px;
-  padding: 8px;
-  z-index: 200;
-}
-.gallery-scroll {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  max-height: 300px;
-  overflow-y: auto;
-}
-.gallery-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 0.2s;
-}
-.gallery-item:hover {
-  background: rgba(255, 255, 255, 0.2);
-}
-.gallery-video {
-  width: 48px;
-  height: 36px;
-  border-radius: 6px;
-  object-fit: cover;
-  background: #2d2d3a;
-}
-.gallery-name {
-  font-size: 12px;
-  color: #fff;
-  flex: 1;
-}
-
 /* 浮动摄像头窗口 */
 .floating-camera {
   position: fixed;
@@ -1363,10 +1457,8 @@ export default {
   .control-btn {
     padding: 10px;
   }
-  .gallery-dock {
-    width: 240px;
-    bottom: 80px;
-    right: 8px;
+  .participants-sidebar {
+    width: 200px;
   }
   .floating-camera {
     width: 180px;
