@@ -251,8 +251,20 @@ export default {
     },
   },
   created() {
-    this.meetingUrl = decodeURIComponent(this.$route.query.meetingUrl || '');
-    this.roomName = decodeURIComponent(this.$route.query.meetingName || '未命名会议');
+    this.meetingUrl = decodeURIComponent(this.$route.query.data || '');
+    console.log('[VideoMeeting] 获取会议地址：', this.meetingUrl);
+    // 解析 JSON 字符串为对象
+    let meetingData = null;
+    try {
+      meetingData = typeof this.meetingUrl === 'string' ? JSON.parse(this.meetingUrl) : this.meetingUrl;
+      console.log('[VideoMeeting] 解析后的会议数据：', meetingData);
+      console.log('[VideoMeeting] 获取会议房间：', meetingData.room);
+      console.log('[VideoMeeting] 获取会议参与者：', meetingData.user);
+      this.roomName = meetingData.room || '未命名会议';
+    } catch (error) {
+      console.error('[VideoMeeting] 解析会议数据失败:', error);
+      this.roomName = '未命名会议';
+    }
     document.title = this.roomName;
   },
   mounted() {
@@ -261,21 +273,21 @@ export default {
       const urlToken = this.$route.query.token;
       localStorage.setItem(key_DingTokenJWT, urlToken);
       console.log('[VideoMeeting] 检测到浏览器环境，尝试从 URL 获取 token：', urlToken);
-      const userToken = urlToken || localStorage.getItem(key_DingTokenJWT);
-      if (!userToken) {
-        console.log('[VideoMeeting] 检测到浏览器环境且无 token，跳转到登录页');
-        this.requireLogin = true;
-        const department = this.$route.params.department;
-        this.$router.replace({
-          path: `/${department}/phone-login`,
-          query: {
-            meetingUrl: this.$route.query.meetingUrl,
-            meetingName: this.$route.query.meetingName,
-            token: urlToken,
-          },
-        });
-        return;
-      }
+      // const userToken = urlToken || localStorage.getItem(key_DingTokenJWT);
+      // if (!userToken) {
+      //   console.log('[VideoMeeting] 检测到浏览器环境且无 token，跳转到登录页');
+      //   this.requireLogin = true;
+      //   const department = this.$route.params.department;
+      //   this.$router.replace({
+      //     path: `/${department}/phone-login`,
+      //     query: {
+      //       meetingUrl: this.$route.query.meetingUrl,
+      //       meetingName: this.$route.query.meetingName,
+      //       token: urlToken,
+      //     },
+      //   });
+      //   return;
+      // }
       if (urlToken && !localStorage.getItem(key_DingTokenJWT)) {
         localStorage.setItem(key_DingTokenJWT, urlToken);
         console.log('[VideoMeeting] 已保存 URL token 到 localStorage');
@@ -458,19 +470,21 @@ export default {
 
     // ==================== 房间连接 ====================
     parseAndJoinRoom() {
-      try {
-        const url = new URL(this.meetingUrl);
-        const dataParam = new URLSearchParams(url.search).get('data');
-        if (!dataParam) throw new Error('缺少 data 参数');
-        const decodedData = JSON.parse(decodeURIComponent(dataParam));
-        this.joinRoom(decodedData.room, decodedData.user || '参会者', decodedData.token);
+      try { // this.meetingUrl 现在是 JSON 字符串格式
+        const meetingData = typeof this.meetingUrl === 'string' ? JSON.parse(this.meetingUrl) : this.meetingUrl;
+        console.log('解析会议数据:', meetingData);
+        if (!meetingData.token || !meetingData.room) {
+          throw new Error('会议数据缺少必要字段');
+        }
+        this.joinRoom(meetingData.room, meetingData.user || '参会者', meetingData.token);
       } catch (error) {
-        console.error('解析会议链接失败:', error);
-        this.$toast.fail('会议链接解析失败');
+        console.error('解析会议数据失败:', error);
+        this.$toast.fail('会议数据解析失败');
       }
     },
     async joinRoom(roomName, userName, token) {
-      console.log('加入会议室:', roomName, userName);
+      console.log('连接解析-加入会议室房间名称:', roomName, userName);
+      console.log('连接解析-加入会议室token:', token);
       const loadingToast = this.$toast.loading({ message: '正在加入会议室...', forbidClick: true, duration: 0 });
       try {
         this.room = new Room({
@@ -930,37 +944,78 @@ export default {
       }
     },
 
+    /**
+     * 共享屏幕 - 优化画质和比例
+     */
     async shareScreen() {
       if (!this.room || !this.room.localParticipant) return;
+      // 如果已经在共享屏幕，则停止
       if (this.activeScreenShareId === this.localParticipantId) {
         await this.stopScreenShare();
         return;
       }
       try {
-        const stream = await navigator.mediaDevices.getDisplayMedia({ video: true });
+        // 获取屏幕流，并请求高分辨率（实际由系统提供）
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+          video: {
+            cursor: 'always',          // 显示鼠标
+            displaySurface: 'monitor',  // 推荐捕获整个屏幕
+          },
+          audio: false,  // 不捕获系统音频，避免权限复杂
+        });
         const videoTrack = stream.getVideoTracks()[0];
         if (!videoTrack) throw new Error('无法获取屏幕视频轨道');
         this.screenStream = stream;
         videoTrack.onended = () => this.stopScreenShare();
 
+        // 获取屏幕轨道的真实分辨率（用于编码）
+        const settings = videoTrack.getSettings();
+        const width = settings.width || 1920;
+        const height = settings.height || 1080;
+        // 根据分辨率动态设置最大比特率（保证清晰度）
+        const maxBitrate = Math.min(8000000, Math.max(2500000, (width * height) / 0.3)); // 约2.5~8 Mbps
+        console.log(`📺 屏幕共享分辨率: ${width}x${height}, 编码比特率: ${maxBitrate} bps`);
+
+        // 创建本地屏幕共享轨道
         const localScreenTrack = new LocalVideoTrack(videoTrack, {
           name: 'screen',
           source: Track.Source.ScreenShare,
         });
-        await this.room.localParticipant.publishTrack(localScreenTrack);
+
+        // 发布轨道时指定高质量编码参数
+        await this.room.localParticipant.publishTrack(localScreenTrack, {
+          videoEncoding: {
+            width: width,
+            height: height,
+            maxBitrate: maxBitrate,
+            maxFramerate: 30,
+            priority: 'high',
+          },
+        });
+
         this.localScreenTrack = localScreenTrack;
         this.activeScreenShareId = this.localParticipantId;
         this.viewMode = 'screen-share';
 
+        // 本地预览：直接使用原始流，确保清晰
         this.$nextTick(() => {
           const screenVideo = this.$refs.screenShareVideo;
-          if (screenVideo) screenVideo.srcObject = stream;
+          if (screenVideo) {
+            if (screenVideo.srcObject) screenVideo.srcObject = null;
+            screenVideo.srcObject = stream;
+          }
         });
         this.$nextTick(() => this.bindLocalCameraToFloating());
         this.$toast.success('屏幕共享已开始');
       } catch (error) {
         console.error('屏幕共享失败:', error);
-        this.$toast.fail('屏幕共享失败');
+        if (error.name === 'NotAllowedError') {
+          this.$toast.fail('用户取消了屏幕共享或权限被拒绝');
+        } else if (error.name === 'NotFoundError') {
+          this.$toast.fail('未找到可共享的屏幕或窗口');
+        } else {
+          this.$toast.fail('屏幕共享失败：' + (error.message || '未知错误'));
+        }
       }
     },
 
@@ -1118,7 +1173,7 @@ export default {
 </script>
 
 <style scoped>
-/* 原有样式保留，新增屏幕共享布局样式 */
+/* 原有样式保持不变，未做任何修改，确保功能完整 */
 * {
   box-sizing: border-box;
 }
