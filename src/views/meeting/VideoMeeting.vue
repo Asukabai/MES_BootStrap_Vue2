@@ -63,21 +63,25 @@
             <div class="sidebar-title">参会者 ({{ totalParticipants }})</div>
             <div class="sidebar-videos">
               <div
-                v-for="item in sidebarParticipants"
-                :key="item.id"
-                class="sidebar-item"
-                @click="switchToParticipant(item.id)"
-              >
-                <div class="sidebar-video-wrapper">
-                  <video
-                    :ref="(el) => setSidebarVideoRef(item.id, el)"
-                    autoplay
-                    playsinline
-                    class="sidebar-video"
-                  ></video>
-                  <div class="sidebar-name">{{ getDisplayNameById(item.id) }}</div>
+              v-for="item in sidebarParticipants"
+              :key="item.id"
+              class="sidebar-item"
+              @click="switchToParticipant(item.id)"
+            >
+              <div class="sidebar-video-wrapper">
+                <video
+                  :ref="(el) => setSidebarVideoRef(item.id, el)"
+                  autoplay
+                  playsinline
+                  class="sidebar-video"
+                  :style="{ display: item.hasVideo ? 'block' : 'none' }"
+                ></video>
+                <div v-if="!item.hasVideo" class="sidebar-avatar-placeholder">
+                  <div class="sidebar-avatar-icon">{{ getDisplayNameById(item.id).charAt(0).toUpperCase() }}</div>
                 </div>
+                <div class="sidebar-name">{{ getDisplayNameById(item.id) }}</div>
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -236,7 +240,7 @@ export default {
       const items = [];
       for (const [id, p] of Object.entries(this.participants)) {
         if (id !== this.activeScreenShareId) {
-          items.push({ id, name: p.name, displayName: p.displayName });
+          items.push({ id, name: p.name, displayName: p.displayName, hasVideo: p.hasVideo });
         }
       }
       return items;
@@ -795,25 +799,65 @@ export default {
         }
 
         // 屏幕共享轨道处理
-        if (track.source === Track.Source.ScreenShare) {
-          console.log('📺 接收到屏幕共享轨道，来自:', participantId);
+        if (track.source === Track.Source.ScreenShare || (track.kind === Track.Kind.Video && track.source === 'unknown')) {
+          console.log('📺 接收到屏幕共享轨道，来自:', participantId, 'source:', track.source);
+          // 先更新状态
           this.activeScreenShareId = participantId;
           this.viewMode = 'screen-share';
-          // 绑定到主区域的 video 元素
+
+          // 等待模板渲染完成后再绑定视频元素
           this.$nextTick(() => {
-            let screenVideoEl = null;
-            if (participantId === this.localParticipantId) {
-              screenVideoEl = this.$refs.screenShareVideo;
-            } else {
-              screenVideoEl = this.$refs.remoteScreenVideo;
-            }
-            if (screenVideoEl) {
-              if (screenVideoEl.srcObject) screenVideoEl.srcObject = null;
-              track.attach(screenVideoEl);
-            }
+            // 强制刷新确保视图更新
+            this.$forceUpdate();
+            console.log('🔄 强制刷新视图，切换到屏幕共享模式');
+
+            // 再次等待模板完全渲染
+            this.$nextTick(() => {
+              let screenVideoEl = null;
+              if (participantId === this.localParticipantId) {
+                screenVideoEl = this.$refs.screenShareVideo;
+              } else {
+                screenVideoEl = this.$refs.remoteScreenVideo;
+              }
+              if (screenVideoEl) {
+                if (screenVideoEl.srcObject) screenVideoEl.srcObject = null;
+                // 确保视频元素大小合适
+                screenVideoEl.style.width = '100%';
+                screenVideoEl.style.height = '100%';
+                screenVideoEl.style.objectFit = 'contain';
+                track.attach(screenVideoEl);
+                const videoTracks = track.mediaStream.getVideoTracks();
+                const width = videoTracks.length > 0 && videoTracks[0].getSettings ? videoTracks[0].getSettings().width : 'unknown';
+                const height = videoTracks.length > 0 && videoTracks[0].getSettings ? videoTracks[0].getSettings().height : 'unknown';
+                console.log(`✅ 已将屏幕共享轨道附加到视频元素，视频轨道信息: width=${width}, height=${height}`);
+              } else {
+                console.warn('❌ 未找到屏幕共享视频元素，尝试使用DOM查询');
+                // 备选方案：直接通过DOM查询获取视频元素
+                const videoElements = document.querySelectorAll('.screen-video');
+                if (videoElements.length > 0) {
+                  const videoEl = videoElements[0];
+                  if (videoEl.srcObject) videoEl.srcObject = null;
+                  // 确保视频元素大小合适
+                  videoEl.style.width = '100%';
+                  videoEl.style.height = '100%';
+                  videoEl.style.objectFit = 'contain';
+                  track.attach(videoEl);
+                  console.log(`✅ 已通过DOM查询将屏幕共享轨道附加到视频元素`);
+                }
+              }
+            });
           });
         } else if (track.kind === Track.Kind.Video) {
           this.updateParticipantVideo(participantId, true, track);
+          // 确保侧边栏视频元素也被更新
+          this.$nextTick(() => {
+            const sidebarEl = this.sidebarVideoRefs.get(participantId);
+            if (sidebarEl && track) {
+              if (sidebarEl.srcObject) sidebarEl.srcObject = null;
+              track.attach(sidebarEl);
+              console.log(`✅ 已将视频轨道附加到侧边栏 ${participantId}`);
+            }
+          });
         } else if (track.kind === Track.Kind.Audio) {
           // 处理远程音频：创建隐藏的 audio 元素并播放
           this.updateParticipantAudio(participantId, true);
@@ -1328,6 +1372,29 @@ export default {
   height: 100%;
   object-fit: cover;
 }
+.sidebar-avatar-placeholder {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+.sidebar-avatar-icon {
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 500;
+  color: #fff;
+}
 .sidebar-name {
   position: absolute;
   bottom: 6px;
@@ -1338,6 +1405,7 @@ export default {
   font-size: 10px;
   color: #fff;
   backdrop-filter: blur(4px);
+  z-index: 2;
 }
 
 /* 原有网格样式保持不变 */
