@@ -186,8 +186,8 @@ export default {
       localScreenTrack: null,
       screenStream: null,
       localCameraTrack: null,
-      activeScreenShareId: null,   // 当前正在共享屏幕的参与者ID（null表示无共享）
-      viewMode: 'grid',            // 'grid' 或 'screen-share'
+      activeScreenShareId: null,
+      viewMode: 'grid',
       // 参与者数据
       participants: {},
       localParticipantId: null,
@@ -209,10 +209,13 @@ export default {
       participantNames: new Map(),
       fetchingNames: new Set(),
       requireLogin: false,
+      // 音频元素管理
+      audioElements: new Map(),
+      pendingAudioElements: null,   // 存储被自动播放策略阻止的音频元素
+      audioTipShown: false,
     };
   },
   computed: {
-    // 网格模式下显示的参与者（排除屏幕共享者）
     videoItems() {
       const items = [];
       for (const [id, p] of Object.entries(this.participants)) {
@@ -228,7 +231,6 @@ export default {
       }
       return items;
     },
-    // 屏幕共享模式下侧边栏显示的参与者（排除屏幕共享者）
     sidebarParticipants() {
       if (this.viewMode !== 'screen-share') return [];
       const items = [];
@@ -286,9 +288,36 @@ export default {
       this.$toast.fail('缺少会议链接参数');
       setTimeout(() => this.leaveRoom(), 1500);
     }
+
+    // 添加用户交互监听，用于解决音频自动播放限制
+    const enableAudioOnInteraction = () => {
+      if (this.pendingAudioElements && this.pendingAudioElements.size > 0) {
+        this.pendingAudioElements.forEach(audioEl => {
+          audioEl.play().catch(e => console.warn('用户交互后播放失败:', e));
+        });
+        this.pendingAudioElements.clear();
+      }
+      // 移除监听，只触发一次
+      document.removeEventListener('click', enableAudioOnInteraction);
+      document.removeEventListener('touchstart', enableAudioOnInteraction);
+    };
+    document.addEventListener('click', enableAudioOnInteraction);
+    document.addEventListener('touchstart', enableAudioOnInteraction);
+    // 保存以便在 beforeDestroy 中清理
+    this._enableAudioOnInteraction = enableAudioOnInteraction;
   },
   beforeDestroy() {
     this.disconnectRoom();
+    // 清理音频元素
+    this.audioElements.forEach((el) => {
+      if (el && el.parentNode) el.parentNode.removeChild(el);
+    });
+    this.audioElements.clear();
+    // 清理交互监听
+    if (this._enableAudioOnInteraction) {
+      document.removeEventListener('click', this._enableAudioOnInteraction);
+      document.removeEventListener('touchstart', this._enableAudioOnInteraction);
+    }
     document.title = '工作助手';
   },
   methods: {
@@ -486,20 +515,52 @@ export default {
           audio: { echoCancellation: true, noiseCancellation: true, autoGainControl: true },
         });
         const publications = await Promise.all(tracks.map((track) => this.room.localParticipant.publishTrack(track)));
-        const cameraPub = publications.find((pub) => pub.track && pub.track.kind === Track.Kind.Video);
-        const micPub = publications.find((pub) => pub.track && pub.track.kind === Track.Kind.Audio);
+
+        // 检查音视频轨道
+        const cameraPub = publications.find((pub) => pub && pub.track && pub.track.kind === Track.Kind.Video);
+        const micPub = publications.find((pub) => pub && pub.track && pub.track.kind === Track.Kind.Audio);
+
+        // 更新本地视频状态
         if (cameraPub && cameraPub.track) {
           this.localCameraTrack = cameraPub.track;
           this.updateParticipantVideo(this.localParticipantId, true, this.localCameraTrack);
+          this.cameraEnabled = true;
+        } else {
+          this.localCameraTrack = null;
+          this.updateParticipantVideo(this.localParticipantId, false, null);
+          this.cameraEnabled = false;
         }
-        if (micPub && micPub.track) this.updateParticipantAudio(this.localParticipantId, true);
-        this.cameraEnabled = true;
-        this.microphoneEnabled = true;
+
+        // 更新本地音频状态
+        if (micPub && micPub.track) {
+          this.updateParticipantAudio(this.localParticipantId, true);
+          this.microphoneEnabled = true;
+          // 诊断：检查本地音频轨道是否有效
+          const audioStream = micPub.track.mediaStream;
+          if (audioStream) {
+            const audioTracks = audioStream.getAudioTracks();
+            if (audioTracks.length > 0) {
+              console.log('🎤 本地音频轨道信息:', audioTracks[0].label, 'enabled:', audioTracks[0].enabled);
+            } else {
+              console.warn('⚠️ 本地音频轨道 mediaStream 中无音频轨道');
+            }
+          } else {
+            console.warn('⚠️ 本地音频轨道 mediaStream 为空');
+          }
+        } else {
+          this.updateParticipantAudio(this.localParticipantId, false);
+          this.microphoneEnabled = false;
+          console.warn('⚠️ 未找到本地音频轨道发布');
+        }
+
         if (this.viewMode === 'screen-share') this.$nextTick(() => this.bindLocalCameraToFloating());
       } catch (error) {
         console.warn('媒体初始化失败:', error);
         this.$toast.fail('无法访问摄像头/麦克风：' + (error.message || '请检查权限设置'));
         this.updateParticipantVideo(this.localParticipantId, false, null);
+        this.updateParticipantAudio(this.localParticipantId, false);
+        this.cameraEnabled = false;
+        this.microphoneEnabled = false;
       }
     },
 
@@ -671,6 +732,12 @@ export default {
           this.activeScreenShareId = null;
           this.viewMode = 'grid';
         }
+        // 清理该参与者的音频元素
+        const audioEl = this.audioElements.get(participant.identity);
+        if (audioEl && audioEl.parentNode) {
+          audioEl.parentNode.removeChild(audioEl);
+          this.audioElements.delete(participant.identity);
+        }
       });
 
       room.on(RoomEvent.Disconnected, () => {
@@ -734,7 +801,34 @@ export default {
         } else if (track.kind === Track.Kind.Video) {
           this.updateParticipantVideo(participantId, true, track);
         } else if (track.kind === Track.Kind.Audio) {
+          // 处理远程音频：创建隐藏的 audio 元素并播放
           this.updateParticipantAudio(participantId, true);
+          let audioEl = this.audioElements.get(participantId);
+          if (!audioEl) {
+            audioEl = document.createElement('audio');
+            audioEl.id = `audio-${participantId}`;
+            audioEl.autoplay = true;
+            audioEl.style.display = 'none';
+            document.body.appendChild(audioEl);
+            this.audioElements.set(participantId, audioEl);
+          }
+          // 附加轨道
+          if (audioEl.srcObject !== track.mediaStream) {
+            if (audioEl.srcObject) audioEl.srcObject = null;
+            track.attach(audioEl);
+          }
+          // 尝试播放，处理自动播放策略
+          audioEl.play().then(() => {
+            console.log(`✅ 音频播放成功: ${participantId}`);
+          }).catch(err => {
+            console.warn(`⚠️ 音频播放被阻止 (${participantId}):`, err.message);
+            if (!this.pendingAudioElements) this.pendingAudioElements = new Set();
+            this.pendingAudioElements.add(audioEl);
+            if (!this.audioTipShown) {
+              this.audioTipShown = true;
+              this.$toast.info('点击页面任意位置即可听到声音', { duration: 3000 });
+            }
+          });
         }
       });
 
@@ -761,6 +855,12 @@ export default {
           this.updateParticipantVideo(participantId, false, null);
         } else if (track.kind === Track.Kind.Audio) {
           this.updateParticipantAudio(participantId, false);
+          // 清理音频元素
+          const audioEl = this.audioElements.get(participantId);
+          if (audioEl) {
+            if (audioEl.srcObject) audioEl.srcObject = null;
+            // 可以选择保留元素，但清除轨道后不再需要
+          }
         }
       });
 
@@ -832,7 +932,6 @@ export default {
 
     async shareScreen() {
       if (!this.room || !this.room.localParticipant) return;
-      // 如果已经在共享屏幕
       if (this.activeScreenShareId === this.localParticipantId) {
         await this.stopScreenShare();
         return;
@@ -897,7 +996,6 @@ export default {
     },
 
     switchToParticipant(participantId) {
-      // 可选：点击侧边栏切换主视图（演讲者模式），当前版本仅记录日志
       console.log('切换到参与者:', participantId);
     },
 
