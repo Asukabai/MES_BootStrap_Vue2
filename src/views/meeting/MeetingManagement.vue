@@ -148,6 +148,8 @@
 import { Toast } from 'vant';
 import SensorRequestPage from '../../utils/SensorRequestPage.js';
 import CustomizableFloatingButton from "../../components/CustomizableFloatingButton.vue";
+import {GetDingUserToken} from "../../utils/Dingding";
+import MqttService from "../../services/MqttService";
 
 export default {
   name: 'MeetingManagement',
@@ -222,20 +224,16 @@ export default {
 
     fetchMeetingList() {
       if (this.loading) return;
-
       this.loading = true;
-
       const param = {
         PageIndex: this.pagination.pageIndex,
         PageSize: this.pagination.pageSize
       };
-
       SensorRequestPage.MeetingInfoGetFunPage(
         JSON.stringify(param),
         (respData) => {
           try {
             const response = JSON.parse(respData);
-
             if (response.Data && Array.isArray(response.Data)) {
               this.list = response.Data;
               this.allData = response.Data;
@@ -265,7 +263,6 @@ export default {
         }
       );
     },
-
     toggleExpand(index) {
       if (this.expandedIndex === index) {
         this.expandedIndex = null;
@@ -275,6 +272,10 @@ export default {
     },
 
     joinVideoMeeting(item) {
+      const department = this.$route.params.department
+      GetDingUserToken(department, async (token) => {
+        // ✅ 获取到 token 后，继续请求会议链接
+        console.log('获取到钉钉用户 Token:', token);
       const param = {
         Meeting_Name: item.Meeting_Name,
         Meeting_Description: item.Meeting_Description,
@@ -291,19 +292,22 @@ export default {
         Ts_edit: item.Ts_edit,
         Logic_del: item.Logic_del
       };
-
       console.log('请求视频会议 Token，参数:', param);
-
       SensorRequestPage.Ding_GetMeetingToken(
         JSON.stringify(param),
         (respData) => {
           try {
             console.log('获取视频会议 Token 成功，响应:', respData);
-
             const meetingUrl = respData;
-
             if (meetingUrl && typeof meetingUrl === 'string') {
-              this.navigateTo(`/videoMeeting?meetingUrl=${encodeURIComponent(meetingUrl)}&meetingName=${encodeURIComponent(item.Meeting_Name)}`);
+              // 从完整的 URL 中提取 data= 后面的内容
+              const dataMatch = meetingUrl.match(/[?&]data=([^&]*)/);
+              const dataContent = dataMatch && dataMatch[1] ? dataMatch[1] : meetingUrl;
+              console.log('从 URL 中提取的 data 内容:', dataContent);
+              this.navigateTo(`/videoMeeting?data=${encodeURIComponent(dataContent)}&token=${encodeURIComponent(token)}`);
+              console.log('跳转至视频会议页面1，参数:', meetingUrl);
+              console.log('跳转至视频会议页面2，参数:', item.Meeting_Name);
+              console.log('跳转至视频会议页面3，参数拼接规则:', `/videoMeeting?data=${encodeURIComponent(dataContent)}&token=${encodeURIComponent(token)}`);
             } else {
               this.$toast.fail('获取会议链接失败');
             }
@@ -317,6 +321,7 @@ export default {
           this.$toast.fail('获取会议链接失败');
         }
       );
+      })
     },
 
     copyMeetingLink(link) {
