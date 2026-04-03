@@ -89,6 +89,7 @@ import inventoryIconNew from '@/assets/库存业务.png'
 import inventoryDownLoad from '@/assets/库存导出.png'
 import scanConfigIcon from '@/assets/scan_icon.png'
 import uploadIcon from '@/assets/跨公司调拨.png'
+import meetingReport from '@/assets/项目总览@3x.png'
 import {
   key_DingScannedInventoryQRCodeResult,
   updateCachedInventoryProductId,
@@ -118,11 +119,11 @@ export default {
           title: '项目列表',
           path: '/project-list',
         },
-        {
-          icon: fileStatIcon,
-          title: '文件统计',
-          path: '/file-statistics',
-        },
+        // {
+        //   icon: fileStatIcon,
+        //   title: '文件统计',
+        //   path: '/file-statistics',
+        // },
         {
           icon: feedbackIcon,
           title: '知识库',
@@ -151,6 +152,10 @@ export default {
         {
           icon: weeklyReport,
           title: '周报管理',
+          path: '/weekly-report',
+        },        {
+          icon: meetingReport,
+          title: '会议管理',
           path: '/weekly-report',
         },
         {
@@ -403,6 +408,9 @@ export default {
       }
       if (item.title === '周报管理') {
         this.navigateTo('/weeklyReportManagement');
+      }
+      if (item.title === '会议管理') {
+        this.navigateTo('/meetingManagement');
       }
       if (item.title === '库存管理') {
         this.navigateTo('/inventory');
