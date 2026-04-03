@@ -297,6 +297,13 @@ const router = new Router({
       component: () => import('@/views/meeting/VideoMeeting.vue'),
       meta: { title: '视频会议' }
     },
+    // ✅ 新增：手机号验证码登录页面路由
+    {
+      path: '/:department/phone-login',
+      name: 'PhoneLogin',
+      component: () => import('@/views/meeting/PhoneLogin.vue'),
+      meta: { title: '身份验证' }
+    },
     {
       path: '/:department/inventoryDetail',
       name: 'InventoryDetail',

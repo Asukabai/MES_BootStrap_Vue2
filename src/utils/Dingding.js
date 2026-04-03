@@ -80,6 +80,8 @@ export function getLoginCodeByDepartment(department) {
   return department === 'taiyuan' ? 'Dajun_GetMFACode' : 'Ding_GetMFACode';
 }
 
+// ✅ 新增：获取手机号登录方法名
+
 // 定义了两个变量，分别用于存储请求ID和目标URL，默认值分别为1和null。
 let reqID = 1
 let urlTarget = null
