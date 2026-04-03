@@ -54,6 +54,7 @@
               autoplay
               playsinline
               class="screen-video"
+              style="width: 100%; height: 100%; object-fit: contain; video-rendering-quality: high;"
             ></video>
             <div class="screen-share-label">
               正在共享屏幕：{{ getDisplayNameById(activeScreenShareId) }}
@@ -492,10 +493,20 @@ export default {
       const loadingToast = this.$toast.loading({ message: '正在加入会议室...', forbidClick: true, duration: 0 });
       try {
         this.room = new Room({
-          adaptiveStream: true,
+          adaptiveStream: false, // 禁用自适应流，确保屏幕共享始终保持高质量
           dynacast: true,
-          videoCaptureDefaults: { resolution: VideoPresets.h540 },
+          videoCaptureDefaults: { resolution: VideoPresets.h720 },
           audioCaptureDefaults: { echoCancellation: true, noiseCancellation: true, autoGainControl: true },
+          networkQuality: {
+            enabled: true,
+            interval: 1000,
+          },
+          videoSubscription: {
+            quality: 'high',
+            maxWidth: 3840, // 提高最大宽度以支持4K屏幕共享
+            maxHeight: 2160, // 提高最大高度以支持4K屏幕共享
+            maxFrameRate: 30,
+          },
         });
         this.setupRoomEvents();
         await this.room.connect(this.wsUrl, token, { name: userName });
@@ -619,12 +630,24 @@ export default {
         const videoEl = this.videoRefs.get(participantId);
         if (videoEl) {
           if (videoEl.srcObject) videoEl.srcObject = null;
+          // 确保视频元素显示设置
+          videoEl.style.width = '100%';
+          videoEl.style.height = '100%';
+          videoEl.style.objectFit = 'contain';
+          videoEl.style.videoRenderingQuality = 'high';
+          videoEl.style.transform = 'translateZ(0)';
           track.attach(videoEl);
           console.log(`✅ 已将视频轨道附加到 ${participantId}`);
         } else {
           this.$nextTick(() => {
             const fallbackEl = document.querySelector(`video[data-participant-id="${participantId}"]`);
             if (fallbackEl && track) {
+              // 确保视频元素显示设置
+              fallbackEl.style.width = '100%';
+              fallbackEl.style.height = '100%';
+              fallbackEl.style.objectFit = 'contain';
+              fallbackEl.style.videoRenderingQuality = 'high';
+              fallbackEl.style.transform = 'translateZ(0)';
               track.attach(fallbackEl);
               console.log(`✅ (fallback) 已将视频轨道附加到 ${participantId}`);
             }
@@ -634,6 +657,12 @@ export default {
         const sidebarEl = this.sidebarVideoRefs.get(participantId);
         if (sidebarEl && sidebarEl.srcObject !== track.mediaStream) {
           if (sidebarEl.srcObject) sidebarEl.srcObject = null;
+          // 确保侧边栏视频元素显示设置
+          sidebarEl.style.width = '100%';
+          sidebarEl.style.height = '100%';
+          sidebarEl.style.objectFit = 'cover';
+          sidebarEl.style.videoRenderingQuality = 'high';
+          sidebarEl.style.transform = 'translateZ(0)';
           track.attach(sidebarEl);
         }
       } else if (!hasVideo) {
@@ -800,53 +829,99 @@ export default {
 
         // 屏幕共享轨道处理
         if (track.source === Track.Source.ScreenShare || (track.kind === Track.Kind.Video && track.source === 'unknown')) {
-          console.log('📺 接收到屏幕共享轨道，来自:', participantId, 'source:', track.source);
-          // 先更新状态
-          this.activeScreenShareId = participantId;
-          this.viewMode = 'screen-share';
+            console.log('📺 接收到屏幕共享轨道，来自:', participantId, 'source:', track.source);
+            // 先更新状态
+            this.activeScreenShareId = participantId;
+            this.viewMode = 'screen-share';
 
-          // 等待模板渲染完成后再绑定视频元素
-          this.$nextTick(() => {
-            // 强制刷新确保视图更新
-            this.$forceUpdate();
-            console.log('🔄 强制刷新视图，切换到屏幕共享模式');
-
-            // 再次等待模板完全渲染
+            // 等待模板渲染完成后再绑定视频元素
             this.$nextTick(() => {
-              let screenVideoEl = null;
-              if (participantId === this.localParticipantId) {
-                screenVideoEl = this.$refs.screenShareVideo;
-              } else {
-                screenVideoEl = this.$refs.remoteScreenVideo;
-              }
-              if (screenVideoEl) {
-                if (screenVideoEl.srcObject) screenVideoEl.srcObject = null;
-                // 确保视频元素大小合适
-                screenVideoEl.style.width = '100%';
-                screenVideoEl.style.height = '100%';
-                screenVideoEl.style.objectFit = 'contain';
-                track.attach(screenVideoEl);
-                const videoTracks = track.mediaStream.getVideoTracks();
-                const width = videoTracks.length > 0 && videoTracks[0].getSettings ? videoTracks[0].getSettings().width : 'unknown';
-                const height = videoTracks.length > 0 && videoTracks[0].getSettings ? videoTracks[0].getSettings().height : 'unknown';
-                console.log(`✅ 已将屏幕共享轨道附加到视频元素，视频轨道信息: width=${width}, height=${height}`);
-              } else {
-                console.warn('❌ 未找到屏幕共享视频元素，尝试使用DOM查询');
-                // 备选方案：直接通过DOM查询获取视频元素
-                const videoElements = document.querySelectorAll('.screen-video');
-                if (videoElements.length > 0) {
-                  const videoEl = videoElements[0];
-                  if (videoEl.srcObject) videoEl.srcObject = null;
-                  // 确保视频元素大小合适
-                  videoEl.style.width = '100%';
-                  videoEl.style.height = '100%';
-                  videoEl.style.objectFit = 'contain';
-                  track.attach(videoEl);
-                  console.log(`✅ 已通过DOM查询将屏幕共享轨道附加到视频元素`);
+              // 强制刷新确保视图更新
+              this.$forceUpdate();
+              console.log('🔄 强制刷新视图，切换到屏幕共享模式');
+
+              // 再次等待模板完全渲染
+              this.$nextTick(() => {
+                let screenVideoEl = null;
+                if (participantId === this.localParticipantId) {
+                  screenVideoEl = this.$refs.screenShareVideo;
+                } else {
+                  screenVideoEl = this.$refs.remoteScreenVideo;
                 }
-              }
+                if (screenVideoEl) {
+                  // 重置视频元素状态
+                  if (screenVideoEl.srcObject) screenVideoEl.srcObject = null;
+                  
+                  // 确保视频元素大小合适，优化显示设置
+                  screenVideoEl.style.width = '100%';
+                  screenVideoEl.style.height = '100%';
+                  screenVideoEl.style.objectFit = 'contain';
+                  screenVideoEl.style.videoRenderingQuality = 'high';
+                  screenVideoEl.style.transform = 'translateZ(0)'; // 启用硬件加速
+                  screenVideoEl.style.imageRendering = 'crisp-edges'; // 保持像素清晰，比pixelated效果更好
+                  screenVideoEl.style.webkitTransform = 'translateZ(0)'; // 兼容性处理
+                  screenVideoEl.style.mozTransform = 'translateZ(0)'; // 兼容性处理
+                  screenVideoEl.style.msTransform = 'translateZ(0)'; // 兼容性处理
+                  screenVideoEl.style.willChange = 'transform'; // 提示浏览器优化
+                  screenVideoEl.style.backfaceVisibility = 'hidden'; // 提高渲染性能
+                  screenVideoEl.style.perspective = '1000px'; // 增强3D渲染效果
+                  screenVideoEl.style.perspectiveOrigin = 'center center'; // 增强3D渲染效果
+                  
+                  // 确保轨道质量
+                  if (track.videoDimensions) {
+                    console.log(`📊 屏幕共享轨道尺寸: ${track.videoDimensions.width}x${track.videoDimensions.height}`);
+                  }
+                  
+                  // 检查轨道的发布信息
+                  if (track.publication) {
+                    console.log(`📢 轨道发布信息:`, track.publication);
+                    // 确保订阅最高质量
+                    if (track.publication.setQuality) {
+                      track.publication.setQuality('high').catch(err => {
+                        console.warn('设置轨道质量失败:', err);
+                      });
+                    }
+                  }
+                  
+                  // 附加轨道到视频元素
+                  track.attach(screenVideoEl);
+                  
+                  // 检查实际附加的流质量
+                  const videoTracks = track.mediaStream.getVideoTracks();
+                  if (videoTracks.length > 0) {
+                    const videoTrack = videoTracks[0];
+                    if (videoTrack.getSettings) {
+                      const settings = videoTrack.getSettings();
+                      console.log(`✅ 已将屏幕共享轨道附加到视频元素，视频轨道信息: width=${settings.width}, height=${settings.height}, frameRate=${settings.frameRate}`);
+                    }
+                  }
+                } else {
+                  console.warn('❌ 未找到屏幕共享视频元素，尝试使用DOM查询');
+                  // 备选方案：直接通过DOM查询获取视频元素
+                  const videoElements = document.querySelectorAll('.screen-video');
+                  if (videoElements.length > 0) {
+                    const videoEl = videoElements[0];
+                    if (videoEl.srcObject) videoEl.srcObject = null;
+                    // 确保视频元素大小合适，优化显示设置
+                    videoEl.style.width = '100%';
+                    videoEl.style.height = '100%';
+                    videoEl.style.objectFit = 'contain';
+                    videoEl.style.videoRenderingQuality = 'high';
+                    videoEl.style.transform = 'translateZ(0)'; // 启用硬件加速
+                    videoEl.style.imageRendering = 'crisp-edges'; // 保持像素清晰，比pixelated效果更好
+                    videoEl.style.webkitTransform = 'translateZ(0)'; // 兼容性处理
+                    videoEl.style.mozTransform = 'translateZ(0)'; // 兼容性处理
+                    videoEl.style.msTransform = 'translateZ(0)'; // 兼容性处理
+                    videoEl.style.willChange = 'transform'; // 提示浏览器优化
+                    videoEl.style.backfaceVisibility = 'hidden'; // 提高渲染性能
+                    videoEl.style.perspective = '1000px'; // 增强3D渲染效果
+                    videoEl.style.perspectiveOrigin = 'center center'; // 增强3D渲染效果
+                    track.attach(videoEl);
+                    console.log(`✅ 已通过DOM查询将屏幕共享轨道附加到视频元素`);
+                  }
+                }
+              });
             });
-          });
         } else if (track.kind === Track.Kind.Video) {
           this.updateParticipantVideo(participantId, true, track);
           // 确保侧边栏视频元素也被更新
@@ -949,6 +1024,15 @@ export default {
           this.updateParticipantAudio(participantId, true);
         }
       });
+
+      // 网络质量变化事件
+      room.on(RoomEvent.NetworkQualityChanged, (quality) => {
+        console.log(`📶 网络质量变化:`, quality);
+        if (quality.downlinkQuality < 3) {
+          console.warn(`⚠️ 网络质量较差，可能影响屏幕共享画质`);
+          // 可以在这里添加网络质量警告提示
+        }
+      });
     },
 
     // ==================== 控制方法 ====================
@@ -999,13 +1083,18 @@ export default {
         return;
       }
       try {
-        // 获取屏幕流，并请求高分辨率（实际由系统提供）
+        // 获取屏幕流，并请求高分辨率
         const stream = await navigator.mediaDevices.getDisplayMedia({
           video: {
-            cursor: 'always',          // 显示鼠标
-            displaySurface: 'monitor',  // 推荐捕获整个屏幕
+            cursor: 'always',
+            displaySurface: 'monitor',
+            width: { ideal: 1920, max: 3840 },
+            height: { ideal: 1080, max: 2160 },
+            frameRate: { ideal: 30, max: 60 },
+            // 关键：要求最高质量的视频
+            aspectRatio: { ideal: 16/9 },
           },
-          audio: false,  // 不捕获系统音频，避免权限复杂
+          audio: false,
         });
         const videoTrack = stream.getVideoTracks()[0];
         if (!videoTrack) throw new Error('无法获取屏幕视频轨道');
@@ -1017,7 +1106,7 @@ export default {
         const width = settings.width || 1920;
         const height = settings.height || 1080;
         // 根据分辨率动态设置最大比特率（保证清晰度）
-        const maxBitrate = Math.min(8000000, Math.max(2500000, (width * height) / 0.3)); // 约2.5~8 Mbps
+        const maxBitrate = Math.min(10000000, Math.max(3000000, (width * height) / 0.25)); // 约3~10 Mbps
         console.log(`📺 屏幕共享分辨率: ${width}x${height}, 编码比特率: ${maxBitrate} bps`);
 
         // 创建本地屏幕共享轨道
@@ -1026,15 +1115,23 @@ export default {
           source: Track.Source.ScreenShare,
         });
 
-        // 发布轨道时指定高质量编码参数
+        // 发布轨道时指定高质量编码参数 - LiveKit 2.18.0 最佳实践
         await this.room.localParticipant.publishTrack(localScreenTrack, {
+          name: 'screen',
+          source: Track.Source.ScreenShare,
           videoEncoding: {
-            width: width,
-            height: height,
-            maxBitrate: maxBitrate,
+            maxBitrate: Math.min(20000000, Math.max(5000000, (width * height) / 0.15)), // 提高比特率上限和下限
             maxFramerate: 30,
             priority: 'high',
           },
+          // 关键：屏幕共享优先保持分辨率，而不是帧率
+          degradationPreference: 'maintain-resolution',
+          // 禁用 simulcast 以避免质量降级
+          simulcast: false,
+          // 确保轨道被所有参与者订阅
+          stopSubscriptions: false,
+          // 确保轨道以最高质量发布
+          videoQuality: 'high',
         });
 
         this.localScreenTrack = localScreenTrack;
@@ -1047,6 +1144,12 @@ export default {
           if (screenVideo) {
             if (screenVideo.srcObject) screenVideo.srcObject = null;
             screenVideo.srcObject = stream;
+            // 优化显示设置，确保清晰度
+            screenVideo.style.width = '100%';
+            screenVideo.style.height = '100%';
+            screenVideo.style.objectFit = 'contain';
+            screenVideo.style.videoRenderingQuality = 'high';
+            screenVideo.style.transform = 'translateZ(0)'; // 启用硬件加速
           }
         });
         this.$nextTick(() => this.bindLocalCameraToFloating());
