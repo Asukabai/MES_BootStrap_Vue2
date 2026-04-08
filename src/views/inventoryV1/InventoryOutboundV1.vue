@@ -61,6 +61,46 @@
               </button>
             </div>
           </div>
+          <!-- 是否关联项目 -->
+          <div class="form-group">
+            <div class="switch-container">
+              <label class="form-label">关联项目</label>
+              <div class="switch-wrapper">
+                <span class="switch-label-text">{{ needProject ? '是' : '否' }}</span>
+                <div
+                  class="custom-switch"
+                  :class="{ 'active': needProject }"
+                  @click="toggleProject"
+                >
+                  <div class="switch-handle"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <!-- 关联项目选择器 -->
+          <div v-if="needProject" class="form-group">
+            <label class="form-label">项目列表</label>
+            <ProjectSelector
+              ref="projectSelector"
+              field-name="Project_Code"
+              label=""
+              placeholder="请选择关联项目"
+              :rules="[]"
+              @change="onProjectChange"
+            />
+          </div>
+          <!-- 使用用户 -->
+          <div class="form-group">
+            <label class="form-label">领用人</label>
+            <PersonSelector
+              ref="personSelector"
+              field-name="Employ_Person"
+              label=""
+              placeholder="请选择实际领用人"
+              :rules="[]"
+              @change="onPersonChange"
+            />
+          </div>
           <!-- 备注 -->
           <div class="form-group">
             <label class="form-label">备注</label>
@@ -108,6 +148,8 @@
 <script>import SensorRequest from '../../utils/SensorRequest.js';
 import {key_DingName, key_DingUserIndex, key_DingUserPhone} from "../../utils/Dingding";
 import SensorRequestPage from "../../utils/SensorRequestPage";
+import ProjectSelector from "../../components/ProjectSelector.vue";
+import PersonSelector from "../../components/PersonSelector.vue";
 function getLocalUserInfo() {
   const name = localStorage.getItem(key_DingName);
   const phone = localStorage.getItem(key_DingUserPhone);
@@ -121,6 +163,7 @@ function getLocalUserInfo() {
 }
 export default {
   name: 'InventoryOutbound',
+  components: {PersonSelector, ProjectSelector},
   data() {
     return {
       itemData: {
@@ -134,6 +177,9 @@ export default {
       outboundQuantity: 0,
       outboundType: 4,
       remark: '',
+      selectedPerson: null,
+      selectedProject: null,
+      needProject: false,
       showSuccess: false,
       outboundTypeColumns: [
         { text: '项目领用', value: 4 },
@@ -154,7 +200,64 @@ export default {
       this.itemData = JSON.parse(this.$route.query.item);
     }
   },
+  mounted() {
+    // 页面挂载后设置默认使用用户
+    this.setDefaultPerson();
+  },
   methods: {
+    setDefaultPerson() {
+      const userInfo = getLocalUserInfo();
+      if (!userInfo.name || !this.$refs.personSelector) {
+        return;
+      }
+
+      // 等待人员列表加载完成后设置默认值
+      const checkAndSetPerson = () => {
+        const personList = this.$refs.personSelector.fullPersonList;
+        if (personList && personList.length > 0) {
+          // 根据钉钉ID或手机号或姓名查找当前用户
+          const currentUser = personList.find(person =>
+            person.Person_DingID === userInfo.dingID ||
+            person.Person_Phone === userInfo.phone ||
+            person.Person_Name === userInfo.name
+          );
+
+          if (currentUser) {
+            this.$refs.personSelector.setPerson(
+              currentUser.Person_Name,
+              currentUser.Person_Department || '',
+              currentUser.Person_Phone || '',
+              currentUser.Person_DingID || '',
+              currentUser.ID_Person || null
+            );
+            this.selectedPerson = {
+              personName: currentUser.Person_Name,
+              personDepartment: currentUser.Person_Department || '',
+              personPhone: currentUser.Person_Phone || '',
+              personDingID: currentUser.Person_DingID || '',
+              personId: currentUser.ID_Person || null,
+              fullData: currentUser
+            };
+          } else {
+            // 如果找不到匹配的人员，至少设置姓名
+            this.$refs.personSelector.setPerson(userInfo.name);
+            this.selectedPerson = {
+              personName: userInfo.name,
+              personDepartment: '',
+              personPhone: userInfo.phone,
+              personDingID: userInfo.dingID,
+              personId: null,
+              fullData: null
+            };
+          }
+        } else {
+          // 如果人员列表还没加载，延迟重试
+          setTimeout(checkAndSetPerson, 500);
+        }
+      };
+
+      checkAndSetPerson();
+    },
     onClickLeft() {
       this.$router.go(-1);
     },
@@ -166,9 +269,30 @@ export default {
         this.outboundQuantity = 0;
       }
     },
+    onProjectChange(projectInfo) {
+      this.selectedProject = projectInfo;
+      console.log('选中的项目:', projectInfo);
+    },
+    onPersonChange(personInfo) {
+      this.selectedPerson = personInfo;
+      console.log('选中的人员:', personInfo);
+    },
+    toggleProject() {
+      this.needProject = !this.needProject;
+      if (!this.needProject) {
+        this.selectedProject = null;
+        if (this.$refs.projectSelector) {
+          this.$refs.projectSelector.clearSelection();
+        }
+      }
+    },
     async onConfirm() {
       if (!this.canSubmit) {
         this.$toast.fail('出库数量必须大于0');
+        return;
+      }
+      if (this.outboundType === 4 && !this.selectedProject) {
+        this.$toast.fail('项目领用必须选择“关联项目”内容');
         return;
       }
       try {
@@ -189,6 +313,12 @@ export default {
             Person_Phone: getLocalUserInfo().phone ,
             Person_DingID: getLocalUserInfo().dingID
           },
+          Employ_Person: {
+            Person_Name: this.selectedPerson.personName,
+            Person_Phone: this.selectedPerson.personPhone,
+            Person_DingID: this.selectedPerson.personDingID
+          },
+          Project_Code: this.selectedProject ? this.selectedProject.projectCode : '',
           Remark: this.remark || this.itemData.Remark || ''
         };
         // 调用出库接口
@@ -207,7 +337,7 @@ export default {
           },
           (error) => {
             console.error('出库失败:', error);
-            this.$toast.fail('出库操作失败: ' + (error.message || '未知错误'));
+            this.$toast.fail('出库操作失败: ' + (error.msg || '未知错误'));
           }
         );
       } catch (error) {
@@ -426,6 +556,55 @@ export default {
   font-size: 12px;
   color: #999;
   margin-top: 4px;
+}
+
+/* 开关样式 */
+.switch-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 0;
+}
+
+.switch-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.switch-label-text {
+  font-size: 14px;
+  color: #666;
+}
+
+.custom-switch {
+  position: relative;
+  width: 52px;
+  height: 32px;
+  background: #e0e0e0;
+  border-radius: 16px;
+  cursor: pointer;
+  transition: background 0.3s;
+}
+
+.custom-switch.active {
+  background: #3f83f8;
+}
+
+.switch-handle {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 28px;
+  height: 28px;
+  background: white;
+  border-radius: 50%;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.3s;
+}
+
+.custom-switch.active .switch-handle {
+  transform: translateX(20px);
 }
 
 /* 底部操作栏 */
