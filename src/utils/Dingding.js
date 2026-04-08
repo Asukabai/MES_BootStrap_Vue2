@@ -30,6 +30,10 @@ export const key_DingScannedInventoryQRCodeResult = "key_DingScannedInventoryQRC
 export const key_DingResponseStored = "key_DingResponseStored"
 export const key_DingResponseUsed = "key_DingResponseUsed"
 
+// ✅ 新增：视频会议专用token存储键
+export const key_VideoMeetingToken = "sensor_VideoMeetingToken"
+export const key_VideoMeetingTokenTS = "sensor_VideoMeetingTokenTS"
+
 // 定义全局变量
 export let cachedProductId = '晟思'; // 默认值
 export let cachedInventoryProductId = '库存物品二维码ID'; // 默认值
