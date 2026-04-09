@@ -175,7 +175,8 @@
 <script>
 import { Room, RoomEvent, Track, VideoPresets, LocalVideoTrack, createLocalTracks } from 'livekit-client';
 import SensorRequest from '../../utils/SensorRequest.js';
-import { key_DingTokenJWT } from '../../utils/Dingding.js';
+import {GetDingUserToken, key_DingTokenJWT, key_VideoMeetingToken} from '../../utils/Dingding.js';
+import SensorRequestPage from "../../utils/SensorRequestPage";
 
 export default {
   name: 'VideoMeeting',
@@ -197,6 +198,8 @@ export default {
       participants: {},
       localParticipantId: null,
       isInDingTalk: false,
+      // Token获取状态
+      isWaitingForToken: false,
       // 拖拽缩放
       isDragging: false,
       isResizing: false,
@@ -256,11 +259,30 @@ export default {
     },
   },
   created() {
-    this.meetingUrl = decodeURIComponent(this.$route.query.data || '');
-    console.log('[VideoMeeting] 获取会议地址：', this.meetingUrl);
-    // 解析 JSON 字符串为对象
-    let meetingData = null;
+    const rawData = this.$route.query.data || '';
+    console.log('[VideoMeeting] 获取原始会议地址参数：', rawData);
+
     try {
+      // ✅ 第一步：Base64 解码
+      let decodedData = rawData;
+
+      // 检查是否是 Base64 编码（包含常见 Base64 特征）
+      if (rawData && /^[A-Za-z0-9+/=]+$/.test(rawData) && rawData.length > 100) {
+        console.log('[VideoMeeting] 检测到 Base64 编码，开始解码...');
+        // 浏览器环境使用 atob 进行 Base64 解码
+        decodedData = decodeURIComponent(escape(window.atob(rawData)));
+        console.log('[VideoMeeting] Base64 解码成功:', decodedData);
+      } else {
+        // 如果不是 Base64，尝试 URL 解码
+        decodedData = decodeURIComponent(rawData);
+        console.log('[VideoMeeting] URL 解码结果:', decodedData);
+      }
+
+      this.meetingUrl = decodedData;
+      console.log('[VideoMeeting] 最终会议地址：', this.meetingUrl);
+
+      // ✅ 第二步：解析 JSON 字符串为对象
+      let meetingData = null;
       meetingData = typeof this.meetingUrl === 'string' ? JSON.parse(this.meetingUrl) : this.meetingUrl;
       console.log('[VideoMeeting] 解析后的会议数据：', meetingData);
       console.log('[VideoMeeting] 获取会议房间：', meetingData.room);
@@ -268,42 +290,52 @@ export default {
       this.roomName = meetingData.room || '未命名会议';
     } catch (error) {
       console.error('[VideoMeeting] 解析会议数据失败:', error);
+      console.error('[VideoMeeting] 原始数据:', this.$route.query.data);
       this.roomName = '未命名会议';
+      this.$toast.fail('会议数据格式错误');
     }
     document.title = this.roomName;
   },
+
   mounted() {
     this.checkDingTalkEnvironment();
+
+    // const department = this.$route.params.department
+    // GetDingUserToken(department, async (token) => {
+    //   // ✅ 获取到 token 后，继续请求会议链接
+    //   console.log('获取到钉钉用户 Token 用于视频会议 :', token);
+    //   localStorage.setItem(key_DingTokenJWT, token);
+    //   console.log('[VideoMeeting] 检测到浏览器环境，尝试自动加载刷新获取 token，用于请求会议 token ：', token);
+    // })
     if (!this.isInDingTalk) {
       const urlToken = this.$route.query.token;
-      localStorage.setItem(key_DingTokenJWT, urlToken);
-      console.log('[VideoMeeting] 检测到浏览器环境，尝试从 URL 获取 token：', urlToken);
-      // const userToken = urlToken || localStorage.getItem(key_DingTokenJWT);
-      // if (!userToken) {
-      //   console.log('[VideoMeeting] 检测到浏览器环境且无 token，跳转到登录页');
-      //   this.requireLogin = true;
-      //   const department = this.$route.params.department;
-      //   this.$router.replace({
-      //     path: `/${department}/phone-login`,
-      //     query: {
-      //       meetingUrl: this.$route.query.meetingUrl,
-      //       meetingName: this.$route.query.meetingName,
-      //       token: urlToken,
-      //     },
-      //   });
-      //   return;
-      // }
-      if (urlToken && !localStorage.getItem(key_DingTokenJWT)) {
-        localStorage.setItem(key_DingTokenJWT, urlToken);
-        console.log('[VideoMeeting] 已保存 URL token 到 localStorage');
+      const onceToken = this.$route.query.onceToken;
+      console.log('[VideoMeeting] 检测到浏览器环境');
+      console.log('[VideoMeeting] URL中的token参数:', urlToken);
+      console.log('[VideoMeeting] URL中的一次性密钥:', onceToken);
+      // ✅ 检查视频会议专用的token缓存（不是钉钉登录token）
+      const cachedVideoToken = localStorage.getItem(key_VideoMeetingToken);
+      console.log('[VideoMeeting] 视频会议专用token缓存:', cachedVideoToken ? '存在' : '不存在');
+      if (cachedVideoToken) {
+        // 缓存中存在视频会议token，直接使用，无需调用接口
+        console.log('[VideoMeeting] 使用缓存中的视频会议token，无需重新获取');
+        // 将token保存到本地（便于后续的接口调用）
+        localStorage.setItem(key_DingTokenJWT, cachedVideoToken);
+        // 直接加入房间
+        this.parseAndJoinRoom();
+      } else if (onceToken && typeof onceToken === 'string') {
+        // 缓存中不存在视频会议token，但URL中有一次性密钥，调用接口获取长时间token
+        console.log('[VideoMeeting] 缓存中无视频会议token，使用一次性密钥获取长时间token...');
+        this.isWaitingForToken = true;
+        this.fetchLongTokenByOnce(onceToken);
+      } else {
+        console.warn('[VideoMeeting] 未找到有效的token或一次性密钥');
+        this.$toast.fail('缺少身份验证信息');
+        setTimeout(() => this.leaveRoom(), 1500);
       }
-    }
-    if (this.isInDingTalk) return;
-    if (this.meetingUrl) {
-      this.parseAndJoinRoom();
     } else {
-      this.$toast.fail('缺少会议链接参数');
-      setTimeout(() => this.leaveRoom(), 1500);
+      // 钉钉环境下直接返回
+      return;
     }
 
     // 添加用户交互监听，用于解决音频自动播放限制
@@ -431,6 +463,45 @@ export default {
       }
       const realName = await this.fetchPersonName(participantId);
       this.registerParticipantName(participantId, realName);
+    },
+// ==================== Token获取 ====================
+    /**
+     * 使用一次性密钥获取长时间token（并加入房间）
+     * @param {string} onceToken - 一次性密钥
+     */
+    fetchLongTokenByOnce(onceToken) {
+      console.log('[VideoMeeting] 开始调用Ding_GetTokenByOnce接口...');
+      console.log('[VideoMeeting] 一次性密钥:', onceToken);
+
+      SensorRequestPage.Ding_GetTokenByOnce(
+        onceToken,
+        (longToken) => {
+          try {
+            console.log('[VideoMeeting] 获取长时间token成功:', longToken);
+
+            if (longToken && typeof longToken === 'string') {
+              // ✅ 保存到视频会议专用的token存储中
+              localStorage.setItem(key_VideoMeetingToken, longToken);
+              console.log('[VideoMeeting] 已保存长时间token到localStorage（视频会议专用）')
+              // 也存储到钉钉token存储中
+              localStorage.setItem(key_DingTokenJWT, longToken);
+              this.$toast.success('身份验证成功');
+              // 直接加入房间
+              this.parseAndJoinRoom();
+            } else {
+              console.error('[VideoMeeting] 返回的token格式不正确:', longToken);
+              this.$toast.fail('获取token失败');
+            }
+          } catch (error) {
+            console.error('[VideoMeeting] 处理长时间token失败:', error);
+            this.$toast.fail('token处理失败');
+          }
+        },
+        (error) => {
+          console.error('[VideoMeeting] 获取长时间token失败:', error);
+          this.$toast.fail('身份验证失败，请重新进入会议');
+        }
+      );
     },
 
     // ==================== 钉钉环境 ====================
@@ -851,7 +922,7 @@ export default {
                 if (screenVideoEl) {
                   // 重置视频元素状态
                   if (screenVideoEl.srcObject) screenVideoEl.srcObject = null;
-                  
+
                   // 确保视频元素大小合适，优化显示设置
                   screenVideoEl.style.width = '100%';
                   screenVideoEl.style.height = '100%';
@@ -866,12 +937,12 @@ export default {
                   screenVideoEl.style.backfaceVisibility = 'hidden'; // 提高渲染性能
                   screenVideoEl.style.perspective = '1000px'; // 增强3D渲染效果
                   screenVideoEl.style.perspectiveOrigin = 'center center'; // 增强3D渲染效果
-                  
+
                   // 确保轨道质量
                   if (track.videoDimensions) {
                     console.log(`📊 屏幕共享轨道尺寸: ${track.videoDimensions.width}x${track.videoDimensions.height}`);
                   }
-                  
+
                   // 检查轨道的发布信息
                   if (track.publication) {
                     console.log(`📢 轨道发布信息:`, track.publication);
@@ -882,10 +953,10 @@ export default {
                       });
                     }
                   }
-                  
+
                   // 附加轨道到视频元素
                   track.attach(screenVideoEl);
-                  
+
                   // 检查实际附加的流质量
                   const videoTracks = track.mediaStream.getVideoTracks();
                   if (videoTracks.length > 0) {
