@@ -312,12 +312,14 @@ export default {
                   if (meetingUrl && typeof meetingUrl === 'string') {
                     console.log('从 URL 中提取的 data 内容:', meetingUrl);
 
-                    // ✅ 第四步：跳转页面时携带一次性密钥
-                    this.navigateTo(`/videoMeeting?data=${encodeURIComponent(meetingUrl)}&onceToken=${encodeURIComponent(onceToken)}`);
+                    // ✅ 第四步：跳转页面时携带一次性密钥和发起人（会议主持人）信息
+                    const initiatorParam = encodeURIComponent(JSON.stringify(item.Meeting_Initiator));
+                    this.navigateTo(`/videoMeeting?data=${encodeURIComponent(meetingUrl)}&onceToken=${encodeURIComponent(onceToken)}&initiator=${initiatorParam}`);
 
                     console.log('跳转至视频会议页面1，参数:', meetingUrl);
                     console.log('跳转至视频会议页面2，参数:', item.Meeting_Name);
-                    console.log('跳转至视频会议页面3，参数拼接规则:', `/videoMeeting?data=${encodeURIComponent(meetingUrl)}&onceToken=${encodeURIComponent(onceToken)}`);
+                    console.log('跳转至视频会议页面3，参数拼接规则:', `/videoMeeting?data=${encodeURIComponent(meetingUrl)}&onceToken=${encodeURIComponent(onceToken)}&initiator=${initiatorParam}`);
+                    console.log('跳转至视频会议页面4，发起人信息:', item.Meeting_Initiator);
                   } else {
                     this.$toast.fail('获取会议链接失败');
                   }
