@@ -73,6 +73,48 @@
         </div>
       </div>
     </van-popup>
+
+    <!-- 库存导出选择弹窗 -->
+    <van-popup
+      v-model="showInventoryExportPopup"
+      position="center"
+      round
+    >
+      <div class="inventory-export-popup">
+        <div class="popup-header">
+          <h3>选择导出类型</h3>
+        </div>
+
+        <div class="popup-content">
+          <van-button
+            type="default"
+            block
+            class="export-option-btn"
+            @click="handleExportOption('inventory-info')"
+          >
+            库存信息记录导出
+          </van-button>
+
+          <van-button
+            type="default"
+            block
+            class="export-option-btn"
+            @click="handleExportOption('inventory-transaction')"
+          >
+            库存操作记录导出
+          </van-button>
+
+          <van-button
+            type="default"
+            block
+            class="export-option-btn cancel-btn"
+            @click="showInventoryExportPopup = false"
+          >
+            取消
+          </van-button>
+        </div>
+      </div>
+    </van-popup>
   </div>
 </template>
 
@@ -186,6 +228,7 @@ export default {
       countdownVisible: false, // 是否显示倒计时
       countdownInterval: null, // 倒计时定时器
       isFetchingSecret: false, // 防止重复请求
+      showInventoryExportPopup: false, // 控制库存导出选择弹窗显示
     };
   },
   computed: {
@@ -432,9 +475,9 @@ export default {
         }
       }
       if (item.title === '库存导出') {
-        // 仅在 PC 端允许跳转
+        // 仅在 PC 端允许操作
         if (this.isPC) {
-          this.navigateTo('/inventory-export');
+          this.showInventoryExportPopup = true;
         } else {
           this.$toast.fail('此功能仅在 PC 端可用');
         }
@@ -572,7 +615,20 @@ export default {
         sessionStorage.setItem(key_DingScannedInventoryQRCodeResult, result);
         // 更新全局变量
         updateCachedInventoryProductId(result);
-        this.navigateTo('/inventoryDetail');}}
+        this.navigateTo('/inventoryDetail');
+      }
+    },
+    // 处理库存导出选项点击
+    handleExportOption(option) {
+      this.showInventoryExportPopup = false;
+      if (option === 'inventory-info') {
+        // 库存信息记录导出，跳转到 /excel-upload 路径
+        this.navigateTo('/inventory-export');
+      } else if (option === 'inventory-transaction') {
+        // 库存操作记录导出，跳转到新页面
+        this.navigateTo('/inventory-transaction-export');
+      }
+    }
   },
   beforeDestroy() {
     // 清除定时器
@@ -726,5 +782,44 @@ export default {
 
 .popup-actions {
   margin-top: 20px;
+}
+
+/* 库存导出选择弹窗样式 */
+.inventory-export-popup {
+  padding: 30px;
+  min-width: 300px;
+}
+
+.inventory-export-popup .popup-header {
+  justify-content: center;
+  margin-bottom: 30px;
+}
+
+.inventory-export-popup .popup-content {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.export-option-btn {
+  padding: 15px;
+  font-size: 16px;
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.export-option-btn:hover {
+  background-color: #f5f7fa;
+}
+
+.cancel-btn {
+  margin-top: 10px;
+  border-color: #dcdfe6;
+  color: #909399;
+}
+
+.cancel-btn:hover {
+  background-color: #f5f7fa;
+  color: #606266;
 }
 </style>
