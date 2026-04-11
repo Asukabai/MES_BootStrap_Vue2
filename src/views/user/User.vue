@@ -70,7 +70,7 @@ export default {
         name: ''
       },
       // 添加版本号
-      version: 'V1.1.43'
+      version: 'V1.1.46'
     };
   },
   mounted() {
