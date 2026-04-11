@@ -297,6 +297,12 @@ const router = new Router({
       component: () => import('@/views/meeting/VideoMeeting.vue'),
       meta: { title: '视频会议' }
     },
+    {
+      path: '/:department/videoMeetingMobile',
+      name: 'VideoMeetingMobile',
+      component: () => import('@/views/meeting/VideoMeetingMobile.vue'),
+      meta: { title: '视频会议' }
+    },
     // ✅ 新增：手机号验证码登录页面路由
     {
       path: '/:department/phone-login',
@@ -363,7 +369,7 @@ const router = new Router({
       path: '/:department/inventory-export',
       name: 'ExcelUpload',
       component: () => import('../components/ExcelUpload.vue'),
-      meta: { title: '库存导出' }
+      meta: { title: '库存信息条件查询导出' }
     },
     {
       path: '/:department/inventoryLogV1',
@@ -424,7 +430,19 @@ const router = new Router({
       path: '/:department/excelUpload',
       name: 'ExcelUpload',
       component: () => import('../views/inventoryV1/ExcelUpload.vue'),
-      meta: { title: '物品信息批量导入' }
+      meta: { title: '库存物品信息批量导入' }
+    },
+    {
+      path: '/:department/excel-upload',
+      name: 'ExcelUpload',
+      component: () => import('../views/inventoryV1/ExcelUpload.vue'),
+      meta: { title: '库存信息记录导出' }
+    },
+    {
+      path: '/:department/inventory-transaction-export',
+      name: 'InventoryTransactionExport',
+      component: () => import('../views/inventoryV1/inventory-transaction-export.vue'),
+      meta: { title: '库存操作记录导出' }
     },
     {
       path: '/:department/inventoryPreview',

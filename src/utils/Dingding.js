@@ -34,6 +34,42 @@ export const key_DingResponseUsed = "key_DingResponseUsed"
 export const key_VideoMeetingToken = "sensor_VideoMeetingToken"
 export const key_VideoMeetingTokenTS = "sensor_VideoMeetingTokenTS"
 
+// 用于设置新的视频会议token
+export function setNewVideoMeetingToken(newToken) {
+  let tsNow = GetTSSecond()
+  localStorage.setItem(key_VideoMeetingTokenTS, tsNow)
+  localStorage.setItem(key_VideoMeetingToken, newToken)
+}
+
+// 检查视频会议token是否有效
+export function isVideoMeetingTokenValid() {
+  let userToken = localStorage.getItem(key_VideoMeetingToken)
+  if (!userToken) {
+    return false
+  }
+
+  let tokenTS = localStorage.getItem(key_VideoMeetingTokenTS);
+  if (tokenTS) {
+    let tsLast = parseInt(tokenTS);
+    let tsNow = GetTSSecond();
+    let tsValid = tsNow - tsLast;
+    // 视频会议token有效期为3小时（10800秒）
+    const TOKEN_EXPIRY = 3 * 60 * 60; // 3小时
+    if (tsValid < TOKEN_EXPIRY) {
+      return true
+    }
+  }
+  return false
+}
+
+// 获取有效的视频会议token，如果过期则返回null
+export function getValidVideoMeetingToken() {
+  if (isVideoMeetingTokenValid()) {
+    return localStorage.getItem(key_VideoMeetingToken)
+  }
+  return null
+}
+
 // 定义全局变量
 export let cachedProductId = '晟思'; // 默认值
 export let cachedInventoryProductId = '库存物品二维码ID'; // 默认值
@@ -118,8 +154,8 @@ export function PostData(method, data, callSuccess, callFail) {
     token: userToken,
     reqData: data
   }
-  // axios.post(systemConfigure.serverrUrl, JSON.stringify(postPack), {
-  axios.post(baseURL, JSON.stringify(postPack), {
+  axios.post(systemConfigure.serverrUrl, JSON.stringify(postPack), {
+  // axios.post(baseURL, JSON.stringify(postPack), {
     headers: {
       "content-type": "application/json"
     }
@@ -139,6 +175,158 @@ export function PostData(method, data, callSuccess, callFail) {
       if (systemConfigure.isDebugMode) {
         alert('PostData_response: ' + JSON.stringify(error)); // 弹出日志;
       }
+      if (callFail) {
+        callFail(error)
+      }
+    });
+}
+
+// 视频会议免登-发送POST请求 (不要token)
+export function PostDataMeeting (postUrlName, data, isJson, callSuccess, callFail) {
+  let postPack = {
+    reqID: getReqID(),
+    method: postUrlName,
+    sender: "",
+    sendee: "",
+    token: "",
+    reqData: data
+  }
+  let dataType = ""
+  if (isJson) {
+    dataType = "application/json"
+  } else {
+    dataType = "multipart/form-data"
+  }
+  let postJson = JSON.stringify(postPack)
+
+  axios.post(systemConfigure.serverrUrl, postJson, {
+  // axios.post(baseURL, postJson, {
+    headers: {
+      "content-type": dataType
+    }
+  })
+    .then(function (response) {
+      if (systemConfigure.isDebugMode) {
+        alert('responseJson: ' + JSON.stringify(response.data));
+      }
+      // 定义错误码映射表
+      const errorCodeMap = {
+        0: "空响应",
+        1: "正常",
+        "-100001": "未找到设备",
+        "-100002": "参数错误",
+        "-100003": "不支持该指令",
+        "-100004": "超时",
+        "-100005": "类型不符",
+        "-100007": "取消操作",
+        "-100008": "设备忙",
+        "-100009": "设备出错",
+        "-100102": "断线",
+        "-100100": "未找到文本",
+        "-100101": "未找到文件",
+        "-100201": "手动退出",
+        "-100202": "手动重启",
+        "-100701": "测试失败",
+        "-100302": "设置失败",
+        "2": "D90已拆除",
+        "-403": "没有接口权限，请联系管理员开通",
+        "-404": "未找到",
+        "-601": "未知错误"
+      };
+
+      if (response.data.result == 1) {
+        console.log('responseJson  1 : ' + JSON.stringify(response.data.respData));
+        callSuccess(response.data.respData)
+      } else if (callFail) {
+        // 根据错误码获取对应的错误信息
+        const errorMsg = errorCodeMap[response.data.result] || response.data.msg ;
+        console.log(response.data);
+        callFail(errorMsg)
+      }
+    })
+    .catch(function (error) {
+      console.log(error);
+      if (callFail) {
+        callFail(error)
+      }
+    });
+}
+
+
+// 向后端发送POST请求 (视频会议-浏览器中调用接口)
+export function PostDataUrlMeeting (postUrlName, data, isJson, callSuccess, callFail, onTokenExpired) {
+  let userToken = getValidVideoMeetingToken()
+  if (!userToken) {
+    // token过期或不存在
+    if (onTokenExpired) {
+      onTokenExpired()
+      return
+    }
+    userToken = ""
+  }
+  let postPack = {
+    reqID: getReqID(),
+    method: postUrlName,
+    sender: "",
+    sendee: "",
+    token: userToken,
+    reqData: data
+  }
+  let dataType = ""
+  if (isJson) {
+    dataType = "application/json"
+  } else {
+    dataType = "multipart/form-data"
+  }
+  let postJson = JSON.stringify(postPack)
+
+  axios.post(systemConfigure.serverrUrl, postJson, {
+  // axios.post(baseURL, postJson, {
+    headers: {
+      "content-type": dataType
+    }
+  })
+    .then(function (response) {
+      if (systemConfigure.isDebugMode) {
+        alert('responseJson: ' + JSON.stringify(response.data));
+      }
+      // 定义错误码映射表
+      const errorCodeMap = {
+        0: "空响应",
+        1: "正常",
+        "-100001": "未找到设备",
+        "-100002": "参数错误",
+        "-100003": "不支持该指令",
+        "-100004": "超时",
+        "-100005": "类型不符",
+        "-100007": "取消操作",
+        "-100008": "设备忙",
+        "-100009": "设备出错",
+        "-100102": "断线",
+        "-100100": "未找到文本",
+        "-100101": "未找到文件",
+        "-100201": "手动退出",
+        "-100202": "手动重启",
+        "-100701": "测试失败",
+        "-100302": "设置失败",
+        "2": "D90已拆除",
+        "-403": "没有接口权限，请联系管理员开通",
+        "-404": "未找到",
+        "-601": "未知错误"
+      };
+
+      if (response.data.result == 1) {
+        console.log('responseJson  1 : ' + JSON.stringify(response.data.respData));
+        callSuccess(response.data.respData)
+      } else if (callFail) {
+        // 根据错误码获取对应的错误信息
+        const errorMsg = errorCodeMap[response.data.result] || response.data.msg ;
+        console.log(response.data);
+        callFail(errorMsg)
+      }
+    })
+    .catch(function (error) {
+      console.log(error);
       if (callFail) {
         callFail(error)
       }
@@ -167,8 +355,8 @@ export function PostDataUrl(postUrlName, data, isJson, callSuccess, callFail) {
   }
   let postJson = JSON.stringify(postPack)
 
-  // axios.post(systemConfigure.serverrUrl, postJson, {
-  axios.post(baseURL, postJson, {
+  axios.post(systemConfigure.serverrUrl, postJson, {
+  // axios.post(baseURL, postJson, {
     headers: {
       "content-type": dataType
     }
@@ -243,8 +431,8 @@ export function PostDataUrlPage(postUrlName, data, isJson, callSuccess, callFail
   }
   let postJson = JSON.stringify(postPack)
 
-  // axios.post(systemConfigure.serverrUrl, postJson, {
-  axios.post(baseURL, postJson, {
+  axios.post(systemConfigure.serverrUrl, postJson, {
+  // axios.post(baseURL, postJson, {
     headers: {
       "content-type": dataType
     }
