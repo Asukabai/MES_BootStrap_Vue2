@@ -411,8 +411,7 @@ export default {
     },
   },
   created() {
-    // 优先从路径参数获取数据，如果路径参数不存在则从查询参数获取
-    const rawData = this.$route.params.data || this.$route.query.data || '';
+    const rawData = this.$route.query.data || '';
     console.log('[VideoMeeting] 获取原始会议地址参数：', rawData);
 
     try {
@@ -443,7 +442,7 @@ export default {
       this.roomName = meetingData.room || '未命名会议';
 
       // ✅ 第三步：获取并解析发起人信息
-      const initiatorParam = this.$route.params.initiator || this.$route.query.initiator;
+      const initiatorParam = this.$route.query.initiator;
       if (initiatorParam) {
         try {
           this.initiator = JSON.parse(decodeURIComponent(initiatorParam));
@@ -454,7 +453,7 @@ export default {
       }
     } catch (error) {
       console.error('[VideoMeeting] 解析会议数据失败:', error);
-      console.error('[VideoMeeting] 原始数据:', rawData);
+      console.error('[VideoMeeting] 原始数据:', this.$route.query.data);
       this.roomName = '未命名会议';
       this.$toast('会议数据格式错误');
     }
@@ -482,7 +481,7 @@ export default {
     // })
     if (!this.isInDingTalk) {
       const urlToken = this.$route.query.token;
-      const onceToken = this.$route.params.onceToken || this.$route.query.onceToken;
+      const onceToken = this.$route.query.onceToken;
       this.onceToken = onceToken; // 存储一次性密钥，用于token过期时重新获取
       console.log('[VideoMeeting] 检测到浏览器环境');
       console.log('[VideoMeeting] URL中的token参数:', urlToken);
