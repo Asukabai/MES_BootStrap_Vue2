@@ -5,22 +5,6 @@
     <van-tabs v-model="activeTab" animated swipeable class="share-tabs" sticky>
       <!-- 收到的分享文件 -->
       <van-tab title="收到的分享">
-        <!-- 搜索框 -->
-        <div class="search-container">
-          <van-search
-            v-model="receivedSearchKey"
-            placeholder="搜索文件名"
-            @search="onReceivedSearch"
-            @clear="onReceivedClear"
-            show-action
-            style="margin: 10px 2.5%"
-          >
-            <template #action>
-              <van-button size="small" type="primary" @click="onReceivedClear" style="margin-right: 8px;">重置</van-button>
-              <van-button size="small" type="primary" @click="onReceivedSearch">搜索</van-button>
-            </template>
-          </van-search>
-        </div>
         <!-- 下拉刷新组件 -->
         <van-pull-refresh v-model="receivedRefreshing" @refresh="onReceivedRefresh">
           <div class="cards-container">
@@ -67,22 +51,6 @@
 
       <!-- 发送的分享文件 -->
       <van-tab title="发送的分享">
-        <!-- 搜索框 -->
-        <div class="search-container">
-          <van-search
-            v-model="sentSearchKey"
-            placeholder="搜索文件名"
-            @search="onSentSearch"
-            @clear="onSentClear"
-            show-action
-            style="margin: 10px 2.5%"
-          >
-            <template #action>
-              <van-button size="small" type="primary" @click="onSentClear" style="margin-right: 8px;">重置</van-button>
-              <van-button size="small" type="primary" @click="onSentSearch">搜索</van-button>
-            </template>
-          </van-search>
-        </div>
         <!-- 下拉刷新组件 -->
         <van-pull-refresh v-model="sentRefreshing" @refresh="onSentRefresh">
           <div class="cards-container">
@@ -144,7 +112,6 @@ import SensorRequest from '@/utils/SensorRequest';
 import { key_DingUserPhone } from '@/utils/Dingding';
 import { downloadFile as utilsDownloadFile, previewFile as utilsPreviewFile } from '../../utils/fileUtils';
 import {GetDingUserToken} from "../../utils/Dingding";
-import { Toast } from 'vant';
 
 function getLocalUserInfo() {
   const phone = localStorage.getItem(key_DingUserPhone);
@@ -163,13 +130,11 @@ export default {
       receivedList: [],
       receivedLoading: false,
       receivedFinished: false,
-      receivedSearchKey: '',
 
       // 发送的分享数据
       sentList: [],
       sentLoading: false,
       sentFinished: false,
-      sentSearchKey: '',
 
       // 下拉刷新状态
       receivedRefreshing: false,
@@ -190,28 +155,19 @@ export default {
 
       const userInfo = getLocalUserInfo();
       const param = {
-        Person_Phone: userInfo.phone,
-        File_Name: this.receivedSearchKey,
-        PageIndex: 0,
-        PageSize: 5
+        Person_Phone: userInfo.phone
       };
 
-      const apiMethod = this.receivedSearchKey ? SensorRequest.GetSharedFileWithMeByNameFun : SensorRequest.GetSharedFileWithMeFun;
-      apiMethod(
+      SensorRequest.GetSharedFileWithMeFun(
           JSON.stringify(param),
           (respData) => {
             let JSON_Data =  JSON.parse(respData)
             console.log("加载收到的分享文件数据 JSON_Data : "+respData)
             // 成功回调
-            // 处理不同的数据结构：如果有 Data 字段，使用 Data；否则直接使用返回数据
-            const data = JSON_Data.Data || JSON_Data || [];
-            this.receivedList = data;
+            this.receivedList = JSON_Data || [];
             this.receivedLoading = false;
             this.receivedFinished = true;
             this.receivedRefreshing = false;
-            if (this.receivedSearchKey) {
-              Toast(`搜索成功，找到 ${data.length} 个文件`);
-            }
           },
           (error) => {
             // 失败回调
@@ -219,9 +175,6 @@ export default {
             this.receivedLoading = false;
             this.receivedFinished = true;
             this.receivedRefreshing = false;
-            if (this.receivedSearchKey) {
-              Toast('搜索失败，请稍后重试');
-            }
           }
       );
     },
@@ -232,24 +185,18 @@ export default {
 
       const userInfo = getLocalUserInfo();
       const param = {
-        Person_Phone: userInfo.phone,
-        File_Name: this.sentSearchKey,
-        PageIndex: 0,
-        PageSize: 5
+        Person_Phone: userInfo.phone
       };
 
-      const apiMethod = this.sentSearchKey ? SensorRequest.GetPersonSharedFileByNameFun : SensorRequest.GetPersonSharedFileFun;
-      apiMethod(
+      SensorRequest.GetPersonSharedFileFun(
           JSON.stringify(param),
           (respData) => {
             let JSON_Data =  JSON.parse(respData)
             console.log("加载发送的分享文件数据 JSON_Data : "+respData)
             // 成功回调
-            // 处理不同的数据结构：如果有 Data 字段，使用 Data；否则直接使用返回数据
-            const data = JSON_Data.Data || JSON_Data || [];
             // 按时间由近到远排序（假设 Shared_Time 是时间字段）
-            if (Array.isArray(data)) {
-              data.sort((a, b) => {
+            if (Array.isArray(JSON_Data)) {
+              JSON_Data.sort((a, b) => {
                 // 将时间字符串转换为时间戳进行比较
                 const timeA = new Date(a.Shared_Time).getTime();
                 const timeB = new Date(b.Shared_Time).getTime();
@@ -257,13 +204,10 @@ export default {
                 return timeB - timeA;
               });
             }
-            this.sentList = data;
+            this.sentList = JSON_Data || [];
             this.sentLoading = false;
             this.sentFinished = true;
             this.sentRefreshing = false;
-            if (this.sentSearchKey) {
-              Toast(`搜索成功，找到 ${data.length} 个文件`);
-            }
           },
           (error) => {
             // 失败回调
@@ -271,9 +215,6 @@ export default {
             this.sentLoading = false;
             this.sentFinished = true;
             this.sentRefreshing = false;
-            if (this.sentSearchKey) {
-              Toast('搜索失败，请稍后重试');
-            }
           }
       );
     },
@@ -301,46 +242,6 @@ export default {
 
     handlePreview(file) {
       utilsPreviewFile(file);
-    },
-
-    // 收到的分享搜索
-    onReceivedSearch() {
-      console.log('onReceivedSearch called, receivedSearchKey:', this.receivedSearchKey);
-      if (!this.receivedSearchKey.trim()) {
-        console.log('showing toast');
-        Toast('请输入文件名');
-        return;
-      }
-      this.receivedFinished = false;
-      this.loadReceivedData();
-    },
-
-    // 收到的分享清除搜索
-    onReceivedClear() {
-      this.receivedSearchKey = '';
-      this.receivedFinished = false;
-      this.loadReceivedData();
-      Toast('重置成功');
-    },
-
-    // 发送的分享搜索
-    onSentSearch() {
-      console.log('onSentSearch called, sentSearchKey:', this.sentSearchKey);
-      if (!this.sentSearchKey.trim()) {
-        console.log('showing toast');
-        Toast('请输入文件名');
-        return;
-      }
-      this.sentFinished = false;
-      this.loadSentData();
-    },
-
-    // 发送的分享清除搜索
-    onSentClear() {
-      this.sentSearchKey = '';
-      this.sentFinished = false;
-      this.loadSentData();
-      Toast('重置成功');
     },
 
     formatDesc(item) {

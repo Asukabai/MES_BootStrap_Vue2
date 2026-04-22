@@ -50,7 +50,9 @@
             'has-task': day.hasTask,
             'selected': selectedDate === day.dateStr,
             'today': isToday(day.dateStr),
-            'empty': !day.date
+            'empty': !day.date,
+            'task-completed': day.hasTask && day.taskStatus === '已完成',
+            'task-pending': day.hasTask && day.taskStatus === '未完成'
           }"
             @click="selectDay(day)"
         >
@@ -105,8 +107,10 @@ export default {
       // 填充日期
       for (let i = 1; i <= lastDate; i++) {
         const dateStr = `${year}-${String(month).padStart(2, '0')}-${String(i).padStart(2, '0')}`;
-        const hasTask = this.tasks.some(task => task.date === dateStr);
-        days.push({ date: i, dateStr, hasTask });
+        const task = this.tasks.find(task => task.date === dateStr);
+        const hasTask = !!task;
+        const taskStatus = task ? task.status : null;
+        days.push({ date: i, dateStr, hasTask, taskStatus });
       }
 
       return days;
@@ -124,6 +128,7 @@ export default {
       this.showMonthDays = true;
       this.selectedDate = this.formatDate(new Date(this.currentYear, this.selectedMonth - 1, 1));
       this.$emit('select-date', this.selectedDate);
+      this.$emit('month-change', { year: this.currentYear, month: this.selectedMonth });
     },
     changeMonth(delta) {
       const newDate = new Date(this.currentYear, this.selectedMonth - 1 + delta, 1);
@@ -132,10 +137,12 @@ export default {
       this.showMonthDays = true;
       this.selectedDate = this.formatDate(newDate);
       this.$emit('select-date', this.selectedDate);
+      this.$emit('month-change', { year: this.currentYear, month: this.selectedMonth });
     },
     selectMonth(month) {
       this.selectedMonth = month;
       this.showMonthDays = true;
+      this.$emit('month-change', { year: this.currentYear, month: this.selectedMonth });
     },
     selectDay(day) {
       if (day.date) {
@@ -247,8 +254,19 @@ export default {
 }
 
 .day.has-task {
-  color: #1989fa;
   font-weight: bold;
+}
+
+.day.task-completed {
+  color: #07c160;
+  background-color: rgba(7, 193, 96, 0.1);
+  border-radius: 50%;
+}
+
+.day.task-pending {
+  color: #ff9500;
+  background-color: rgba(255, 149, 0, 0.1);
+  border-radius: 50%;
 }
 
 .day.selected {
