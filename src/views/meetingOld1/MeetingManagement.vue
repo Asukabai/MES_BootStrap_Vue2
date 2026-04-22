@@ -272,78 +272,83 @@ export default {
     },
 
     joinVideoMeeting(item) {
-      // ✅ 第一步：构建会议参数
-      const param = {
-        Meeting_Name: item.Meeting_Name,
-        Meeting_Description: item.Meeting_Description,
-        Meeting_Type: item.Meeting_Type,
-        Meeting_Address: item.Meeting_Address,
-        Meeting_Link: item.Meeting_Link,
-        Meeting_Date: item.Meeting_Date,
-        Week_Display: item.Week_Display,
-        Meeting_Initiator: item.Meeting_Initiator,
-        Meeting_Participant: item.Meeting_Participant,
-        Id: item.Id,
-        Uuid: item.Uuid,
-        Ts_create: item.Ts_create,
-        Ts_edit: item.Ts_edit,
-        Logic_del: item.Logic_del
-      };
-
-      console.log('请求视频会议 Token，参数:', param);
-
-      // ✅ 第二步：获取视频会议链接
-      SensorRequestPage.Ding_GetMeetingToken(
-        JSON.stringify(param),
-        (respData) => {
+      // ✅ 第一步：获取一次性密钥
+      SensorRequestPage.Ding_GetOnceToken("",
+        (onceToken) => {
           try {
-            console.log('获取视频会议 Token 成功，响应:', respData);
-            const meetingUrl = respData;
-
-            if (meetingUrl && typeof meetingUrl === 'string') {
-              console.log('从 URL 中提取的 data 内容:', meetingUrl);
-
-              // 检测设备类型，根据设备类型跳转到不同的视频会议组件
-              // 检测是否为PC端（Windows、Macintosh、Linux）
-              const isPC = /Windows|Macintosh|Linux/i.test(navigator.userAgent);
-              const routePath = isPC ? '/videoMeeting2' : '/videoMeetingMobile2';
-
-              // 获取钉钉一次性密钥
-              SensorRequestPage.Ding_GetOnceToken("", (onceToken) => {
-                try {
-                  console.log('获取到钉钉一次性密钥:', onceToken);
-                  if (!onceToken || typeof onceToken !== 'string') {
-                    this.$toast.fail('获取一次性密钥失败');
-                    return;
-                  }
-                  
-                  // 因为跳转到浏览器之后打开，再调用这个接口就没有token了
-                  // 使用?data=形式传递数据，并添加onceToken参数
-                  this.navigateTo(`${routePath}?data=${encodeURIComponent(meetingUrl)}&onceToken=${encodeURIComponent(onceToken)}`);
-
-                  console.log('跳转至视频会议页面，参数:', meetingUrl);
-                  console.log('设备类型:', isPC ? 'PC端' : '移动端');
-                  console.log('跳转路径:', routePath);
-                  console.log('一次性令牌:', onceToken);
-                } catch (tokenError) {
-                  console.error('获取一次性密钥失败:', tokenError);
-                  this.$toast.fail('获取一次性密钥失败');
-                }
-              }, (error) => {
-                console.error('获取一次性密钥失败:', error);
-                this.$toast.fail('获取一次性密钥失败');
-              });
-            } else {
-              this.$toast.fail('获取会议链接失败');
+            console.log('获取到钉钉一次性密钥:', onceToken);
+            if (!onceToken || typeof onceToken !== 'string') {
+              this.$toast.fail('获取一次性密钥失败');
+              return;
             }
-          } catch (parseError) {
-            console.error('解析视频会议响应失败:', parseError);
-            this.$toast.fail('数据解析失败');
+            // ✅ 第二步：构建会议参数
+            const param = {
+              Meeting_Name: item.Meeting_Name,
+              Meeting_Description: item.Meeting_Description,
+              Meeting_Type: item.Meeting_Type,
+              Meeting_Address: item.Meeting_Address,
+              Meeting_Link: item.Meeting_Link,
+              Meeting_Date: item.Meeting_Date,
+              Week_Display: item.Week_Display,
+              Meeting_Initiator: item.Meeting_Initiator,
+              Meeting_Participant: item.Meeting_Participant,
+              Id: item.Id,
+              Uuid: item.Uuid,
+              Ts_create: item.Ts_create,
+              Ts_edit: item.Ts_edit,
+              Logic_del: item.Logic_del
+            };
+
+            console.log('请求视频会议 Token，参数:', param);
+
+            // ✅ 第三步：获取视频会议链接
+            SensorRequestPage.Ding_GetMeetingToken(
+              JSON.stringify(param),
+              (respData) => {
+                try {
+                  console.log('获取视频会议 Token 成功，响应:', respData);
+                  const meetingUrl = respData;
+
+                  if (meetingUrl && typeof meetingUrl === 'string') {
+                    console.log('从 URL 中提取的 data 内容:', meetingUrl);
+
+                    // ✅ 第四步：跳转页面时携带一次性密钥和发起人（会议主持人）信息
+                    const initiatorParam = encodeURIComponent(JSON.stringify(item.Meeting_Initiator));
+                    
+                    // 检测设备类型，根据设备类型跳转到不同的视频会议组件
+                    // 检测是否为PC端（Windows、Macintosh、Linux）
+                    const isPC = /Windows|Macintosh|Linux/i.test(navigator.userAgent);
+                    const routePath = isPC ? '/videoMeeting' : '/videoMeetingMobile';
+                    
+                    this.navigateTo(`${routePath}?data=${encodeURIComponent(meetingUrl)}&onceToken=${encodeURIComponent(onceToken)}&initiator=${initiatorParam}`);
+
+                    console.log('跳转至视频会议页面1，参数:', meetingUrl);
+                    console.log('跳转至视频会议页面2，参数:', item.Meeting_Name);
+                    console.log('跳转至视频会议页面3，参数拼接规则:', `${routePath}?data=${encodeURIComponent(meetingUrl)}&onceToken=${encodeURIComponent(onceToken)}&initiator=${initiatorParam}`);
+                    console.log('跳转至视频会议页面4，发起人信息:', item.Meeting_Initiator);
+                    console.log('设备类型:', isPC ? 'PC端' : '移动端');
+                    console.log('跳转路径:', routePath);
+                  } else {
+                    this.$toast.fail('获取会议链接失败');
+                  }
+                } catch (parseError) {
+                  console.error('解析视频会议响应失败:', parseError);
+                  this.$toast.fail('数据解析失败');
+                }
+              },
+              (error) => {
+                console.error('获取视频会议 Token 失败:', error);
+                this.$toast.fail('获取会议链接失败');
+              }
+            );
+          } catch (error) {
+            console.error('处理一次性密钥失败:', error);
+            this.$toast.fail('获取会议信息失败');
           }
         },
         (error) => {
-          console.error('获取视频会议 Token 失败:', error);
-          this.$toast.fail('获取会议链接失败');
+          console.error('获取一次性密钥失败:', error);
+          this.$toast.fail('获取一次性密钥结果失败 ：'+ error);
         }
       );
     },
