@@ -50,7 +50,12 @@
     <!-- 结果列表 -->
     <div class="results-section">
       <van-pull-refresh v-model="refreshing" @refresh="onRefresh">
-        <div>
+        <van-list
+          v-model="loading"
+          :finished="finished"
+          :finished-text="`共有 ${total} 条会议记录，没有更多了`"
+          @load="onLoadMore"
+        >
           <van-cell
             v-for="(item, index) in list"
             :key="item.Id"
@@ -114,15 +119,12 @@
               </div>
             </div>
           </van-cell>
-        </div>
+        </van-list>
 
         <!-- 空状态 -->
         <div v-if="hasSearched && list.length === 0 && !loading" class="empty-state">
           <van-empty description="暂无相关会议信息" />
         </div>
-
-        <!-- 加载完成提示 -->
-        <div v-if="list.length > 0 && !loading" class="finished-text">没有更多了</div>
       </van-pull-refresh>
     </div>
 
@@ -182,13 +184,11 @@ export default {
       list: [],
       loading: false,
       refreshing: false,
+      finished: false,
       allData: [],
-      pagination: {
-        pageIndex: 0,
-        pageSize: 10,
-        totalCount: 0,
-        totalPages: 0
-      }
+      currentPage: 1,
+      pageSize: 10,
+      total: 0
     };
   },
   created() {
@@ -223,45 +223,75 @@ export default {
     },
 
     fetchMeetingList() {
-      if (this.loading) return;
-      this.loading = true;
-      const param = {
-        PageIndex: this.pagination.pageIndex,
-        PageSize: this.pagination.pageSize
-      };
-      SensorRequestPage.MeetingInfoGetFunPage(
-        JSON.stringify(param),
-        (respData) => {
-          try {
-            const response = JSON.parse(respData);
-            if (response.Data && Array.isArray(response.Data)) {
-              this.list = response.Data;
-              this.allData = response.Data;
-              this.pagination.totalCount = response.TotalCount || 0;
-              this.pagination.totalPages = response.TotalPages || 0;
-              this.hasSearched = true;
-            } else {
-              this.list = [];
-              this.allData = [];
-              this.$toast.fail('数据格式错误');
+      return new Promise((resolve) => {
+        this.loading = true;
+        const param = {
+          PageIndex: this.currentPage - 1,
+          PageSize: this.pageSize
+        };
+        SensorRequestPage.MeetingInfoGetFunPage(
+          JSON.stringify(param),
+          (respData) => {
+            try {
+              const response = JSON.parse(respData);
+              if (response.Data && Array.isArray(response.Data)) {
+                const newData = response.Data;
+                
+                if (this.currentPage === 1) {
+                  this.list = newData;
+                  this.allData = newData;
+                } else {
+                  // 防止重复添加相同 ID 的项目
+                  const newItems = newData.filter(newItem =>
+                    !this.list.some(existingItem => existingItem.Id === newItem.Id)
+                  );
+                  this.list = [...this.list, ...newItems];
+                  this.allData = [...this.allData, ...newItems];
+                }
+                
+                // 根据返回的数据判断是否还有更多数据
+                this.finished = newData.length < this.pageSize;
+                this.currentPage++;
+                
+                // 更新总记录数
+                if (response.TotalCount !== undefined) {
+                  this.total = response.TotalCount;
+                }
+                
+                this.hasSearched = true;
+              } else {
+                if (this.currentPage === 1) {
+                  this.list = [];
+                  this.allData = [];
+                }
+                this.finished = true;
+                if (this.currentPage === 1) {
+                  this.$toast.fail('数据格式错误');
+                }
+              }
+            } catch (parseError) {
+              console.error('解析会议信息响应失败:', parseError);
+              this.$toast.fail('数据解析失败');
+              if (this.currentPage === 1) {
+                this.list = [];
+                this.allData = [];
+              }
+            } finally {
+              this.loading = false;
+              this.refreshing = false;
+              resolve();
             }
-          } catch (parseError) {
-            console.error('解析会议信息响应失败:', parseError);
-            this.$toast.fail('数据解析失败');
-            this.list = [];
-            this.allData = [];
-          } finally {
+          },
+          (error) => {
+            console.error('获取会议信息失败:', error);
+            this.$toast.fail('获取会议信息失败');
             this.loading = false;
             this.refreshing = false;
+            this.finished = true;
+            resolve();
           }
-        },
-        (error) => {
-          console.error('获取会议信息失败:', error);
-          this.$toast.fail('获取会议信息失败');
-          this.loading = false;
-          this.refreshing = false;
-        }
-      );
+        );
+      });
     },
     toggleExpand(index) {
       if (this.expandedIndex === index) {
@@ -378,6 +408,9 @@ export default {
     onSearch() {
       if (this.searchValue || this.filter.meetingType || this.filter.dateRange) {
         this.hasSearched = true;
+        this.currentPage = 1;
+        this.list = [];
+        this.finished = false;
         this.filterData();
       } else {
         Toast('请输入搜索关键词或选择筛选条件');
@@ -386,6 +419,9 @@ export default {
 
     onFilterChange() {
       this.hasSearched = true;
+      this.currentPage = 1;
+      this.list = [];
+      this.finished = false;
       this.filterData();
     },
 
@@ -397,6 +433,9 @@ export default {
       };
       this.hasSearched = false;
       this.expandedIndex = null;
+      this.currentPage = 1;
+      this.list = [];
+      this.finished = false;
       this.fetchMeetingList();
     },
 
@@ -449,7 +488,16 @@ export default {
     },
 
     onRefresh() {
-      this.pagination.pageIndex = 0;
+      this.currentPage = 1;
+      this.list = [];
+      this.finished = false;
+      this.fetchMeetingList().then(() => {
+        this.refreshing = false;
+      });
+    },
+
+    onLoadMore() {
+      if (this.finished) return;
       this.fetchMeetingList();
     },
 
@@ -516,6 +564,8 @@ export default {
 
 .results-section {
   padding: 0 10px;
+  height: calc(100vh - 200px);
+  overflow-y: auto;
 }
 
 .meeting-cell {
