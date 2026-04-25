@@ -2,48 +2,67 @@
   <div class="meeting-page">
     <!-- 页面顶部搜索区域 -->
     <div class="search-section search-top">
+      <!-- 搜索类型切换 -->
+      <div class="search-type-tabs">
+        <div
+          v-for="type in searchTypeOptions"
+          :key="type.value"
+          :class="['search-type-tab', { active: activeSearchTypes.includes(type.value) }]"
+          @click="toggleSearchType(type.value)"
+        >
+          {{ type.label }}
+          <van-icon v-if="activeSearchTypes.includes(type.value)" name="success" class="active-icon" />
+        </div>
+      </div>
+
       <div class="search-container">
-        <!-- 搜索输入框 -->
+        <!-- 会议名称搜索输入框 -->
         <van-field
-          v-model="searchValue"
+          v-if="activeSearchTypes.includes('meetingName')"
+          v-model="searchParams.meetingName"
           placeholder="请输入会议名称关键词"
           class="search-input"
           inputmode="search"
           enterkeyhint="search"
         />
+
+        <!-- 发起人搜索输入框 -->
+        <van-field
+          v-if="activeSearchTypes.includes('initiator')"
+          v-model="searchParams.initiator"
+          placeholder="请输入发起人姓名"
+          class="search-input"
+          inputmode="search"
+          enterkeyhint="search"
+        />
+
+        <!-- 会议类型下拉框 -->
+        <van-dropdown-menu v-if="activeSearchTypes.includes('meetingType')" class="meeting-type-dropdown">
+          <van-dropdown-item
+            v-model="searchParams.meetingType"
+            :options="meetingTypeOptions"
+          />
+        </van-dropdown-menu>
+
         <!-- 搜索按钮 -->
         <van-button
           type="info"
           class="search-btn"
           @click="onSearch"
         >
+          <van-icon name="search" />
           搜索
         </van-button>
 
         <!-- 重置按钮 -->
         <van-button
-          type="default"
+          type="info"
           class="reset-btn"
           @click="onReset"
         >
+          <van-icon name="replay" />
           重置
         </van-button>
-      </div>
-
-      <!-- 筛选下拉框 -->
-      <div class="filter-container">
-        <van-dropdown-menu>
-          <van-dropdown-item
-            v-model="filter.meetingType"
-            :options="meetingTypeOptions"
-            @change="onFilterChange"
-          />
-          <van-dropdown-item
-            v-model="filter.dateRange"
-            :options="dateRangeOptions"
-            @change="onFilterChange"
-          />
-        </van-dropdown-menu>
       </div>
     </div>
 
@@ -164,22 +183,24 @@ export default {
       searchValue: '',
       hasSearched: false,
       expandedIndex: null,
-      filter: {
-        meetingType: '',
-        dateRange: ''
+      activeSearchTypes: ['meetingName'], // 活动的搜索类型
+      searchParams: {
+        meetingName: '',
+        initiator: '',
+        meetingType: ''
       },
-      meetingTypeOptions: [
-        { text: '全部类型', value: '' },
-        { text: '周例会', value: '周例会' },
-        { text: '评审会', value: '评审会' },
-        { text: '内部讨论', value: '内部讨论' },
-        { text: '评审会议', value: '评审会议' }
+      searchTypeOptions: [
+        { label: '会议名称', value: 'meetingName' },
+        { label: '发起人', value: 'initiator' },
+        { label: '会议类型', value: 'meetingType' }
       ],
-      dateRangeOptions: [
-        { text: '全部时间', value: '' },
-        { text: '本周', value: 'week' },
-        { text: '本月', value: 'month' },
-        { text: '最近三月', value: 'threeMonths' }
+      meetingTypeOptions: [
+        { text: '全部', value: '' },
+        { text: '培训会', value: '培训会' },
+        { text: '讨论会', value: '讨论会' },
+        { text: '评审会', value: '评审会' },
+        { text: '周例会', value: '周例会' },
+        { text: '其他', value: '其他' }
       ],
       list: [],
       loading: false,
@@ -235,30 +256,42 @@ export default {
             try {
               const response = JSON.parse(respData);
               if (response.Data && Array.isArray(response.Data)) {
-                const newData = response.Data;
-                
+                let newData = response.Data;
+
+                // 根据搜索类型进行前端过滤
+                if (this.hasSearched) {
+                  newData = this.filterMeetingData(newData);
+                }
+
                 if (this.currentPage === 1) {
                   this.list = newData;
-                  this.allData = newData;
+                  this.allData = response.Data; // 保存原始数据用于分页加载
+                  // 如果是搜索状态，更新 total 为过滤后的数量
+                  if (this.hasSearched) {
+                    this.total = newData.length;
+                  }
                 } else {
                   // 防止重复添加相同 ID 的项目
                   const newItems = newData.filter(newItem =>
                     !this.list.some(existingItem => existingItem.Id === newItem.Id)
                   );
                   this.list = [...this.list, ...newItems];
-                  this.allData = [...this.allData, ...newItems];
+                  this.allData = [...this.allData, ...response.Data];
+                  // 如果是搜索状态，更新 total 为过滤后的总数量
+                  if (this.hasSearched) {
+                    this.total = this.list.length;
+                  }
                 }
-                
+
                 // 根据返回的数据判断是否还有更多数据
-                this.finished = newData.length < this.pageSize;
+                this.finished = response.Data.length < this.pageSize;
                 this.currentPage++;
-                
+
                 // 更新总记录数
                 if (response.TotalCount !== undefined) {
                   this.total = response.TotalCount;
                 }
-                
-                this.hasSearched = true;
+
               } else {
                 if (this.currentPage === 1) {
                   this.list = [];
@@ -291,6 +324,30 @@ export default {
             resolve();
           }
         );
+      });
+    },
+
+    filterMeetingData(data) {
+      return data.filter(item => {
+        let match = true;
+
+        // 会议名称搜索
+        if (this.activeSearchTypes.includes('meetingName') && this.searchParams.meetingName) {
+          match = match && item.Meeting_Name && item.Meeting_Name.includes(this.searchParams.meetingName);
+        }
+
+        // 发起人搜索
+        if (this.activeSearchTypes.includes('initiator') && this.searchParams.initiator) {
+          match = match && item.Meeting_Initiator && item.Meeting_Initiator.Person_Name &&
+                 item.Meeting_Initiator.Person_Name.includes(this.searchParams.initiator);
+        }
+
+        // 会议类型搜索
+        if (this.activeSearchTypes.includes('meetingType') && this.searchParams.meetingType) {
+          match = match && item.Meeting_Type === this.searchParams.meetingType;
+        }
+
+        return match;
       });
     },
     toggleExpand(index) {
@@ -344,12 +401,12 @@ export default {
 
                     // ✅ 第四步：跳转页面时携带一次性密钥和发起人（会议主持人）信息
                     const initiatorParam = encodeURIComponent(JSON.stringify(item.Meeting_Initiator));
-                    
+
                     // 检测设备类型，根据设备类型跳转到不同的视频会议组件
                     // 检测是否为PC端（Windows、Macintosh、Linux）
                     const isPC = /Windows|Macintosh|Linux/i.test(navigator.userAgent);
                     const routePath = isPC ? '/videoMeeting' : '/videoMeetingMobile';
-                    
+
                     this.navigateTo(`${routePath}?data=${encodeURIComponent(meetingUrl)}&onceToken=${encodeURIComponent(onceToken)}&initiator=${initiatorParam}`);
 
                     console.log('跳转至视频会议页面1，参数:', meetingUrl);
@@ -405,86 +462,39 @@ export default {
       }
     },
 
-    onSearch() {
-      if (this.searchValue || this.filter.meetingType || this.filter.dateRange) {
-        this.hasSearched = true;
-        this.currentPage = 1;
-        this.list = [];
-        this.finished = false;
-        this.filterData();
+    toggleSearchType(type) {
+      const index = this.activeSearchTypes.indexOf(type);
+      if (index > -1) {
+        // 不能移除所有搜索类型
+        if (this.activeSearchTypes.length > 1) {
+          this.activeSearchTypes.splice(index, 1);
+        }
       } else {
-        Toast('请输入搜索关键词或选择筛选条件');
+        this.activeSearchTypes.push(type);
       }
     },
 
-    onFilterChange() {
+    onSearch() {
       this.hasSearched = true;
-      this.currentPage = 1;
-      this.list = [];
-      this.finished = false;
-      this.filterData();
-    },
-
-    onReset() {
-      this.searchValue = '';
-      this.filter = {
-        meetingType: '',
-        dateRange: ''
-      };
-      this.hasSearched = false;
-      this.expandedIndex = null;
       this.currentPage = 1;
       this.list = [];
       this.finished = false;
       this.fetchMeetingList();
     },
 
-    filterData() {
-      let filtered = this.allData;
-
-      if (this.searchValue) {
-        filtered = filtered.filter(item =>
-          item.Meeting_Name && item.Meeting_Name.includes(this.searchValue)
-        );
-      }
-
-      if (this.filter.meetingType) {
-        filtered = filtered.filter(item =>
-          item.Meeting_Type === this.filter.meetingType
-        );
-      }
-
-      if (this.filter.dateRange) {
-        const now = new Date();
-        let startDate;
-
-        switch (this.filter.dateRange) {
-          case 'week':
-            startDate = new Date();
-            startDate.setDate(now.getDate() - 7);
-            break;
-          case 'month':
-            startDate = new Date();
-            startDate.setMonth(now.getMonth() - 1);
-            break;
-          case 'threeMonths':
-            startDate = new Date();
-            startDate.setMonth(now.getMonth() - 3);
-            break;
-          default:
-            startDate = null;
-        }
-
-        if (startDate) {
-          filtered = filtered.filter(item => {
-            const meetingDate = new Date(item.Meeting_Date);
-            return meetingDate >= startDate;
-          });
-        }
-      }
-
-      this.list = filtered;
+    onReset() {
+      this.searchParams = {
+        meetingName: '',
+        initiator: '',
+        meetingType: ''
+      };
+      this.activeSearchTypes = ['meetingName'];
+      this.hasSearched = false;
       this.expandedIndex = null;
+      this.currentPage = 1;
+      this.list = [];
+      this.finished = false;
+      this.fetchMeetingList();
     },
 
     onRefresh() {
@@ -540,26 +550,82 @@ export default {
   margin-bottom: 10px;
 }
 
-.search-container {
+.search-type-tabs {
   display: flex;
   gap: 10px;
   margin-bottom: 15px;
+  flex-wrap: wrap;
+}
+
+.search-type-tab {
+  padding: 8px 16px;
+  border: 1px solid #e8e8e8;
+  border-radius: 20px;
+  font-size: 14px;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.search-type-tab:hover {
+  border-color: #3f83f8;
+  color: #3f83f8;
+}
+
+.search-type-tab.active {
+  background: #3f83f8;
+  color: white;
+  border-color: #3f83f8;
+}
+
+.active-icon {
+  font-size: 12px;
+}
+
+.meeting-type-dropdown {
+  margin: 0 10px;
+  min-width: 120px;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.search-container {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+  padding: 10px;
+  background: #f8f9fa;
+  border-radius: 8px;
 }
 
 .search-input {
   flex: 1;
+  min-width: 200px;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .search-btn {
-  width: 80px;
+  width: 100px;
+  border-radius: 8px;
+  font-weight: bold;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 
 .reset-btn {
-  width: 80px;
-}
-
-.filter-container {
-  margin-top: 10px;
+  width: 100px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
 }
 
 .results-section {
