@@ -47,7 +47,7 @@ module.exports = {
     },
     // Various Dev Server settings
     // host: 'localhost', // can be overwritten by process.env.HOST
-    host: '192.168.67.54', // can be overwritten by process.env.HOST    host: '192.168.65.76', // can be overwritten by process.env.HOST
+    host: '192.168.0.104',
     port: 35001,
     autoOpenBrowser: true,
     errorOverlay: true,

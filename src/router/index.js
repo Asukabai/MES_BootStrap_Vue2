@@ -152,6 +152,29 @@ const router = new Router({
       component: () => import('@/views/task/taskManage.vue'),
       meta: { title: '任务日历' }
     },
+    { path: '/:department/task-calendar',
+      name: 'taskManage',
+      component: () => import('@/views/task/taskCalendar.vue'),
+      meta: { title: '任务日报' }
+    },
+    {
+      path: '/:department/createDailyReport',
+      name: 'CreateDailyReport',
+      component: () => import('@/views/task/createDailyReport.vue'),
+      meta: { title: '填写日报' }
+    },
+    {
+      path: '/:department/dailyReportDetail',
+      name: 'DailyReportDetail',
+      component: () => import('@/views/task/dailyReportDetail.vue'),
+      meta: { title: '查看日报' }
+    },
+    {
+      path: '/:department/editDailyReport',
+      name: 'EditDailyReport',
+      component: () => import('@/views/task/editDailyReport.vue'),
+      meta: { title: '编辑日报' }
+    },
     {
       path: '/:department/task-detail',
       name: 'TaskDetail',
@@ -292,15 +315,44 @@ const router = new Router({
       meta: { title: '会议管理' }
     },
     {
+      path: '/:department/meetingManagement2',
+      name: 'MeetingManagement2',
+      component: () => import('../views/meeting2/MeetingManagement.vue'),
+      meta: { title: '会议管理 2' }
+    },
+    {
       path: '/:department/videoMeeting',
       name: 'VideoMeeting',
       component: () => import('@/views/meeting/VideoMeeting.vue'),
+      meta: { title: '视频会议' }
+    },    {
+      path: '/:department/videoMeeting2',
+      name: 'VideoMeeting2',
+      component: () => import('@/views/meeting2/VideoMeeting.vue'),
+      meta: { title: '视频会议' }
+    },
+    {
+      path: '/:department/videoMeeting2/:data/:onceToken/:initiator',
+      name: 'VideoMeeting2WithParams',
+      component: () => import('@/views/meeting2/VideoMeeting.vue'),
       meta: { title: '视频会议' }
     },
     {
       path: '/:department/videoMeetingMobile',
       name: 'VideoMeetingMobile',
       component: () => import('@/views/meeting/VideoMeetingMobile.vue'),
+      meta: { title: '视频会议' }
+    },
+    {
+      path: '/:department/videoMeetingMobile2',
+      name: 'VideoMeetingMobile2',
+      component: () => import('@/views/meeting2/VideoMeetingMobile.vue'),
+      meta: { title: '视频会议' }
+    },
+    {
+      path: '/:department/videoMeetingMobile2/:data/:onceToken/:initiator',
+      name: 'VideoMeetingMobile2WithParams',
+      component: () => import('@/views/meeting2/VideoMeetingMobile.vue'),
       meta: { title: '视频会议' }
     },
     // ✅ 新增：手机号验证码登录页面路由
