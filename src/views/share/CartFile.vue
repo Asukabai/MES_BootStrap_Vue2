@@ -16,8 +16,8 @@
             style="margin: 10px 2.5%"
           >
             <template #action>
-              <van-button size="small" type="primary" @click="onReceivedClear" style="margin-right: 8px;">重置</van-button>
-              <van-button size="small" type="primary" @click="onReceivedSearch">搜索</van-button>
+              <van-button size="small" type="info" @click="onReceivedClear" style="margin-right: 8px;">重置</van-button>
+              <van-button size="small" type="info" @click="onReceivedSearch">搜索</van-button>
             </template>
           </van-search>
         </div>
@@ -78,8 +78,8 @@
             style="margin: 10px 2.5%"
           >
             <template #action>
-              <van-button size="small" type="primary" @click="onSentClear" style="margin-right: 8px;">重置</van-button>
-              <van-button size="small" type="primary" @click="onSentSearch">搜索</van-button>
+              <van-button size="small" type="info" @click="onSentClear" style="margin-right: 8px;">重置</van-button>
+              <van-button size="small" type="info" @click="onSentSearch">搜索</van-button>
             </template>
           </van-search>
         </div>
