@@ -105,7 +105,7 @@
       <div class="video-area" ref="videoArea">
         <!-- 屏幕共享模式 -->
         <div v-if="viewMode === 'screen-share'" class="screen-share-layout">
-          <div class="main-screen" @click="toggleFullscreen" :class="{ 'fullscreen-mode': isFullscreen }">
+          <div class="main-screen" :class="{ 'fullscreen-mode': isFullscreen }" @click="toggleFullscreen">
             <!-- 本地共享的屏幕视频 -->
             <video
               v-if="activeScreenShareId === localParticipantId"
@@ -125,12 +125,28 @@
               :class="{ 'fullscreen-video': isFullscreen }"
               style="width: 100%; height: 100%; object-fit: contain; video-rendering-quality: high;"
             ></video>
+
+            <!-- 批注组件 -->
+            <AnnotationCanvas
+              :viewMode="viewMode"
+              :isFullscreen="isFullscreen"
+              :isPC="isPC"
+              :room="room"
+              :localParticipantId="localParticipantId"
+              :isDisconnected="isDisconnected"
+              ref="annotationCanvas"
+              @exit-annotation="handleExitAnnotation"
+              @annotation-notification="handleAnnotationNotification"
+            />
+
             <div class="screen-share-label" :class="{ 'fullscreen-label': isFullscreen }">
               正在共享屏幕：{{ getDisplayNameById(activeScreenShareId) }}
             </div>
             <div v-if="isFullscreen" class="fullscreen-exit-hint" @click.stop="toggleFullscreen">
               点击任意处退出全屏
             </div>
+            <!-- 正在批注的用户提示 -->
+
           </div>
           <div v-if="!isFullscreen" class="participants-sidebar">
             <div class="sidebar-title">参会者 ({{ totalParticipants }})</div>
@@ -153,6 +169,16 @@
                     <div class="sidebar-avatar-icon">{{ getDisplayNameById(item.id).charAt(0).toUpperCase() }}</div>
                   </div>
                   <div class="sidebar-name">{{ getDisplayNameById(item.id) }}{{ item.isHost ? ' (主持人)' : '' }}</div>
+                  <div v-if="!item.hasAudio" class="sidebar-audio-mute-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+                      <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z" fill="currentColor"/>
+                    </svg>
+                  </div>
+                  <div v-else-if="item.isSpeaking" class="sidebar-audio-speaking-badge">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="white">
+                      <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" fill="currentColor"/>
+                    </svg>
+                  </div>
                   <div v-if="item.isHost" class="sidebar-host-badge">主持人</div>
                 </div>
               </div>
@@ -189,6 +215,11 @@
                   <path d="M19 11h-1.7c0 .74-.16 1.43-.43 2.05l1.23 1.23c.56-.98.9-2.09.9-3.28zm-4.02.17c0-.06.02-.11.02-.17V5c0-1.66-1.34-3-3-3S9 3.34 9 5v.18l5.98 5.99zM4.27 3L3 4.27l6.01 6.01V11c0 1.66 1.33 3 2.99 3 .22 0 .44-.03.65-.08l1.66 1.66c-.71.33-1.5.52-2.31.52-2.76 0-5.3-2.1-5.3-5H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c.91-.13 1.77-.45 2.54-.9L19.73 21 21 19.73 4.27 3z" fill="currentColor"/>
                 </svg>
               </div>
+              <div v-else-if="item.isSpeaking" class="audio-speaking-badge">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
+                  <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z" fill="currentColor"/>
+                </svg>
+              </div>
               <div v-if="item.isHost" class="host-badge">
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="white">
                   <path d="M12 2L2 7l10 5 10-5-10-5zm0 3.84L18.16 7 12 9.68 5.84 7 12 5.84zm0 12.92c-1.66 0-3-1.34-3-3 0-.73.33-1.38.84-1.81L9 13.42c-.31.41-.5.89-.5 1.4V19h6v-2.16c0-.51-.19-1-.5-1.4l-1.84-1.84c.51-.43.84-1.08.84-1.81 0-1.66-1.34-3-3-3z" fill="currentColor"/>
@@ -216,19 +247,27 @@
           <span>{{ cameraEnabled ? '关闭视频' : '开启视频' }}</span>
         </button>
 
-        <button @click="shareScreen" :class="['control-btn', { active: viewMode === 'screen-share' && activeScreenShareId === localParticipantId }]">
+        <button v-if="isPC" @click="shareScreen" :class="['control-btn', { active: viewMode === 'screen-share' && activeScreenShareId === localParticipantId }]">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M21 3H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h5v2h8v-2h5c1.1 0 1.99-.9 1.99-2L23 5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z" fill="currentColor"/>
           </svg>
           <span>{{ viewMode === 'screen-share' && activeScreenShareId === localParticipantId ? '停止共享' : '共享屏幕' }}</span>
         </button>
 
-        <button v-if="isHost" @click="endMeeting" class="control-btn end-btn">
+        <button
+          v-if="viewMode === 'screen-share' && isPC"
+          @click="toggleAnnotationMode"
+          :class="['control-btn']"
+          :disabled="!activeScreenShareId"
+          title="批注"
+        >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/>
+            <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" fill="currentColor"/>
           </svg>
-          <span>结束会议</span>
+          <span>批注</span>
         </button>
+
+
         <button @click="leaveRoom" class="control-btn leave-btn">
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
             <path d="M10.09 15.59L11.5 17l5-5-5-5-1.41 1.41L12.67 11H3v2h9.67l-2.58 2.59zM19 3H5c-1.11 0-2 .9-2 2v4h2V5h14v14H5v-4H3v4c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z" fill="currentColor"/>
@@ -264,9 +303,13 @@ import SensorRequest from '../../utils/SensorRequest.js';
 import {GetDingUserToken, key_DingTokenJWT, key_VideoMeetingToken, setNewVideoMeetingToken, isVideoMeetingTokenValid} from '../../utils/Dingding.js';
 import SensorRequestPage from "../../utils/SensorRequestPage";
 import SensorRequestMeeting from "../../utils/SensorRequestMeeting";
+import AnnotationCanvas from '@/components/AnnotationCanvas.vue';
 
 export default {
   name: 'VideoMeeting',
+  components: {
+    AnnotationCanvas
+  },
   data() {
     return {
       meetingUrl: '',
@@ -283,6 +326,8 @@ export default {
       viewMode: 'grid',
       // 参与者数据
       participants: {},
+      // 音频活动状态
+      audioActivity: new Map(),
       localParticipantId: null,
       isInDingTalk: false,
       // Token获取状态
@@ -310,6 +355,11 @@ export default {
       pendingVideoElements: null,   // 存储被自动播放策略阻止的视频元素
       audioTipShown: false,
       mediaPlayTipShown: false,     // 媒体播放提示是否已显示
+      // 本地音频活动检测
+      audioContext: null,
+      analyser: null,
+      audioStream: null,
+      audioActivityInterval: null,
       // 主持人相关
       initiator: null, // 会议发起人信息
       isHost: false, // 当前用户是否为主持人
@@ -327,22 +377,22 @@ export default {
       isFullscreen: false,
       // 参与者同步定时器
       participantSyncTimer: null,
+      // 批注相关
+
     };
   },
   computed: {
+    isPC() {
+      return !this.isMobile;
+    },
+
+
     videoItems() {
       const items = [];
-      console.log('🔍 生成视频项列表:', {
-        participants: Object.entries(this.participants).map(([id, p]) => ({ id, isHost: p.isHost, hasVideo: p.hasVideo, isLocal: p.isLocal })),
-        activeScreenShareId: this.activeScreenShareId,
-        viewMode: this.viewMode
-      });
       for (const [id, p] of Object.entries(this.participants)) {
         if (this.viewMode === 'screen-share' && this.activeScreenShareId === id) {
-          console.log('ℹ️ 跳过屏幕共享者:', id);
           continue;
         }
-        console.log('➕ 添加视频项:', { id, isHost: p.isHost, hasVideo: p.hasVideo, isLocal: p.isLocal });
         items.push({
           id,
           name: p.name,
@@ -351,23 +401,17 @@ export default {
           isHost: p.isHost,
           hasVideo: p.hasVideo,
           hasAudio: p.hasAudio,
+          isSpeaking: p.isSpeaking || false,
         });
       }
-      console.log('📋 最终视频项列表:', items);
       return items;
     },
     sidebarParticipants() {
       if (this.viewMode !== 'screen-share') return [];
       const items = [];
       const hostItems = [];
-      console.log('🔍 生成侧边栏参与者列表:', {
-        participants: Object.entries(this.participants).map(([id, p]) => ({ id, isHost: p.isHost, hasVideo: p.hasVideo, isLocal: p.isLocal })),
-        activeScreenShareId: this.activeScreenShareId,
-        viewMode: this.viewMode
-      });
       // 确保至少有一个参与者（本地用户）
       if (Object.keys(this.participants).length === 0 && this.localParticipantId) {
-        console.log('⚠️ 参与者列表为空，添加本地用户');
         const localParticipant = {
           id: this.localParticipantId,
           name: this.getDisplayNameById(this.localParticipantId),
@@ -375,7 +419,8 @@ export default {
           isLocal: true,
           isHost: this.isHost,
           hasVideo: this.cameraEnabled,
-          hasAudio: this.microphoneEnabled
+          hasAudio: this.microphoneEnabled,
+          isSpeaking: (this.participants[this.localParticipantId] && this.participants[this.localParticipantId].isSpeaking) || false
         };
         if (this.isHost) {
           hostItems.push(localParticipant);
@@ -386,16 +431,13 @@ export default {
         for (const [id, p] of Object.entries(this.participants)) {
           // 总是将主持人添加到参会者列表中，无论是否正在共享屏幕
           if (p.isHost) {
-            console.log('👑 主持人添加到侧边栏:', { id, hasVideo: p.hasVideo, isLocal: p.isLocal });
-            hostItems.push({ id, name: p.name, displayName: p.displayName, isHost: p.isHost, hasVideo: p.hasVideo });
+            hostItems.push({ id, name: p.name, displayName: p.displayName, isHost: p.isHost, hasVideo: p.hasVideo, hasAudio: p.hasAudio, isSpeaking: p.isSpeaking || false });
           } else {
             // 非主持人也添加到参会者列表中，无论是否正在共享屏幕
-            console.log('👤 非主持人添加到侧边栏:', { id, hasVideo: p.hasVideo, isLocal: p.isLocal });
-            items.push({ id, name: p.name, displayName: p.displayName, isHost: p.isHost, hasVideo: p.hasVideo });
+            items.push({ id, name: p.name, displayName: p.displayName, isHost: p.isHost, hasVideo: p.hasVideo, hasAudio: p.hasAudio, isSpeaking: p.isSpeaking || false });
           }
         }
       }
-      console.log('📋 侧边栏最终列表:', { hostItems, items });
       // 主持人置顶
       return [...hostItems, ...items];
     },
@@ -409,7 +451,8 @@ export default {
     },
   },
   created() {
-    const rawData = this.$route.query.data || '';
+    // 优先从路径参数获取数据，如果路径参数不存在则从查询参数获取
+    const rawData = this.$route.params.data || this.$route.query.data || '';
     console.log('[VideoMeeting] 获取原始会议地址参数：', rawData);
 
     try {
@@ -440,7 +483,7 @@ export default {
       this.roomName = meetingData.room || '未命名会议';
 
       // ✅ 第三步：获取并解析发起人信息
-      const initiatorParam = this.$route.query.initiator;
+      const initiatorParam = this.$route.params.initiator || this.$route.query.initiator;
       if (initiatorParam) {
         try {
           this.initiator = JSON.parse(decodeURIComponent(initiatorParam));
@@ -451,7 +494,7 @@ export default {
       }
     } catch (error) {
       console.error('[VideoMeeting] 解析会议数据失败:', error);
-      console.error('[VideoMeeting] 原始数据:', this.$route.query.data);
+      console.error('[VideoMeeting] 原始数据:', rawData);
       this.roomName = '未命名会议';
       this.$toast('会议数据格式错误');
     }
@@ -470,38 +513,23 @@ export default {
     document.addEventListener('mozfullscreenchange', this.handleFullscreenChange);
     document.addEventListener('MSFullscreenChange', this.handleFullscreenChange);
 
-    // const department = this.$route.params.department
-    // GetDingUserToken(department, async (token) => {
-    //   // ✅ 获取到 token 后，继续请求会议链接
-    //   console.log('获取到钉钉用户 Token 用于视频会议 :', token);
-    //   localStorage.setItem(key_DingTokenJWT, token);
-    //   console.log('[VideoMeeting] 检测到浏览器环境，尝试自动加载刷新获取 token，用于请求会议 token ：', token);
-    // })
     if (!this.isInDingTalk) {
-      const urlToken = this.$route.query.token;
-      const onceToken = this.$route.query.onceToken;
-      this.onceToken = onceToken; // 存储一次性密钥，用于token过期时重新获取
       console.log('[VideoMeeting] 检测到浏览器环境');
-      console.log('[VideoMeeting] URL中的token参数:', urlToken);
-      console.log('[VideoMeeting] URL中的一次性密钥:', onceToken);
       // ✅ 检查视频会议专用的token缓存（不是钉钉登录token）
       const cachedVideoToken = localStorage.getItem(key_VideoMeetingToken);
       console.log('[VideoMeeting] 视频会议专用token缓存:', cachedVideoToken ? '存在' : '不存在');
       console.log('[VideoMeeting] 视频会议token是否有效:', isVideoMeetingTokenValid() ? '有效' : '无效');
+
       if (cachedVideoToken && isVideoMeetingTokenValid()) {
         // 缓存中存在有效的视频会议token，直接使用，无需调用接口
         console.log('[VideoMeeting] 使用缓存中的有效视频会议token，无需重新获取：'+ cachedVideoToken);
-        // 直接加入房间
-        this.parseAndJoinRoom();
-      } else if (onceToken && typeof onceToken === 'string') {
-        // 缓存中不存在视频会议token，但URL中有一次性密钥，调用接口获取长时间token
-        console.log('[VideoMeeting] 缓存中无视频会议token，使用一次性密钥获取长时间token...');
-        this.isWaitingForToken = true;
-        this.fetchLongTokenByOnce(onceToken);
+        // 调用MeetingInfoGetFun接口获取会议信息
+        this.fetchMeetingInfo();
       } else {
-        console.warn('[VideoMeeting] 未找到有效的token或一次性密钥');
-        this.$toast('缺少身份验证信息');
-        setTimeout(() => this.leaveRoom(), 1500);
+        // 缓存中不存在有效的视频会议token，调用onceToken接口获取
+        console.log('[VideoMeeting] 缓存中无有效视频会议token，获取一次性密钥...');
+        this.isWaitingForToken = true;
+        this.fetchOnceToken();
       }
     } else {
       // 钉钉环境下直接返回
@@ -545,6 +573,8 @@ export default {
   },
   beforeDestroy() {
     this.disconnectRoom();
+    // 停止本地音频活动检测
+    this.stopAudioActivityDetection();
     // 清理音频元素
     this.audioElements.forEach((el) => {
       if (el && el.parentNode) el.parentNode.removeChild(el);
@@ -586,6 +616,29 @@ export default {
       if (p.displayName) return p.displayName;
       if (p.name && p.name !== participantId) return p.name;
       return participantId;
+    },
+
+    // ==================== 批注功能 ====================
+
+
+    // 处理批注通知
+    handleAnnotationNotification(message) {
+      console.log('批注通知:', message);
+      this.$toast(message, { duration: 2000 });
+    },
+
+    // 开始批注模式
+    startAnnotation() {
+      if (this.$refs.annotationCanvas) {
+        this.$refs.annotationCanvas.startAnnotation();
+      }
+    },
+
+    // 处理收到的批注数据
+    handleReceivedAnnotation(message) {
+      if (this.$refs.annotationCanvas) {
+        this.$refs.annotationCanvas.handleReceivedAnnotation(message);
+      }
     },
 
     // ==================== 注册/注销参会者姓名 ====================
@@ -875,142 +928,7 @@ export default {
           }
         });
     },
-    // 主持人结束会议（强制所有人下线）
-    endMeeting() {
-      if (!this.isHost || this.isDisconnected) return;
 
-      this.$dialog
-        .confirm({
-          title: '确认结束会议',
-          message: '确定要结束当前会议吗？这将强制所有参会者下线。',
-          confirmButtonText: '确定',
-          cancelButtonText: '取消',
-        })
-        .then(() => {
-          // 构建结束会议消息
-          const controlMessage = {
-            type: 'moderator-request',
-            target: 'all',
-            action: 'end-meeting'
-          };
-
-          try {
-            // 发送结束会议消息给所有参与者
-            // 不使用destinationIdentities，而是通过message.target来指定目标
-            this.room.localParticipant.publishData(
-              new TextEncoder().encode(JSON.stringify(controlMessage)),
-              {
-                reliable: true
-              }
-            );
-            console.log(`✅ 发送结束会议消息给所有参与者`);
-
-            // 延迟断开自己的连接，确保消息发送完成
-            setTimeout(() => {
-              this.disconnectRoom();
-              this.$toast('会议已结束');
-              setTimeout(() => this.$router.back(), 1000);
-            }, 500);
-          } catch (error) {
-            console.error('发送结束会议消息失败:', error);
-            this.$toast('结束会议失败，请重试');
-          }
-        });
-    },
-    // 显示移交主持人权限的弹窗
-    showTransferHostDialog() {
-      // 获取除了自己之外的其他参会者
-      const otherParticipants = Object.entries(this.participants).filter(([id, p]) => !p.isLocal);
-
-      if (otherParticipants.length === 0) {
-        // 没有其他参会者，直接离开
-        this.disconnectRoom();
-        this.$toast('已离开会议室');
-        setTimeout(() => this.$router.back(), 1000);
-        return;
-      }
-
-      // 构建参会者选项
-      const actions = otherParticipants.map(([id, p]) => ({
-        name: this.getDisplayNameById(id),
-        value: id
-      }));
-
-      // 显示操作面板选择新主持人
-      ActionSheet.create({
-        title: '移交主持人权限',
-        message: '会议不能没有主持人，请选择一位参会者作为新的主持人',
-        actions: actions,
-        cancelText: '取消',
-        closeOnClickAction: true,
-        callback: (action, index) => {
-          if (action && action.value) {
-            this.transferHost(action.value);
-          }
-        }
-      }).show();
-    },
-    // 移交主持人权限
-    transferHost(newHostId) {
-      if (!this.isHost || this.isDisconnected) return;
-
-      // 构建移交权限消息
-      const controlMessage = {
-        type: 'moderator-request',
-        target: newHostId,
-        action: 'transfer-host'
-      };
-
-      try {
-        // 发送移交权限消息给新主持人
-        // 不使用destinationIdentities，而是通过message.target来指定目标
-        this.room.localParticipant.publishData(
-          new TextEncoder().encode(JSON.stringify(controlMessage)),
-          {
-            reliable: true
-          }
-        );
-        console.log(`✅ 发送移交主持人权限消息给 ${newHostId}`);
-
-        // 同时通知所有其他参会者主持人变更
-        const notifyMessage = {
-          type: 'moderator-request',
-          target: 'all',
-          action: 'host-changed',
-          newHostId: newHostId,
-          newHostName: this.getDisplayNameById(newHostId)
-        };
-
-        // 不使用destinationIdentities，而是通过message.target来指定目标
-        this.room.localParticipant.publishData(
-          new TextEncoder().encode(JSON.stringify(notifyMessage)),
-          {
-            reliable: true
-          }
-        );
-        console.log(`✅ 通知所有参会者主持人已变更为 ${newHostId}`);
-
-        // 更新本地参与者列表中的主持人状态
-        Object.keys(this.participants).forEach(id => {
-          const participant = this.participants[id];
-          participant.isHost = id === newHostId;
-          this.$set(this.participants, id, participant);
-        });
-
-        // 更新本地isHost变量
-        this.isHost = this.localParticipantId === newHostId;
-
-        // 延迟断开自己的连接，确保消息发送完成
-        setTimeout(() => {
-          this.disconnectRoom();
-          this.$toast('已离开会议室，主持人权限已移交');
-          setTimeout(() => this.$router.back(), 1000);
-        }, 500);
-      } catch (error) {
-        console.error('发送移交权限消息失败:', error);
-        this.$toast('移交权限失败，请重试');
-      }
-    },
 
 // ==================== Token获取 ====================
     /**
@@ -1018,6 +936,79 @@ export default {
      * @param {string} onceToken - 一次性密钥
      * @param {function} callback - 获取token后的回调函数
      */
+    fetchOnceToken() {
+      console.log('[VideoMeeting] 开始从URL参数中获取一次性密钥...');
+      try {
+        // 从URL参数中获取一次性密钥
+        const onceToken = this.$route.query.onceToken;
+        console.log('[VideoMeeting] 从URL参数中获取到一次性密钥:', onceToken);
+        if (!onceToken || typeof onceToken !== 'string') {
+          this.$toast.fail('获取一次性密钥失败');
+          return;
+        }
+        this.onceToken = onceToken; // 存储一次性密钥
+        // 使用一次性密钥获取长时间token
+        this.fetchLongTokenByOnce(onceToken, () => {
+          // 获取长时间token成功后，调用MeetingInfoGetFun接口获取会议信息
+          this.fetchMeetingInfo();
+        });
+      } catch (error) {
+        console.error('[VideoMeeting] 处理一次性密钥失败:', error);
+        this.$toast.fail('获取会议信息失败');
+      }
+    },
+
+    fetchMeetingInfo() {
+      console.log('[VideoMeeting] 开始调用MeetingInfoGetFun接口获取会议信息...');
+      // 构建请求体
+      const requestBody = {
+        "Week_Display": "",
+        "Meeting_Name": this.roomName,
+        "Meeting_Type": "",
+        "Meeting_Address": "",
+        "Meeting_Initiator": {
+          "Person_DingID": "",
+          "Person_Phone": "",
+          "Person_Name": "",
+          "Person_Department": ""
+        }
+      };
+
+      SensorRequestMeeting.MeetingInfoGetFunPage(
+        JSON.stringify(requestBody),
+        (respData) => {
+          try {
+            console.log('[VideoMeeting] 获取会议信息成功，响应:', respData);
+            // 解析响应数据
+            const meetingInfo = typeof respData === 'string' ? JSON.parse(respData) : respData;
+            console.log('[VideoMeeting] 解析后的会议信息:', meetingInfo);
+
+            // 保存主持人信息（仅当路由中未获取到发起人信息时）
+            if (!this.initiator && meetingInfo && Array.isArray(meetingInfo) && meetingInfo.length > 0) {
+              this.initiator = meetingInfo[0].Meeting_Initiator;
+              console.log('[VideoMeeting] 从API获取到主持人信息:', this.initiator);
+            } else if (this.initiator) {
+              console.log('[VideoMeeting] 使用路由中获取的发起人信息:', this.initiator);
+            }
+
+            // 加入房间
+            this.parseAndJoinRoom();
+          } catch (parseError) {
+            console.error('[VideoMeeting] 解析会议信息失败:', parseError);
+            this.$toast.fail('数据解析失败');
+            // 即使解析失败，也尝试加入房间
+            this.parseAndJoinRoom();
+          }
+        },
+        (error) => {
+          console.error('[VideoMeeting] 获取会议信息失败:', error);
+          this.$toast.fail('获取会议信息失败');
+          // 即使获取失败，也尝试加入房间
+          this.parseAndJoinRoom();
+        }
+      );
+    },
+
     fetchLongTokenByOnce(onceToken, callback) {
       console.log('[VideoMeeting] 开始调用Ding_GetTokenByOnce接口...');
       console.log('[VideoMeeting] 一次性密钥:', onceToken);
@@ -1129,6 +1120,12 @@ export default {
             maxFrameRate: 30,
           },
         });
+        console.log('🔊 音频活动检测配置: LiveKit 2.18.0版本默认启用');
+        console.log('   注意: 此版本API与预期不同，将使用默认配置');
+
+        // 检查Room配置
+        console.log('🔍 Room配置检查:');
+        console.log(`   room.config: ${JSON.stringify(this.room.config)}`);
         this.setupRoomEvents();
         await this.room.connect(this.wsUrl, token, { name: userName });
         this.roomName = this.room.name;
@@ -1158,9 +1155,11 @@ export default {
           isHost: this.isHost,
           hasVideo: false,
           hasAudio: false,
+          isSpeaking: false,
           videoTrack: null,
           audioTrack: null,
         });
+        this.audioActivity.set(this.localParticipantId, false);
         console.log('👤 本地参与者信息:', this.participants[this.localParticipantId]);
 
         await this.enableMedia();
@@ -1300,10 +1299,8 @@ export default {
       };
       this.$set(this.participants, participantId, newParticipant);
 
-      this.$nextTick(() => {
-        this.$forceUpdate();
-        console.log(`🔄 强制刷新视图，参与者 ${participantId} hasVideo=${hasVideo}`);
-      });
+      // 移除强制刷新，依赖Vue的响应式更新机制
+      // 强制刷新会导致视频元素重新渲染，引起卡顿
 
       if (hasVideo && track) {
         // 同时更新主视频区域和侧边栏的视频
@@ -1453,8 +1450,28 @@ export default {
         return;
       }
 
+      // 音频活动检测在LiveKit 2.x版本中默认启用
+      console.log('🔊 音频活动检测配置: LiveKit 2.x版本默认启用');
+
       room.on(RoomEvent.Connected, () => {
         console.log('✅ 房间连接成功');
+
+        // 检查并配置音频活动检测
+        console.log('🔊 连接成功后检查音频活动检测配置:');
+        console.log(`   room.audio: ${JSON.stringify(room.audio)}`);
+        console.log(`   room.getAudioActivityDetection: ${typeof room.getAudioActivityDetection}`);
+        console.log(`   room.setAudioActivityDetection: ${typeof room.setAudioActivityDetection}`);
+
+        // 尝试启用音频活动检测
+        if (typeof room.setAudioActivityDetection === 'function') {
+          room.setAudioActivityDetection(true);
+          console.log('✅ 已调用 setAudioActivityDetection(true)');
+        } else if (room.audio && room.audio.activityDetection) {
+          console.log('✅ 音频活动检测已在初始化时配置');
+        } else {
+          console.warn('⚠️ 未找到音频活动检测配置方法');
+        }
+
         if (room.participants && typeof room.participants.values === 'function') {
           for (const participant of room.participants.values()) {
             if (!this.participants[participant.identity]) {
@@ -1476,9 +1493,11 @@ export default {
                 isHost: isParticipantHost,
                 hasVideo: false,
                 hasAudio: false,
+                isSpeaking: false,
                 videoTrack: null,
                 audioTrack: null,
               });
+              this.audioActivity.set(participant.identity, false);
               console.log(`👤 发现参与者：${participant.identity}, name: ${displayName}${isParticipantHost ? ' (主持人)' : ''}`);
               if (!participant.name || participant.name.trim() === '' || participant.name === participant.identity) {
                 this.fetchAndRegisterName(participant.identity, participant.name);
@@ -1509,22 +1528,8 @@ export default {
             this.$set(this.participants, id, p);
           });
 
-          // 通知所有参与者主持人已变更
-          const notifyMessage = {
-            type: 'moderator-request',
-            target: 'all',
-            action: 'host-changed',
-            newHostId: participant.identity,
-            newHostName: displayName
-          };
-
-          this.room.localParticipant.publishData(
-            new TextEncoder().encode(JSON.stringify(notifyMessage)),
-            {
-              reliable: true
-            }
-          );
-          console.log(`✅ 通知所有参会者主持人已变更为 ${participant.identity}`);
+          // 页面加载时不发送主持人变更通知，避免显示不必要的提示
+          // 只有在真正的主持人移交时才发送通知
         }
 
         this.registerParticipantName(participant.identity, displayName);
@@ -1536,12 +1541,16 @@ export default {
           isHost: isParticipantHost,
           hasVideo: false,
           hasAudio: false,
+          isSpeaking: false,
           videoTrack: null,
           audioTrack: null,
         });
+        this.audioActivity.set(participant.identity, false);
         if (!participant.name || participant.name.trim() !== '' && participant.name === participant.identity) {
           this.fetchAndRegisterName(participant.identity, participant.name);
         }
+
+
       });
 
       room.on(RoomEvent.ParticipantDisconnected, (participant) => {
@@ -1598,9 +1607,11 @@ export default {
             isHost: isParticipantHost,
             hasVideo: false,
             hasAudio: false,
+            isSpeaking: false,
             videoTrack: null,
             audioTrack: null,
           });
+          this.audioActivity.set(participantId, false);
           console.log(`👤 新增参与者: ${participantId}, isHost=${isParticipantHost}, isLocal=${participant.isLocal}`);
           if (!participant.name || participant.name.trim() === '' || participant.name === participantId) {
             this.fetchAndRegisterName(participantId, participant.name);
@@ -1613,6 +1624,8 @@ export default {
           // 先更新状态
           this.activeScreenShareId = participantId;
           this.viewMode = 'screen-share';
+
+
 
           // 等待模板渲染完成后再绑定视频元素
           this.$nextTick(() => {
@@ -1851,12 +1864,56 @@ export default {
         }
       });
 
+      // 音频活动检测事件
+      room.on(RoomEvent.AudioActivityChanged, (participant, active) => {
+        const participantId = participant.identity;
+        const participantName = this.getDisplayNameById(participantId);
+        const isLocal = participant.isLocal;
+        const isHost = this.participants[participantId] && this.participants[participantId].isHost ? this.participants[participantId].isHost : false;
+
+        console.log(`🎤 音频活动变化: ${participantId} (${participantName}), active=${active}, isLocal=${isLocal}, isHost=${isHost}`);
+
+        // 检查参与者是否存在于本地状态中
+        if (this.participants[participantId]) {
+          const p = this.participants[participantId];
+          console.log(`   当前状态: hasAudio=${p.hasAudio}, isSpeaking=${p.isSpeaking}`);
+
+          // 更新参与者的isSpeaking状态
+          p.isSpeaking = active;
+          this.$set(this.participants, participantId, p);
+          console.log(`   已更新isSpeaking状态为: ${active}`);
+
+          // 强制刷新视图，确保图标更新
+          this.$nextTick(() => {
+            this.$forceUpdate();
+            console.log(`   已强制刷新视图，参与者 ${participantId} isSpeaking=${active}`);
+          });
+        } else {
+          console.warn(`   参与者 ${participantId} 不在本地参与者列表中`);
+        }
+
+        // 更新音频活动状态Map
+        this.audioActivity.set(participantId, active);
+        console.log(`   音频活动Map状态: ${Array.from(this.audioActivity.entries()).map(([id, status]) => `${id}:${status}`).join(', ')}`);
+      });
+
+      // 检查Room对象是否有音频活动检测相关的属性或方法
+      console.log('🔊 检查Room对象音频活动检测相关属性:');
+      console.log(`   room.audio: ${JSON.stringify(room.audio)}`);
+      console.log(`   room.getAudioActivityDetection: ${typeof room.getAudioActivityDetection}`);
+      console.log(`   room.setAudioActivityDetection: ${typeof room.setAudioActivityDetection}`);
+
       // 数据消息接收事件
       room.on(RoomEvent.DataReceived, (payload, participant, kind) => {
         try {
           const message = JSON.parse(new TextDecoder().decode(payload));
           console.log('📨 收到数据消息:', message, '来自:', participant && participant.identity);
-          if (message.type === 'moderator-request') {
+          if (message.type === 'annotation') {
+            if (message.participantId !== this.localParticipantId) {
+              console.log('📝 收到来自', message.participantName, '的批注数据:', message.data);
+              this.handleReceivedAnnotation(message);
+            }
+          } else if (message.type === 'moderator-request') {
             // 检查是否是发给自己的请求
             if (message.target === 'all' || message.target === this.localParticipantId) {
               console.log('🎯 收到主持人控制请求:', message.action);
@@ -1992,6 +2049,44 @@ export default {
         this.microphoneEnabled = newEnabled;
         this.updateParticipantAudio(this.localParticipantId, newEnabled);
 
+        // 检查本地音频轨道状态
+        console.log(`🎤 麦克风状态更新: ${newEnabled ? '开启' : '关闭'}`);
+
+        // 检查所有本地轨道
+        const tracks = Array.from(this.room.localParticipant.trackPublications.values());
+        console.log(`   本地轨道数量: ${tracks.length}`);
+        tracks.forEach((pub, index) => {
+          console.log(`   轨道 ${index}: kind=${pub.kind}, source=${pub.source}, isMuted=${pub.isMuted}, track=${pub.track ? '存在' : '不存在'}`);
+        });
+
+        // 尝试通过source获取音频轨道
+        const audioTrackBySource = this.room.localParticipant.getTrackPublication(Track.Source.Microphone);
+        console.log(`   通过source获取音频轨道: ${audioTrackBySource ? '存在' : '不存在'}`);
+        if (audioTrackBySource && audioTrackBySource.track) {
+          console.log(`   音频轨道状态: enabled=${audioTrackBySource.track.enabled}, muted=${audioTrackBySource.isMuted}`);
+        }
+
+        // 检查Room对象的音频活动检测配置
+        console.log('🔊 检查Room音频活动检测配置:');
+        console.log(`   room.config: ${JSON.stringify(this.room.config)}`);
+        console.log(`   room.audio: ${JSON.stringify(this.room.audio)}`);
+
+        // 手动触发音频活动检测测试
+        if (newEnabled) {
+          console.log('🔊 手动测试音频活动检测:');
+          console.log('   请开始讲话，观察控制台是否有音频活动变化日志');
+        }
+
+        // 启动或停止本地音频活动检测
+        if (newEnabled) {
+          // 延迟启动，确保音频轨道已准备就绪
+          setTimeout(() => {
+            this.startAudioActivityDetection();
+          }, 500);
+        } else {
+          this.stopAudioActivityDetection();
+        }
+
         // 关闭加载提示
         loadingToast.close();
         this.$toast(newEnabled ? '麦克风已开启' : '麦克风已关闭');
@@ -2016,6 +2111,11 @@ export default {
      * 共享屏幕 - 优化画质和比例
      */
     async shareScreen() {
+      // 移动端不支持共享屏幕
+      if (!this.isPC) {
+        this.$toast('移动端不支持共享屏幕功能');
+        return;
+      }
       console.log('🚀 开始共享屏幕');
       console.log('📋 当前状态:', {
         localParticipantId: this.localParticipantId,
@@ -2070,7 +2170,7 @@ export default {
           name: 'screen',
           source: Track.Source.ScreenShare,
           videoEncoding: {
-            maxBitrate: Math.min(20000000, Math.max(5000000, (width * height) / 0.15)), // 提高比特率上限和下限
+            maxBitrate: Math.min(30000000, Math.max(8000000, (width * height) / 0.1)), // 进一步提高比特率上限和下限
             maxFramerate: 30,
             priority: 'high',
           },
@@ -2098,6 +2198,8 @@ export default {
 
         console.log('🔄 切换到屏幕共享模式');
 
+
+
         // 本地预览：直接使用原始流，确保清晰
         this.$nextTick(() => {
           const screenVideo = this.$refs.screenShareVideo;
@@ -2115,26 +2217,9 @@ export default {
         });
         // 确保主持人的摄像头轨道在侧边栏中显示
         this.$nextTick(() => {
-          console.log('🔍 检查主持人摄像头状态:', {
-            cameraEnabled: this.cameraEnabled,
-            localCameraTrack: !!this.localCameraTrack,
-            localParticipantId: this.localParticipantId,
-            isHost: this.isHost
-          });
           if (this.cameraEnabled && this.localCameraTrack) {
-            console.log('📹 调用 updateParticipantVideo 更新主持人视频状态');
+            // 只调用一次updateParticipantVideo，避免重复操作导致卡顿
             this.updateParticipantVideo(this.localParticipantId, true, this.localCameraTrack);
-            // 再次强制更新视图，确保侧边栏元素渲染
-            this.$nextTick(() => {
-              this.$forceUpdate();
-              console.log('🔄 再次强制刷新视图，确保侧边栏元素渲染');
-              // 尝试再次更新视频轨道
-              if (this.cameraEnabled && this.localCameraTrack) {
-                this.updateParticipantVideo(this.localParticipantId, true, this.localCameraTrack);
-              }
-            });
-          } else {
-            console.log('ℹ️ 主持人摄像头未启用或无轨道');
           }
         });
         this.$toast('屏幕共享已开始');
@@ -2163,6 +2248,8 @@ export default {
       this.activeScreenShareId = null;
       this.viewMode = 'grid';
 
+
+
       // 清除 sessionStorage 中的屏幕共享状态
       sessionStorage.removeItem('videoMeeting_screenSharing');
 
@@ -2187,33 +2274,69 @@ export default {
     switchToParticipant(participantId) {
       console.log('切换到参与者:', participantId);
     },
-    leaveRoom() {
-      // 如果是主持人且还有其他参会者，需要移交权限
-      if (this.isHost && Object.keys(this.participants).length > 1) {
-        // 自动选择第一个非本地参与者作为新主持人
-        const otherParticipants = Object.entries(this.participants).filter(([id, p]) => !p.isLocal);
-        if (otherParticipants.length > 0) {
-          // 按照参会成员列表顺序选择第一个参与者
-          const [newHostId, newHost] = otherParticipants[0];
-          this.transferHost(newHostId);
-          // 显示移交成功提示
-          this.$toast(`已将主持人权限移交给 ${this.getDisplayNameById(newHostId)}`);
-          // 延迟离开，确保权限移交完成
-          setTimeout(() => {
-            this.disconnectRoom();
-            this.$toast('已离开会议室');
-            setTimeout(() => this.$router.back(), 1000);
-          }, 500);
-        } else {
-          // 没有其他参会者，直接离开
-          this.disconnectRoom();
-          this.$toast('已离开会议室');
-          setTimeout(() => this.$router.back(), 1000);
-        }
+
+    // ==================== 批注功能 ====================
+    toggleAnnotationMode() {
+      if (!this.activeScreenShareId) {
+        this.$toast('当前没有共享屏幕，无法使用批注功能');
         return;
       }
+      if (this.$refs.annotationCanvas) {
+        // 检查当前是否已经在批注模式中
+        if (this.$refs.annotationCanvas.isAnnotating) {
+          this.$refs.annotationCanvas.exitAnnotationMode();
+        } else {
+          this.$refs.annotationCanvas.startAnnotation();
+        }
+      }
+    },
 
-      // 非主持人或没有其他参会者，直接离开
+    handleExitAnnotation() {
+      console.log('处理从批注模式退出');
+      // 确保批注模式已完全退出
+      if (this.$refs.annotationCanvas) {
+        // 1. 确保批注模式状态已更新
+        this.$refs.annotationCanvas.isAnnotating = false;
+
+        // 2. 发送通知给用户
+        this.$toast('已退出批注模式', { duration: 2000 });
+
+        // 3. 清理批注相关状态
+        if (this.$refs.annotationCanvas.annotationCanvas) {
+          // 可选：清除画布内容
+          const ctx = this.$refs.annotationCanvas.annotationCanvas.getContext('2d');
+          if (ctx) {
+            ctx.clearRect(0, 0, this.$refs.annotationCanvas.annotationCanvas.width, this.$refs.annotationCanvas.annotationCanvas.height);
+          }
+        }
+
+        // 4. 通知其他参会者当前用户已退出批注模式
+        if (this.room && this.localParticipantId) {
+          try {
+            const exitMessage = {
+              type: 'annotation',
+              participantId: this.localParticipantId,
+              participantName: this.getDisplayNameById(this.localParticipantId),
+              timestamp: Date.now(),
+              data: {
+                type: 'exit-annotation'
+              }
+            };
+            this.room.localParticipant.publishData(
+              new TextEncoder().encode(JSON.stringify(exitMessage)),
+              { reliable: true }
+            );
+            console.log('已通知其他参会者退出批注模式');
+          } catch (error) {
+            console.error('发送退出批注模式通知失败:', error);
+          }
+        }
+        console.log('批注模式已成功退出');
+      }
+    },
+
+    leaveRoom() {
+      // 所有用户都直接离开会议，不进行主持人权限移交
       this.$dialog
         .confirm({
           title: '确认离开',
@@ -2545,6 +2668,115 @@ export default {
       }
     },
 
+    // ==================== 本地音频活动检测 ====================
+    /**
+     * 初始化本地音频分析器
+     */
+    initAudioAnalyzer() {
+      try {
+        if (this.audioContext) {
+          this.audioContext.close();
+        }
+        this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        this.analyser = this.audioContext.createAnalyser();
+        this.analyser.fftSize = 256;
+        console.log('✅ 本地音频分析器初始化成功');
+      } catch (error) {
+        console.error('❌ 初始化音频分析器失败:', error);
+      }
+    },
+
+    /**
+     * 开始本地音频活动检测
+     */
+    startAudioActivityDetection() {
+      if (!this.microphoneEnabled) return;
+
+      // 获取本地音频轨道
+      const audioTrack = this.room.localParticipant.getTrackPublication(Track.Source.Microphone);
+      if (!audioTrack || !audioTrack.track) {
+        console.warn('⚠️ 无法获取本地音频轨道');
+        return;
+      }
+
+      try {
+        // 停止之前的检测
+        this.stopAudioActivityDetection();
+
+        // 初始化音频分析器
+        this.initAudioAnalyzer();
+
+        // 获取媒体流
+        this.audioStream = audioTrack.track.mediaStream;
+        const audioSource = this.audioContext.createMediaStreamSource(this.audioStream);
+        audioSource.connect(this.analyser);
+
+        // 开始检测，增加间隔时间以减少性能开销
+        this.audioActivityInterval = setInterval(() => {
+          this.detectAudioActivity();
+        }, 200);
+
+        console.log('✅ 本地音频活动检测已启动');
+      } catch (error) {
+        console.error('❌ 启动音频活动检测失败:', error);
+      }
+    },
+
+    /**
+     * 停止本地音频活动检测
+     */
+    stopAudioActivityDetection() {
+      if (this.audioActivityInterval) {
+        clearInterval(this.audioActivityInterval);
+        this.audioActivityInterval = null;
+      }
+      if (this.audioContext) {
+        this.audioContext.close();
+        this.audioContext = null;
+        this.analyser = null;
+      }
+      this.audioStream = null;
+      console.log('🛑 本地音频活动检测已停止');
+    },
+
+    /**
+     * 检测音频活动
+     */
+    detectAudioActivity() {
+      if (!this.analyser) return;
+
+      try {
+        const bufferLength = this.analyser.frequencyBinCount;
+        const dataArray = new Uint8Array(bufferLength);
+        this.analyser.getByteFrequencyData(dataArray);
+
+        // 计算音频能量
+        let sum = 0;
+        for (let i = 0; i < bufferLength; i++) {
+          sum += dataArray[i];
+        }
+        const average = sum / bufferLength;
+
+        // 检测是否有音频活动
+        const isSpeaking = average > 20; // 阈值可调整
+
+        // 更新本地参与者的isSpeaking状态
+        if (this.participants[this.localParticipantId]) {
+          const p = this.participants[this.localParticipantId];
+          if (p.isSpeaking !== isSpeaking) {
+            p.isSpeaking = isSpeaking;
+            this.$set(this.participants, this.localParticipantId, p);
+            console.log(`🎤 本地音频活动检测: ${isSpeaking ? '正在发言' : '静音'}`);
+
+            // 只在状态变化时更新视图，避免频繁刷新导致卡顿
+            // 移除强制刷新，依赖Vue的响应式更新
+          }
+        }
+      } catch (error) {
+        console.error('❌ 检测音频活动失败:', error);
+      }
+    },
+
     /**
      * 检查 sessionStorage 中的屏幕共享状态
      */
@@ -2552,19 +2784,8 @@ export default {
       try {
         const storedState = sessionStorage.getItem('videoMeeting_screenSharing');
         if (storedState) {
-          const state = JSON.parse(storedState);
-          if (state.active && state.shareId === this.localParticipantId) {
-            // 检查状态是否过期（5分钟内有效）
-            const now = Date.now();
-            if (now - state.timestamp < 5 * 60 * 1000) {
-              console.log('🔄 恢复屏幕共享状态');
-              // 重新开始屏幕共享
-              this.shareScreen();
-            } else {
-              // 状态过期，清除
-              sessionStorage.removeItem('videoMeeting_screenSharing');
-            }
-          }
+          // 清除之前的屏幕共享状态，避免自动恢复
+          sessionStorage.removeItem('videoMeeting_screenSharing');
         }
       } catch (error) {
         console.warn('检查屏幕共享状态失败:', error);
@@ -2785,6 +3006,38 @@ export default {
   color: #fff;
   backdrop-filter: blur(4px);
   z-index: 2;
+}
+
+.sidebar-audio-mute-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ff4d4f;
+  z-index: 2;
+}
+
+.sidebar-audio-speaking-badge {
+  position: absolute;
+  bottom: 6px;
+  right: 6px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 2;
+  animation: pulse 1.5s infinite;
+  box-shadow: 0 0 8px rgba(82, 196, 26, 0.7);
 }
 
 /* 移动端屏幕共享优化 */
@@ -3090,6 +3343,38 @@ export default {
   justify-content: center;
   color: #ff4d4f;
   z-index: 2;
+}
+
+.audio-speaking-badge {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  background: rgba(0, 0, 0, 0.6);
+  border-radius: 50%;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  z-index: 2;
+  animation: pulse 1.5s infinite;
+  box-shadow: 0 0 10px rgba(82, 196, 26, 0.7);
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.1);
+    opacity: 0.8;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
 .host-badge {
@@ -3620,5 +3905,279 @@ export default {
 
 .control-icon.active {
   color: #3f83f8;
+}
+
+/* 音频活动指示器样式 */
+.audio-speaking-badge {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  background-color: #4CAF50;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 1s infinite;
+}
+
+.sidebar-audio-speaking-badge {
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  background-color: #4CAF50;
+  border-radius: 50%;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0.7);
+  }
+  70% {
+    transform: scale(1);
+    box-shadow: 0 0 0 10px rgba(76, 175, 80, 0);
+  }
+  100% {
+    transform: scale(0.95);
+    box-shadow: 0 0 0 0 rgba(76, 175, 80, 0);
+  }
+}
+
+/* 批注画布样式 */
+.annotation-canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 10;
+  pointer-events: auto;
+}
+
+.annotation-canvas.fullscreen-canvas {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  z-index: 1000;
+}
+
+/* 批注工具栏样式 */
+.annotation-toolbar {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 30, 30, 0.95);
+  border-radius: 12px;
+  padding: 8px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  z-index: 20;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+  backdrop-filter: blur(10px);
+  transition: all 0.3s ease;
+}
+
+.annotation-toolbar.collapsed {
+  padding: 8px;
+  min-width: 52px;
+  justify-content: center;
+}
+
+.annotation-toolbar .collapse-only {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.annotation-toolbar .toolbar-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  transition: all 0.3s ease;
+}
+
+.annotation-toolbar .collapse-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* 正在批注的用户提示 */
+.annotating-users-hint {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(30, 30, 30, 0.95);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  z-index: 15;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  max-width: 300px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+@media (max-width: 768px) {
+  .annotating-users-hint {
+    top: 60px;
+    right: 12px;
+    font-size: 11px;
+    padding: 4px 8px;
+    max-width: 200px;
+  }
+}
+
+.annotation-tool-group,
+.annotation-color-group,
+.annotation-size-group,
+.annotation-action-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.annotation-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.annotation-tool-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+}
+
+.annotation-tool-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.annotation-tool-btn.active {
+  background: #3b82f6;
+  color: #fff;
+}
+
+.annotation-color-btn {
+  width: 24px;
+  height: 24px;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.annotation-color-btn:hover {
+  transform: scale(1.15);
+  border-color: rgba(255, 255, 255, 0.5);
+}
+
+.annotation-color-btn.active {
+  border-color: #fff;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.5);
+}
+
+.annotation-size-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.annotation-size-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.annotation-size-btn.active {
+  background: rgba(59, 130, 246, 0.3);
+}
+
+.size-dot {
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+}
+
+.annotation-action-btn {
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.8);
+  transition: all 0.2s ease;
+}
+
+.annotation-action-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.annotation-action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.annotation-action-btn.close-btn:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #ef4444;
+}
+
+/* 响应式调整 */
+@media (max-width: 768px) {
+  .annotation-toolbar {
+    padding: 6px 12px;
+    gap: 8px;
+    flex-wrap: wrap;
+    max-width: 90%;
+    justify-content: center;
+  }
+
+  .annotation-tool-btn,
+  .annotation-action-btn {
+    width: 32px;
+    height: 32px;
+  }
+
+  .annotation-color-btn {
+    width: 20px;
+    height: 20px;
+  }
+
+  .annotation-size-btn {
+    width: 28px;
+    height: 28px;
+  }
 }
 </style>
