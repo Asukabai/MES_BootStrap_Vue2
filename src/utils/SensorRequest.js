@@ -3,6 +3,11 @@ import * as ssDing from '../utils/Dingding.js';
 
   const SensorRequest = {
 
+      Ding_LoginByPhoneCode(param, callSuccess, callFail) {
+        ssDing.PostDataUrl("Ding_LoginByPhoneCode", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
       GetDDingCode(loginMethod,param, callSuccess, callFail) {
         ssDing.PostDataUrl(loginMethod, param, true, respData => {
           callSuccess(respData);
@@ -175,9 +180,21 @@ import * as ssDing from '../utils/Dingding.js';
               callSuccess(respData);
           }, callFail);
       },
+      // 根据文件名模糊查询给我共享的文件信息（支持分页）
+      GetSharedFileWithMeByNameFun(param, callSuccess, callFail) {
+          ssDing.PostDataUrl("GetSharedFileWithMeByNameFun", param, true, respData => {
+              callSuccess(respData);
+          }, callFail);
+      },
       // 发送的文件信息获取
       GetPersonSharedFileFun(param, callSuccess, callFail) {
           ssDing.PostDataUrl("GetPersonSharedFileFun", param, true, respData => {
+              callSuccess(respData);
+          }, callFail);
+      },
+      // 根据文件名模糊查询个人共享的文件信息（支持分页）
+      GetPersonSharedFileByNameFun(param, callSuccess, callFail) {
+          ssDing.PostDataUrl("GetPersonSharedFileByNameFun", param, true, respData => {
               callSuccess(respData);
           }, callFail);
       },
@@ -298,6 +315,30 @@ import * as ssDing from '../utils/Dingding.js';
       // 根据条件查询库存并导出为Excel文件
       InventoryExportToExcelFun(param, callSuccess, callFail) {
           ssDing.PostDataUrl("InventoryExportToExcelFun", param, true, respData => {
+              callSuccess(respData);
+          }, callFail);
+      },
+      // 根据条件查询库存的操作记录并导出为 Excel 文件
+      InventoryTransactionsExportToExcelFun(param, callSuccess, callFail) {
+          ssDing.PostDataUrl("InventoryTransactionsExportToExcelFun", param, true, respData => {
+              callSuccess(respData);
+          }, callFail);
+      },
+      // 获取个人月所有工作日的日报任务
+      GetPersonTaskMonthWorkdayFun(param, callSuccess, callFail) {
+          ssDing.PostDataUrl("GetPersonTaskMonthWorkdayFun", param, true, respData => {
+              callSuccess(respData);
+          }, callFail);
+      },
+      // 添加任务信息（用于创建日报）
+      TaskInfoAddFun(param, callSuccess, callFail) {
+          ssDing.PostDataUrl("TaskInfoAddFun", param, true, respData => {
+              callSuccess(respData);
+          }, callFail);
+      },
+      // 更新任务信息（用于编辑日报）
+      TaskInfoUpdateFun(param, callSuccess, callFail) {
+          ssDing.PostDataUrl("TaskInfoUpdateFun", param, true, respData => {
               callSuccess(respData);
           }, callFail);
       },

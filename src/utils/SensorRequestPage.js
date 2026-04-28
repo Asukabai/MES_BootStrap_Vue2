@@ -1,5 +1,6 @@
 
 import * as ssDing from '../utils/Dingding.js';
+import {PostDataMeeting, PostDataUrlMeeting} from "../utils/Dingding.js";
 
 const SensorRequestPage = {
       // 获取库存信息表格数据(分页)
@@ -80,7 +81,37 @@ const SensorRequestPage = {
         }, callFail);
       },
       Ding_GetMeetingToken(param, callSuccess, callFail) {
-        ssDing.PostDataUrlPage("Ding_GetMeetingToken", param, true, respData => {
+        ssDing.PostDataUrlPage("Ding_GetMeetingToken2", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 获取钉钉一次性密钥
+      Ding_GetOnceToken(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("Ding_GetOnceToken", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 通过一次性密钥获取长时间token
+      Ding_GetTokenByOnce(param, callSuccess, callFail) {
+        ssDing.PostDataUrlMeeting("Ding_GetTokenByOnce", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 获取项目信息
+      ProjectInfoGetFunPage(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("ProjectInfoGetFunPage", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 获取个人创建或者负责的任务信息
+      GetPersonTaskInfoFunPage(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("GetPersonTaskInfoFunPage", param, true, respData => {
+          callSuccess(respData);
+        }, callFail);
+      },
+      // 获取个人参与的任务信息
+      GetTaskInfoWithMeFunPage(param, callSuccess, callFail) {
+        ssDing.PostDataUrlPage("GetTaskInfoWithMeFunPage", param, true, respData => {
           callSuccess(respData);
         }, callFail);
       },
