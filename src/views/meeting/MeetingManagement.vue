@@ -475,14 +475,30 @@ export default {
     },
 
     onSearch() {
+      const hasSearchParams = this.activeSearchTypes.some(type => {
+        if (type === 'meetingName') return this.searchParams.meetingName;
+        if (type === 'initiator') return this.searchParams.initiator;
+        if (type === 'meetingType') return this.searchParams.meetingType;
+        return false;
+      });
+      
+      if (!hasSearchParams) {
+        Toast('请输入搜索条件');
+        return;
+      }
+      
       this.hasSearched = true;
       this.currentPage = 1;
       this.list = [];
       this.finished = false;
-      this.fetchMeetingList();
+      Toast.loading({ message: '搜索中...', forbidClick: true });
+      this.fetchMeetingList().then(() => {
+        Toast.success(`找到 ${this.list.length} 条会议记录`);
+      });
     },
 
     onReset() {
+      Toast.loading({ message: '重置中...', forbidClick: true });
       this.searchParams = {
         meetingName: '',
         initiator: '',
@@ -494,21 +510,28 @@ export default {
       this.currentPage = 1;
       this.list = [];
       this.finished = false;
-      this.fetchMeetingList();
+      this.fetchMeetingList().then(() => {
+        Toast.success('已重置');
+      });
     },
 
     onRefresh() {
       this.currentPage = 1;
       this.list = [];
       this.finished = false;
+      Toast.loading({ message: '刷新中...', forbidClick: true });
       this.fetchMeetingList().then(() => {
         this.refreshing = false;
+        Toast.success('刷新成功');
       });
     },
 
     onLoadMore() {
       if (this.finished) return;
-      this.fetchMeetingList();
+      Toast.loading({ message: '加载中...', forbidClick: true, duration: 0 });
+      this.fetchMeetingList().then(() => {
+        Toast.clear();
+      });
     },
 
     formatDate(dateString) {

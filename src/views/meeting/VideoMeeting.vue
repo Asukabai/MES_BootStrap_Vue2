@@ -4,7 +4,7 @@
     <div v-if="isInDingTalk" class="dingtalk-overlay">
       <div class="dingtalk-card">
         <div class="dingtalk-icon">⚠️</div>
-        <p><strong>由于钉钉环境不支持共享屏幕等权限</strong></p>
+        <p><strong>钉钉环境不支持共享屏幕等权限功能</strong></p>
         <p><strong>视频会议无法正常运行</strong></p>
         <p>1、PC端请点击下方按钮，复制会议链接打开</p>
         <p>2、移动端请点击右上方...选择默认浏览器打开</p>
@@ -53,6 +53,12 @@
                     <path d="M12 16c-2.21 0-4-1.79-4-4V6c0-2.21 1.79-4 4-4s4 1.79 4 4v6c0 2.21-1.79 4-4 4zm-6-4c0 3.31 2.69 6 6 6s6-2.69 6-6h-2c0 2.21-1.79 4-4 4s-4-1.79-4-4H6z" fill="currentColor"/>
                   </svg>
                   批量音频
+                </button>
+                <button @click="refreshAllParticipantsStatus" class="batch-btn">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z" fill="currentColor"/>
+                  </svg>
+                  刷新状态
                 </button>
               </div>
               <button @click="hideMemberList" class="close-btn">
@@ -297,7 +303,7 @@
 </template>
 
 <script>
-import { Room, RoomEvent, Track, VideoPresets, LocalVideoTrack, createLocalTracks } from 'livekit-client';
+import { Room, RoomEvent, ParticipantEvent, Track, VideoPresets, LocalVideoTrack, createLocalTracks } from 'livekit-client';
 import { ActionSheet } from 'vant';
 import SensorRequest from '../../utils/SensorRequest.js';
 import {GetDingUserToken, key_DingTokenJWT, key_VideoMeetingToken, setNewVideoMeetingToken, isVideoMeetingTokenValid} from '../../utils/Dingding.js';
@@ -648,8 +654,7 @@ export default {
         console.log(`✅ 注册参会者：${participantId} -> ${name}`);
         const p = this.participants[participantId];
         if (p && p.displayName !== name) {
-          p.displayName = name;
-          this.$set(this.participants, participantId, p);
+          this.$set(this.participants, participantId, { ...p, displayName: name });
         }
       }
     },
@@ -825,15 +830,20 @@ export default {
         const participant = this.participants[participantId];
         if (participant) {
           if (action === 'disable-video' || action === 'enable-video') {
-            participant.hasVideo = action === 'enable-video';
-            this.$set(this.participants, participantId, participant);
+            this.$set(this.participants, participantId, { ...participant, hasVideo: action === 'enable-video' });
             this.$toast(`已${action === 'enable-video' ? '开启' : '关闭'}${this.getDisplayNameById(participantId)}的视频`);
           } else if (action === 'mute-audio' || action === 'unmute-audio') {
-            participant.hasAudio = action === 'unmute-audio';
-            this.$set(this.participants, participantId, participant);
+            this.$set(this.participants, participantId, { ...participant, hasAudio: action === 'unmute-audio' });
             this.$toast(`已${action === 'unmute-audio' ? '取消静音' : '静音'}${this.getDisplayNameById(participantId)}的麦克风`);
           }
         }
+        // 延迟后强制同步该参与者的状态，确保本地状态与LiveKit实际状态一致
+        setTimeout(() => {
+          const roomParticipant = this.room.participants.get(participantId);
+          if (roomParticipant) {
+            this.forceSyncParticipantTrack(roomParticipant, participantId);
+          }
+        }, 500);
       } catch (error) {
         console.error('发送控制消息失败:', error);
         this.$toast('控制失败，请重试');
@@ -864,11 +874,9 @@ export default {
           const participant = this.participants[participantId];
           if (!participant.isLocal) {
             if (actionType === 'video') {
-              participant.hasVideo = false;
-              this.$set(this.participants, participantId, participant);
+              this.$set(this.participants, participantId, { ...participant, hasVideo: false });
             } else if (actionType === 'audio') {
-              participant.hasAudio = false;
-              this.$set(this.participants, participantId, participant);
+              this.$set(this.participants, participantId, { ...participant, hasAudio: false });
             }
           }
         });
@@ -927,6 +935,103 @@ export default {
             this.$toast('移出失败，请重试');
           }
         });
+    },
+    // 刷新所有参与者的状态
+    refreshAllParticipantsStatus() {
+      console.log('🔄 手动刷新所有参与者状态');
+      
+      // 首先强制同步所有远程参与者的轨道状态
+      this.forceSyncAllParticipants();
+      
+      // 触发 UI 更新
+      this.$forceUpdate();
+      
+      this.$toast('成员状态已刷新', { duration: 1500 });
+    },
+    // 强制同步所有参与者（包括本地）
+    forceSyncAllParticipants() {
+      if (!this.room || this.isDisconnected) return;
+
+      console.log('🔄 强制同步所有参与者状态');
+
+      // 同步远程参与者
+      const remoteParticipants = this.room.participants;
+      if (remoteParticipants) {
+        if (typeof remoteParticipants.forEach === 'function') {
+          remoteParticipants.forEach((participant, participantId) => {
+            this.forceSyncParticipantTrack(participant, participantId);
+          });
+        } else if (typeof remoteParticipants.values === 'function') {
+          for (const participant of remoteParticipants.values()) {
+            this.forceSyncParticipantTrack(participant, participant.identity);
+          }
+        }
+      }
+    },
+    // 强制同步单个参与者的轨道状态（不考虑之前的状态）
+    forceSyncParticipantTrack(participant, participantId) {
+      if (!this.participants[participantId]) return;
+
+      const p = this.participants[participantId];
+      
+      // 保持原有状态作为默认值
+      let latestHasAudio = p.hasAudio;
+      let latestAudioTrack = p.audioTrack;
+      let latestHasVideo = p.hasVideo;
+      let latestVideoTrack = p.videoTrack;
+      
+      // 标记是否有变化
+      let hasChanged = false;
+
+      participant.trackPublications.forEach((pub) => {
+        if (!pub || !pub.track) return;
+
+        const trackSource = pub.source || 'unknown';
+        const isMuted = pub.isMuted;
+        
+        // 如果 isMuted 未定义，尝试从 track 对象获取
+        let actualMuted = isMuted;
+        if (actualMuted === undefined || actualMuted === null) {
+          if (pub.track && typeof pub.track.isMuted !== 'undefined') {
+            actualMuted = pub.track.isMuted;
+          } else {
+            console.log(`⚠️ ${participantId} 轨道 ${trackSource} 的 isMuted 无法确定，保持原状态`);
+            return;
+          }
+        }
+
+        if (pub.kind === Track.Kind.Audio) {
+          const shouldBeAudioOn = !actualMuted;
+          if (latestHasAudio !== shouldBeAudioOn) {
+            latestHasAudio = shouldBeAudioOn;
+            latestAudioTrack = pub.track;
+            hasChanged = true;
+            console.log(`🔊 ${participantId} 音频状态更新: hasAudio=${latestHasAudio}, isMuted=${actualMuted}`);
+          }
+        } else if (pub.kind === Track.Kind.Video && (trackSource === Track.Source.Camera || trackSource === 'unknown')) {
+          const shouldBeVideoOn = !actualMuted;
+          if (latestHasVideo !== shouldBeVideoOn) {
+            latestHasVideo = shouldBeVideoOn;
+            latestVideoTrack = pub.track;
+            hasChanged = true;
+            console.log(`📹 ${participantId} 视频状态更新: hasVideo=${latestHasVideo}, isMuted=${actualMuted}`);
+          }
+        }
+      });
+
+      // 只有在状态有变化时才更新
+      if (hasChanged) {
+        console.log(`🔄 强制更新 ${participantId}: audio ${p.hasAudio}->${latestHasAudio}, video ${p.hasVideo}->${latestHasVideo}`);
+        this.$set(this.participants, participantId, { 
+          ...p, 
+          hasAudio: latestHasAudio, 
+          audioTrack: latestAudioTrack, 
+          hasVideo: latestHasVideo, 
+          videoTrack: latestVideoTrack 
+        });
+      } else {
+        console.log(`ℹ️ ${participantId} 状态无变化，无需更新`);
+      }
     },
 
 
@@ -1119,6 +1224,10 @@ export default {
             maxHeight: 2160, // 提高最大高度以支持4K屏幕共享
             maxFrameRate: 30,
           },
+          audioActivityDetection: {
+            enabled: true,
+            interval: 100,
+          },
         });
         console.log('🔊 音频活动检测配置: LiveKit 2.18.0版本默认启用');
         console.log('   注意: 此版本API与预期不同，将使用默认配置');
@@ -1163,6 +1272,8 @@ export default {
         console.log('👤 本地参与者信息:', this.participants[this.localParticipantId]);
 
         await this.enableMedia();
+
+        this.syncRemoteParticipantTracks();
 
         loadingToast.close();
         if (this.isHost) {
@@ -1376,8 +1487,7 @@ export default {
       }
       const p = this.participants[participantId];
       if (p) {
-        p.hasAudio = hasAudio;
-        this.$set(this.participants, participantId, p);
+        this.$set(this.participants, participantId, { ...p, hasAudio });
         console.log(`🎤 更新音频状态: ${participantId}, hasAudio=${hasAudio}`);
       }
     },
@@ -1472,6 +1582,9 @@ export default {
           console.warn('⚠️ 未找到音频活动检测配置方法');
         }
 
+        // 同步远程参与者轨道状态
+        this.syncRemoteParticipantTracks();
+
         if (room.participants && typeof room.participants.values === 'function') {
           for (const participant of room.participants.values()) {
             if (!this.participants[participant.identity]) {
@@ -1503,8 +1616,18 @@ export default {
                 this.fetchAndRegisterName(participant.identity, participant.name);
               }
             }
+            
+            // 为所有远程参与者添加轨道状态变化监听（包括已存在的）
+            if (!participant.isLocal) {
+              this.setupParticipantTrackListeners(participant);
+            }
           }
         }
+        
+        // 启动定期同步机制，作为事件监听的补充
+        this.startParticipantSync();
+        // 启动轨道状态同步定时器（更频繁，用于同步参与者自己操作麦克风/摄像头的状态）
+        this.startTrackStatusSync();
       });
 
       room.on(RoomEvent.ParticipantConnected, (participant) => {
@@ -1525,7 +1648,7 @@ export default {
           Object.keys(this.participants).forEach(id => {
             const p = this.participants[id];
             p.isHost = false;
-            this.$set(this.participants, id, p);
+            this.$set(this.participants, id, { ...p, isHost: false });
           });
 
           // 页面加载时不发送主持人变更通知，避免显示不必要的提示
@@ -1550,6 +1673,15 @@ export default {
           this.fetchAndRegisterName(participant.identity, participant.name);
         }
 
+        // 立即同步远程参与者的轨道状态
+        setTimeout(() => {
+          this.syncRemoteParticipantTracks();
+        }, 100);
+
+        // 为远程参与者添加轨道状态变化监听
+        if (!participant.isLocal) {
+          this.setupParticipantTrackListeners(participant);
+        }
 
       });
 
@@ -1752,8 +1884,22 @@ export default {
             });
           });
         } else if (track.kind === Track.Kind.Video) {
-          console.log('🎥 接收到视频轨道，来自:', participantId, 'isLocal:', participant.isLocal);
-          this.updateParticipantVideo(participantId, true, track);
+          // 获取轨道的实际静音状态，如果无法确定，假设轨道是激活的（hasVideo=true）
+          let isTrackMuted = true; // 默认假设是静音的（保守估计）
+          if (participant && participant.getTrackPublication) {
+            const videoPub = participant.getTrackPublication(Track.Source.Camera);
+            if (videoPub && typeof videoPub.isMuted !== 'undefined') {
+              isTrackMuted = videoPub.isMuted;
+            }
+          }
+          // 如果还是无法确定，从 track 本身获取
+          if (isTrackMuted === true && track && typeof track.isMuted !== 'undefined') {
+            isTrackMuted = track.isMuted;
+          }
+          // 如果仍然无法确定（undefined），假设轨道已发布且未静音
+          const hasVideo = isTrackMuted === false ? true : (typeof isTrackMuted === 'undefined' ? true : false);
+          console.log('🎥 接收到视频轨道，来自:', participantId, 'isLocal:', participant.isLocal, 'isMuted:', isTrackMuted, 'hasVideo:', hasVideo);
+          this.updateParticipantVideo(participantId, hasVideo, track);
           // 确保侧边栏视频元素也被更新
           this.$nextTick(() => {
             const sidebarEl = this.sidebarVideoRefs.get(participantId);
@@ -1765,7 +1911,22 @@ export default {
           });
         } else if (track.kind === Track.Kind.Audio) {
           // 处理远程音频：创建隐藏的 audio 元素并播放
-          this.updateParticipantAudio(participantId, true);
+          // 获取轨道的实际静音状态，如果无法确定，假设轨道是激活的（hasAudio=true）
+          let isTrackMuted = true; // 默认假设是静音的（保守估计）
+          if (participant && participant.getTrackPublication) {
+            const audioPub = participant.getTrackPublication(Track.Source.Microphone);
+            if (audioPub && typeof audioPub.isMuted !== 'undefined') {
+              isTrackMuted = audioPub.isMuted;
+            }
+          }
+          // 如果还是无法确定，从 track 本身获取
+          if (isTrackMuted === true && track && typeof track.isMuted !== 'undefined') {
+            isTrackMuted = track.isMuted;
+          }
+          // 如果仍然无法确定（undefined），假设轨道已发布且未静音
+          const hasAudio = isTrackMuted === false ? true : (typeof isTrackMuted === 'undefined' ? true : false);
+          console.log(`🎧 TrackSubscribed - 接收到远程音频轨道: ${participantId}, isLocal=${participant.isLocal}, isMuted=${isTrackMuted}, hasAudio=${hasAudio}`);
+          this.updateParticipantAudio(participantId, hasAudio);
           let audioEl = this.audioElements.get(participantId);
           if (!audioEl) {
             audioEl = document.createElement('audio');
@@ -1780,6 +1941,7 @@ export default {
             if (audioEl.srcObject) audioEl.srcObject = null;
             track.attach(audioEl);
           }
+          console.log(`✅ 远程音频轨道处理完成: ${participantId}, hasAudio=${this.participants[participantId] ? this.participants[participantId].hasAudio : 'undefined'}`);
           // 尝试播放，处理自动播放策略
           audioEl.play().then(() => {
             console.log(`✅ 音频播放成功: ${participantId}`);
@@ -1827,31 +1989,28 @@ export default {
         }
       });
 
-      // 轨道静音/取消静音处理
-      room.on(RoomEvent.TrackMuted, (track, publication, participant) => {
-        if (!participant) return;
+      // 轨道静音/取消静音处理 - 全局监听
+      room.on(RoomEvent.TrackMuted, (publication, participant) => {
+        if (!participant || !publication) return;
         const participantId = participant.identity;
-        console.log(`🔇 TrackMuted: ${participantId}, kind=${track.kind}`);
-        if (track.kind === Track.Kind.Video) {
-          this.updateParticipantVideo(participantId, false, null);
-        } else if (track.kind === Track.Kind.Audio) {
+        console.log(`🔇 RoomEvent.TrackMuted: ${participantId}, kind=${publication.kind}, source=${publication.source}, isMuted=${publication.isMuted}`);
+        if (publication.kind === Track.Kind.Audio) {
           this.updateParticipantAudio(participantId, false);
+        } else if (publication.kind === Track.Kind.Video && (publication.source === Track.Source.Camera || publication.source === 'unknown')) {
+          this.updateParticipantVideo(participantId, false, null);
         }
       });
 
-      room.on(RoomEvent.TrackUnmuted, (track, publication, participant) => {
-        if (!participant) return;
+      room.on(RoomEvent.TrackUnmuted, (publication, participant) => {
+        if (!participant || !publication) return;
         const participantId = participant.identity;
-        console.log(`🔊 TrackUnmuted: ${participantId}, kind=${track.kind}`);
-        if (track.kind === Track.Kind.Video) {
-          const videoTrack = participant.getTrack(Track.Source.Camera);
-          if (videoTrack && videoTrack.track) {
-            this.updateParticipantVideo(participantId, true, videoTrack.track);
-          } else {
-            console.warn(`TrackUnmuted 但无法获取视频轨道: ${participantId}`);
-          }
-        } else if (track.kind === Track.Kind.Audio) {
+        console.log(`🔊 RoomEvent.TrackUnmuted: ${participantId}, kind=${publication.kind}, source=${publication.source}, isMuted=${publication.isMuted}`);
+        if (publication.kind === Track.Kind.Audio) {
           this.updateParticipantAudio(participantId, true);
+        } else if (publication.kind === Track.Kind.Video && (publication.source === Track.Source.Camera || publication.source === 'unknown')) {
+          if (publication.track) {
+            this.updateParticipantVideo(participantId, true, publication.track);
+          }
         }
       });
 
@@ -1864,37 +2023,34 @@ export default {
         }
       });
 
-      // 音频活动检测事件
-      room.on(RoomEvent.AudioActivityChanged, (participant, active) => {
-        const participantId = participant.identity;
-        const participantName = this.getDisplayNameById(participantId);
-        const isLocal = participant.isLocal;
-        const isHost = this.participants[participantId] && this.participants[participantId].isHost ? this.participants[participantId].isHost : false;
+      // 音频活动检测事件（ActiveSpeakersChanged）
+      room.on(RoomEvent.ActiveSpeakersChanged, (speakers) => {
+        console.log(`🎤 ActiveSpeakersChanged 事件触发: 说话的参与者 ${speakers.length} 人`);
 
-        console.log(`🎤 音频活动变化: ${participantId} (${participantName}), active=${active}, isLocal=${isLocal}, isHost=${isHost}`);
-
-        // 检查参与者是否存在于本地状态中
-        if (this.participants[participantId]) {
+        // 首先重置所有参与者的 isSpeaking 为 false
+        Object.keys(this.participants).forEach(participantId => {
           const p = this.participants[participantId];
-          console.log(`   当前状态: hasAudio=${p.hasAudio}, isSpeaking=${p.isSpeaking}`);
+          if (p && p.isSpeaking) {
+            this.$set(this.participants, participantId, { ...p, isSpeaking: false });
+          }
+        });
 
-          // 更新参与者的isSpeaking状态
-          p.isSpeaking = active;
-          this.$set(this.participants, participantId, p);
-          console.log(`   已更新isSpeaking状态为: ${active}`);
+        // 然后设置正在说话的参与者的 isSpeaking 为 true
+        speakers.forEach(speaker => {
+          const participantId = speaker.identity;
+          if (this.participants[participantId]) {
+            const p = this.participants[participantId];
+            console.log(`   说话的参与者: ${participantId} (${this.getDisplayNameById(participantId)})`);
 
-          // 强制刷新视图，确保图标更新
-          this.$nextTick(() => {
-            this.$forceUpdate();
-            console.log(`   已强制刷新视图，参与者 ${participantId} isSpeaking=${active}`);
-          });
-        } else {
-          console.warn(`   参与者 ${participantId} 不在本地参与者列表中`);
-        }
-
-        // 更新音频活动状态Map
-        this.audioActivity.set(participantId, active);
-        console.log(`   音频活动Map状态: ${Array.from(this.audioActivity.entries()).map(([id, status]) => `${id}:${status}`).join(', ')}`);
+            // 如果检测到音频活动，说明参与者确实有音频输入，更新 hasAudio 和 isSpeaking
+            if (!p.hasAudio) {
+              console.log(`   检测到音频活动但 hasAudio=false，自动修正 hasAudio 状态`);
+              this.$set(this.participants, participantId, { ...p, hasAudio: true, isSpeaking: true });
+            } else {
+              this.$set(this.participants, participantId, { ...p, isSpeaking: true });
+            }
+          }
+        });
       });
 
       // 检查Room对象是否有音频活动检测相关的属性或方法
@@ -1962,8 +2118,7 @@ export default {
                   // 更新本地参与者的主持人状态
                   if (this.participants[this.localParticipantId]) {
                     const p = this.participants[this.localParticipantId];
-                    p.isHost = true;
-                    this.$set(this.participants, this.localParticipantId, p);
+                    this.$set(this.participants, this.localParticipantId, { ...p, isHost: true });
                   }
                   this.$toast('您已成为新的主持人');
                   break;
@@ -1986,6 +2141,48 @@ export default {
           console.warn('解析数据消息失败:', error);
         }
       });
+    },
+    // 为远程参与者设置轨道状态变化监听
+    setupParticipantTrackListeners(participant) {
+      if (!participant || participant.isLocal) return;
+
+      const participantId = participant.identity;
+      
+      // 移除已存在的监听器，避免重复注册
+      participant.removeAllListeners(ParticipantEvent.TrackMuted);
+      participant.removeAllListeners(ParticipantEvent.TrackUnmuted);
+
+      participant.on(ParticipantEvent.TrackMuted, (publication) => {
+        if (!publication || !publication.track) return;
+        console.log(`🔇 RemoteParticipant TrackMuted: ${participantId}, kind=${publication.track.kind}, isMuted=${publication.isMuted}`);
+        // 直接设置状态，不依赖缓存值
+        if (publication.track.kind === Track.Kind.Audio) {
+          this.updateParticipantAudio(participantId, false);
+        } else if (publication.track.kind === Track.Kind.Video) {
+          this.updateParticipantVideo(participantId, false, null);
+        }
+        // 延迟后同步，确保状态更新到最新
+        setTimeout(() => {
+          this.forceSyncParticipantTrack(participant, participantId);
+        }, 100);
+      });
+
+      participant.on(ParticipantEvent.TrackUnmuted, (publication) => {
+        if (!publication || !publication.track) return;
+        console.log(`🔊 RemoteParticipant TrackUnmuted: ${participantId}, kind=${publication.track.kind}, isMuted=${publication.isMuted}`);
+        // 直接设置状态，不依赖缓存值
+        if (publication.track.kind === Track.Kind.Audio) {
+          this.updateParticipantAudio(participantId, true);
+        } else if (publication.track.kind === Track.Kind.Video) {
+          this.updateParticipantVideo(participantId, true, publication.track);
+        }
+        // 延迟后同步，确保状态更新到最新
+        setTimeout(() => {
+          this.forceSyncParticipantTrack(participant, participantId);
+        }, 100);
+      });
+
+      console.log(`✅ 已为 ${participantId} 设置轨道状态监听`);
     },
 
     // ==================== 控制方法 ====================
@@ -2581,6 +2778,74 @@ export default {
     showFullRoomName() {
       this.$toast(this.roomName);
     },
+    syncRemoteParticipantTracks() {
+      if (!this.room || this.isDisconnected) return;
+
+      console.log('🔄 同步远程参与者轨道状态');
+
+      const remoteParticipants = this.room.participants;
+      if (!remoteParticipants) return;
+
+      // LiveKit room.participants 是 Map，forEach 回调参数是 (participant, participantId)
+      if (typeof remoteParticipants.forEach === 'function') {
+        remoteParticipants.forEach((participant, participantId) => {
+          this.syncParticipantTrack(participant, participantId);
+        });
+      } else if (typeof remoteParticipants.values === 'function') {
+        for (const participant of remoteParticipants.values()) {
+          this.syncParticipantTrack(participant, participant.identity);
+        }
+      }
+    },
+    syncParticipantTrack(participant, participantId) {
+      if (!this.participants[participantId]) return;
+
+      const p = this.participants[participantId];
+      let updated = false;
+      let newHasAudio = p.hasAudio;
+      let newAudioTrack = p.audioTrack;
+      let newHasVideo = p.hasVideo;
+      let newVideoTrack = p.videoTrack;
+
+      participant.trackPublications.forEach((pub) => {
+        if (!pub || !pub.track) return;
+
+        const trackSource = pub.source || 'unknown';
+        const isMuted = pub.isMuted;
+        
+        // 如果 isMuted 未定义，尝试从 track 对象获取
+        let actualMuted = isMuted;
+        if (actualMuted === undefined || actualMuted === null) {
+          if (pub.track && typeof pub.track.isMuted !== 'undefined') {
+            actualMuted = pub.track.isMuted;
+          } else {
+            return;
+          }
+        }
+
+        if (pub.kind === Track.Kind.Audio) {
+          const shouldBeAudioOn = !actualMuted;
+          if (newHasAudio !== shouldBeAudioOn) {
+            newHasAudio = shouldBeAudioOn;
+            newAudioTrack = pub.track;
+            updated = true;
+            console.log(`🔊 同步远程音频状态: ${participantId}, source=${trackSource}, hasAudio=${newHasAudio}, isMuted=${actualMuted}`);
+          }
+        } else if (pub.kind === Track.Kind.Video && (trackSource === Track.Source.Camera || trackSource === 'unknown')) {
+          const shouldBeVideoOn = !actualMuted;
+          if (newHasVideo !== shouldBeVideoOn) {
+            newHasVideo = shouldBeVideoOn;
+            newVideoTrack = pub.track;
+            updated = true;
+            console.log(`📹 同步远程视频状态: ${participantId}, source=${trackSource}, hasVideo=${newHasVideo}, isMuted=${actualMuted}`);
+          }
+        }
+      });
+
+      if (updated) {
+        this.$set(this.participants, participantId, { ...p, hasAudio: newHasAudio, audioTrack: newAudioTrack, hasVideo: newHasVideo, videoTrack: newVideoTrack });
+      }
+    },
     startParticipantSync() {
       // Clear any existing timer
       if (this.participantSyncTimer) {
@@ -2592,6 +2857,19 @@ export default {
         this.syncParticipants();
       }, 300000);
       console.log('✅ 启动参与者同步定时器，每5分钟同步一次');
+    },
+    // 启动轨道状态同步定时器（更频繁）
+    startTrackStatusSync() {
+      // Clear any existing timer
+      if (this.trackStatusSyncTimer) {
+        clearInterval(this.trackStatusSyncTimer);
+      }
+
+      // Start new timer - sync every 3 seconds (3000 ms)
+      this.trackStatusSyncTimer = setInterval(() => {
+        this.syncRemoteParticipantTracks();
+      }, 3000);
+      console.log('✅ 启动轨道状态同步定时器，每3秒同步一次');
     },
     syncParticipants() {
       if (!this.room || this.isDisconnected) return;
@@ -2659,12 +2937,19 @@ export default {
           }
         }
       });
+
+      this.syncRemoteParticipantTracks();
     },
     stopParticipantSync() {
       if (this.participantSyncTimer) {
         clearInterval(this.participantSyncTimer);
         this.participantSyncTimer = null;
         console.log('🛑 停止参与者同步定时器');
+      }
+      if (this.trackStatusSyncTimer) {
+        clearInterval(this.trackStatusSyncTimer);
+        this.trackStatusSyncTimer = null;
+        console.log('🛑 停止轨道状态同步定时器');
       }
     },
 
@@ -2690,12 +2975,17 @@ export default {
      * 开始本地音频活动检测
      */
     startAudioActivityDetection() {
-      if (!this.microphoneEnabled) return;
+      if (!this.microphoneEnabled) {
+        console.log('🔊 麦克风未开启，跳过本地音频活动检测');
+        return;
+      }
 
       // 获取本地音频轨道
       const audioTrack = this.room.localParticipant.getTrackPublication(Track.Source.Microphone);
       if (!audioTrack || !audioTrack.track) {
         console.warn('⚠️ 无法获取本地音频轨道');
+        console.log(`   room.localParticipant: ${this.room.localParticipant ? '存在' : '不存在'}`);
+        console.log(`   getTrackPublication(Microphone): ${audioTrack ? '存在' : '不存在'}`);
         return;
       }
 
@@ -2708,6 +2998,8 @@ export default {
 
         // 获取媒体流
         this.audioStream = audioTrack.track.mediaStream;
+        console.log('🔊 本地音频流:', this.audioStream);
+        
         const audioSource = this.audioContext.createMediaStreamSource(this.audioStream);
         audioSource.connect(this.analyser);
 
@@ -2760,16 +3052,12 @@ export default {
         // 检测是否有音频活动
         const isSpeaking = average > 20; // 阈值可调整
 
-        // 更新本地参与者的isSpeaking状态
+        // 更新本地参与者的isSpeaking状态（已移除本地检测，使用LiveKit内置检测）
         if (this.participants[this.localParticipantId]) {
           const p = this.participants[this.localParticipantId];
           if (p.isSpeaking !== isSpeaking) {
-            p.isSpeaking = isSpeaking;
-            this.$set(this.participants, this.localParticipantId, p);
+            this.$set(this.participants, this.localParticipantId, { ...p, isSpeaking });
             console.log(`🎤 本地音频活动检测: ${isSpeaking ? '正在发言' : '静音'}`);
-
-            // 只在状态变化时更新视图，避免频繁刷新导致卡顿
-            // 移除强制刷新，依赖Vue的响应式更新
           }
         }
       } catch (error) {
